@@ -1,10 +1,14 @@
-﻿using OpenTK.Graphics.OpenGL4;
+﻿using System;
+using System.Windows.Forms;                 // WinForms key/mouse events
+using System.Diagnostics;
+using System.Drawing;
+using OpenTK.Graphics.OpenGL4;
 using OpenTK.Mathematics;
 using OpenTK.GLControl;
 using UnBox3D.Utils;
 using UnBox3D.Controls.States;
 using UnBox3D.Controls;
-using System.Diagnostics;
+using UnBox3D.Rendering;                    // OrbitCamera, ICamera
 
 namespace UnBox3D.Rendering.OpenGL
 {
@@ -16,7 +20,6 @@ namespace UnBox3D.Rendering.OpenGL
         int GetHeight();
         void Render();
         void Cleanup();
-
     }
 
     // Enumeration for rendering modes
@@ -29,8 +32,7 @@ namespace UnBox3D.Rendering.OpenGL
 
     public class GLControlHost : GLControl, IGLControlHost
     {
-        // Here we now have added the normals of the vertices
-        // Remember to define the layouts to the VAO's
+      
         private readonly float[] _vertices =
         {
              // Position          Normal
@@ -80,23 +82,16 @@ namespace UnBox3D.Rendering.OpenGL
         private readonly Vector3 _lightPos = new Vector3(1.2f, 1.0f, 2.0f);
 
         private int _vertexBufferObject;
-
         private int _vaoModel;
-
         private int _vaoLamp;
-
         private Shader _lampShader;
-
         private Shader _lightingShader;
-
-
-
 
         // Private Fields
         private readonly ISettingsManager _settingsManager;
         private readonly ISceneManager _sceneManager;
         private readonly IRenderer _sceneRenderer;
-        private  GridPlaneRenderer _gridRenderer;
+        private GridPlaneRenderer _gridRenderer;
         private readonly string _vertShader = "Rendering/OpenGL/Shaders/shader.vert";
         private readonly string _fragShader = "Rendering/OpenGL/Shaders/lighting.frag";
 
@@ -105,12 +100,13 @@ namespace UnBox3D.Rendering.OpenGL
         private RayCaster _rayCaster;
         private KeyboardController _keyboardController;
 
-
-
         private RenderMode currentRenderMode;
         private ShadingModel currentShadingModel;
         private Vector4 backgroundColor;
         private float angle = 0f;
+
+        private readonly Stopwatch _timer = new Stopwatch();
+        private double _lastTime;
 
         // Constructor
         public GLControlHost(ISceneManager sceneManager, IRenderer sceneRenderer, ISettingsManager settingsManager)
@@ -120,42 +116,32 @@ namespace UnBox3D.Rendering.OpenGL
             _sceneManager = sceneManager;
             _sceneRenderer = sceneRenderer;
             _settingsManager = settingsManager;
-            
 
             // Attach event handlers
             Load += GlControl_Load;
             Paint += GlControl_Paint;
             Resize += GlControl_Resize;
 
-            // Attach mouse event handlers
+            // Mouse
             MouseDown += OnMouseDown;
             MouseMove += OnMouseMove;
             MouseUp += OnMouseUp;
             MouseWheel += OnMouseWheel;
+
+            // Keep keyboard focus inside GL area when mouse enters
+            MouseEnter += (s, e) => Focus();
+
+            // Ensure control can receive focus
+            TabStop = true;
         }
 
         // Public Methods
-        public void Render() 
-        {
-            Invalidate();
-        }
-        public void SetRenderMode(RenderMode mode)
-        {
-            currentRenderMode = mode;
-        }
-
-        public void SetShadingMode(ShadingModel shadingModel)
-        {
-            currentShadingModel = shadingModel;
-        }
-
+        public void Render() => Invalidate();
+        public void SetRenderMode(RenderMode mode) => currentRenderMode = mode;
+        public void SetShadingMode(ShadingModel shadingModel) => currentShadingModel = shadingModel;
         public int GetWidth() => Width;
         public int GetHeight() => Height;
-
-        public void Invalidate()
-        {
-            base.Invalidate();
-        }
+        public void Invalidate() => base.Invalidate();
 
         public void Cleanup()
         {
@@ -175,15 +161,9 @@ namespace UnBox3D.Rendering.OpenGL
             // Apply settings
             switch (renderMode)
             {
-                case "wireframe":
-                    SetRenderMode(RenderMode.Wireframe);
-                    break;
-                case "solid":
-                    SetRenderMode(RenderMode.Solid);
-                    break;
-                case "point":
-                    SetRenderMode(RenderMode.Point);
-                    break;
+                case "wireframe": SetRenderMode(RenderMode.Wireframe); break;
+                case "solid": SetRenderMode(RenderMode.Solid); break;
+                case "point": SetRenderMode(RenderMode.Point); break;
                 default:
                     Console.WriteLine("Error occurred when loading settings for render mode.");
                     SetRenderMode(RenderMode.Wireframe);
@@ -199,15 +179,27 @@ namespace UnBox3D.Rendering.OpenGL
             BackgroundColors.backgroundColorMap.TryGetValue(color, out backgroundColor);
         }
 
+        // Camera Inputs: 
+        private static bool IsArrowKey(Keys k) =>
+            k == Keys.Left || k == Keys.Right || k == Keys.Up || k == Keys.Down;
+
+        // Strongest signal to WinForms that arrows belong to this control.
+        protected override bool IsInputKey(Keys keyData)
+        {
+            if (IsArrowKey(keyData) || keyData == Keys.Space)
+                return true;
+            return base.IsInputKey(keyData);
+        }
+
         // Event Handlers
         private void GlControl_Load(object sender, EventArgs e)
         {
             LoadSettingsFromJson();
-            GL.ClearColor(backgroundColor.X,backgroundColor.Y, backgroundColor.Z,  1.0f);
+            GL.ClearColor(backgroundColor.X, backgroundColor.Y, backgroundColor.Z, 1.0f);
 
             GL.Enable(EnableCap.DepthTest);
 
-            _vertexBufferObject = GL.GenBuffer(); // Generates a unique ID for a new OpenGL buffer object
+            _vertexBufferObject = GL.GenBuffer();
             GL.BindBuffer(BufferTarget.ArrayBuffer, _vertexBufferObject);
             GL.BufferData(BufferTarget.ArrayBuffer, _vertices.Length * sizeof(float), _vertices, BufferUsageHint.StaticDraw);
 
@@ -220,10 +212,8 @@ namespace UnBox3D.Rendering.OpenGL
 
                 var positionLocation = _lightingShader.GetAttribLocation("aPos");
                 GL.EnableVertexAttribArray(positionLocation);
-                // Remember to change the stride as we now have 6 floats per vertex
                 GL.VertexAttribPointer(positionLocation, 3, VertexAttribPointerType.Float, false, 6 * sizeof(float), 0);
 
-                // We now need to define the layout of the normal so the shader can use it
                 var normalLocation = _lightingShader.GetAttribLocation("aNormal");
                 GL.EnableVertexAttribArray(normalLocation);
                 GL.VertexAttribPointer(normalLocation, 3, VertexAttribPointerType.Float, false, 6 * sizeof(float), 3 * sizeof(float));
@@ -235,17 +225,15 @@ namespace UnBox3D.Rendering.OpenGL
 
                 var positionLocation = _lampShader.GetAttribLocation("aPos");
                 GL.EnableVertexAttribArray(positionLocation);
-                // Also change the stride here as we now have 6 floats per vertex. Now we don't define the normal for the lamp VAO
-                // this is because it isn't used, it might seem like a waste to use the same VBO if they dont have the same data
-                // The two cubes still use the same position, and since the position is already in the graphics memory it is actually
-                // better to do it this way. Look through the web version for a much better understanding of this.
                 GL.VertexAttribPointer(positionLocation, 3, VertexAttribPointerType.Float, false, 6 * sizeof(float), 0);
             }
+
             GL.Enable(EnableCap.DepthTest);
             GL.DepthFunc(DepthFunction.Less);
             GL.Disable(EnableCap.CullFace);
 
-            _camera = new Camera(new Vector3(0, 0, 5), GetWidth() / (float)GetHeight());
+            // Use OrbitCamera (origin as target, radius = 5)
+            _camera = new OrbitCamera(new Vector3(0, 0, 0), 5f, GetWidth() / (float)GetHeight());
 
             // Initialize RayCaster
             _rayCaster = new RayCaster(this, _camera);
@@ -254,30 +242,74 @@ namespace UnBox3D.Rendering.OpenGL
             _mouseController = new MouseController(
                 _settingsManager,
                 _camera,
-                new DefaultState(_sceneManager, this, _camera, _rayCaster), 
+                new DefaultState(_sceneManager, this, _camera, _rayCaster),
                 _rayCaster,
                 this
             );
 
             _keyboardController = new KeyboardController(_camera);
             _gridRenderer = new GridPlaneRenderer(_vertShader, _fragShader);
+
+            // Enable keyboard focus and makes arrows the input keys
+            Focus();
+
+            PreviewKeyDown += (s2, e2) =>
+            {
+                if (IsArrowKey(e2.KeyCode) || e2.KeyCode == Keys.Space)
+                {
+                    e2.IsInputKey = true; // prevents parent navigation from side panel
+                }
+            };
+
+            // Makes it so the UI doesn't react to the arrow keys
+            KeyDown += (s3, e3) =>
+            {
+                _keyboardController.HandleWinFormsKeyDown(e3.KeyCode);
+
+                if (IsArrowKey(e3.KeyCode) || e3.KeyCode == Keys.Space)
+                {
+                    e3.Handled = true;
+                    e3.SuppressKeyPress = true;
+                }
+
+                Invalidate();
+            };
+
+            KeyUp += (s4, e4) =>
+            {
+                _keyboardController.HandleWinFormsKeyUp(e4.KeyCode);
+
+                if (IsArrowKey(e4.KeyCode) || e4.KeyCode == Keys.Space)
+                {
+                    e4.Handled = true;
+                    e4.SuppressKeyPress = true;
+                }
+            };
+
+            _timer.Start();
+            _lastTime = 0.0;
         }
 
         private void GlControl_Paint(object sender, PaintEventArgs e)
         {
+            double t = _timer.Elapsed.TotalSeconds;
+            float dt = (float)(t - _lastTime);
+            _lastTime = t;
+
+            // Provides a smooth camera update if using OrbitCamera
+            if (_camera is OrbitCamera orbit)
+                orbit.Update(dt);
+
             GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
 
             _sceneRenderer.RenderScene(_camera, _lightingShader);
-
             _gridRenderer.DrawGrid(_camera.GetViewMatrix(), _camera.GetProjectionMatrix());
 
-
             GL.BindVertexArray(_vaoLamp);
-
             _lampShader.Use();
 
             Matrix4 lampMatrix = Matrix4.CreateScale(0.2f);
-            lampMatrix = lampMatrix * Matrix4.CreateTranslation(_lightPos);
+            lampMatrix *= Matrix4.CreateTranslation(_lightPos);
 
             _lampShader.SetMatrix4("model", lampMatrix);
             _lampShader.SetMatrix4("view", _camera.GetViewMatrix());
@@ -287,7 +319,6 @@ namespace UnBox3D.Rendering.OpenGL
 
             SwapBuffers();
         }
-
 
         private void GlControl_Resize(object sender, EventArgs e)
         {
@@ -299,21 +330,11 @@ namespace UnBox3D.Rendering.OpenGL
         private void OnMouseDown(object sender, MouseEventArgs e)
         {
             _mouseController?.OnMouseDown(sender, e);
+            Focus(); // ensure subsequent key events go here
         }
 
-        private void OnMouseMove(object sender, MouseEventArgs e)
-        {
-            _mouseController?.OnMouseMove(sender, e);
-        }
-
-        private void OnMouseUp(object sender, MouseEventArgs e)
-        {
-            _mouseController?.OnMouseUp(sender, e);
-        }
-
-        private void OnMouseWheel(object sender, MouseEventArgs e)
-        {
-            _mouseController?.OnMouseWheel(sender, e);
-        }
+        private void OnMouseMove(object sender, MouseEventArgs e) => _mouseController?.OnMouseMove(sender, e);
+        private void OnMouseUp(object sender, MouseEventArgs e) => _mouseController?.OnMouseUp(sender, e);
+        private void OnMouseWheel(object sender, MouseEventArgs e) => _mouseController?.OnMouseWheel(sender, e);
     }
 }
