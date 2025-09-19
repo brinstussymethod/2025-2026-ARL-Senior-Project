@@ -32,8 +32,7 @@ namespace UnBox3D.Rendering.OpenGL
 
     public class GLControlHost : GLControl, IGLControlHost
     {
-        // Here we now have added the normals of the vertices
-        // Remember to define the layouts to the VAO's
+      
         private readonly float[] _vertices =
         {
              // Position          Normal
@@ -180,7 +179,7 @@ namespace UnBox3D.Rendering.OpenGL
             BackgroundColors.backgroundColorMap.TryGetValue(color, out backgroundColor);
         }
 
-        // ---- INPUT UTILITIES ----
+        // Camera Inputs: 
         private static bool IsArrowKey(Keys k) =>
             k == Keys.Left || k == Keys.Right || k == Keys.Up || k == Keys.Down;
 
@@ -251,18 +250,18 @@ namespace UnBox3D.Rendering.OpenGL
             _keyboardController = new KeyboardController(_camera);
             _gridRenderer = new GridPlaneRenderer(_vertShader, _fragShader);
 
-            // ---- Enable keyboard focus + make arrows "input keys" ----
+            // Enable keyboard focus and makes arrows the input keys
             Focus();
 
             PreviewKeyDown += (s2, e2) =>
             {
                 if (IsArrowKey(e2.KeyCode) || e2.KeyCode == Keys.Space)
                 {
-                    e2.IsInputKey = true; // prevents parent navigation (side panel)
+                    e2.IsInputKey = true; // prevents parent navigation from side panel
                 }
             };
 
-            // Forward KeyDown/KeyUp to KeyboardController and suppress arrows so side UI doesn't react
+            // Makes it so the UI doesn't react to the arrow keys
             KeyDown += (s3, e3) =>
             {
                 _keyboardController.HandleWinFormsKeyDown(e3.KeyCode);
@@ -287,7 +286,6 @@ namespace UnBox3D.Rendering.OpenGL
                 }
             };
 
-            // Start timer for smooth camera updates
             _timer.Start();
             _lastTime = 0.0;
         }
@@ -298,7 +296,7 @@ namespace UnBox3D.Rendering.OpenGL
             float dt = (float)(t - _lastTime);
             _lastTime = t;
 
-            // Smooth camera update
+            // Provides a smooth camera update if using OrbitCamera
             if (_camera is OrbitCamera orbit)
                 orbit.Update(dt);
 

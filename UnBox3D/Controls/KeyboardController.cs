@@ -3,8 +3,6 @@ using System.Windows.Input;
 using UnBox3D.Rendering;
 
 // NOTE: we reference System.Windows.Forms.Keys in the WinForms bridge method.
-// We don't need "using System.Windows.Forms;" at the top to avoid conflicts,
-// we just fully-qualify it in the method signatures.
 namespace UnBox3D.Controls
 {
     public class KeyboardController
@@ -15,14 +13,12 @@ namespace UnBox3D.Controls
         {
             _camera = camera ?? throw new ArgumentNullException(nameof(camera));
 
-            // WPF side (works when MainWindow has focus)
             var win = System.Windows.Application.Current.MainWindow;
             win.PreviewKeyDown += OnKeyDown;   // catch arrows too
             win.KeyDown += OnKeyDown;
-            // If you later want WPF KeyUp semantics, you can also hook: win.KeyUp += OnKeyUp;
         }
 
-        // ===== WinForms bridge (GLControlHost forwards here) =====
+        // WinForms bridge (GLControlHost for controls. All options listed here.)
         public void HandleWinFormsKeyDown(System.Windows.Forms.Keys key)
         {
             Key mapped = key switch
@@ -54,20 +50,15 @@ namespace UnBox3D.Controls
             if (mapped != Key.None)
                 HandleKey(mapped);
         }
-
-        // Optional: WinForms KeyUp bridge (currently no stateful logic needed).
         // We include it so GLControlHost can call it without compile errors.
         public void HandleWinFormsKeyUp(System.Windows.Forms.Keys key)
         {
-            // If you ever add stateful handling (e.g., continuous movement on key hold),
-            // you can mirror the mapping above and clear flags here.
-            // For now, it's intentionally a no-op.
         }
 
-        // ===== WPF event handler -> shared logic =====
+        // WPF event handler -> shared logic
         private void OnKeyDown(object sender, System.Windows.Input.KeyEventArgs e) => HandleKey(e.Key);
 
-        // ===== Shared camera logic (Blender-like) =====
+        // Shared camera logic. Made to be like Blender
         private void HandleKey(Key key)
         {
             const float yawStep = 3.0f;   // arrow rotation (deg)
