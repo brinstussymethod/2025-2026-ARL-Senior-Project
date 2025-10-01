@@ -19,6 +19,7 @@ namespace UnBox3D.Controls
         private void OnKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
         {
             const float cameraSpeed = 1.5f;
+            const float rollStep = 2.5f; 
 
             switch (e.Key)
             {
@@ -40,6 +41,10 @@ namespace UnBox3D.Controls
                 case Key.LeftShift:
                     _camera.Position -= _camera.Up * cameraSpeed; // Move Down
                     break;
+
+                case Key.Q: _camera.AddRoll(-rollStep); break;
+                case Key.E: _camera.AddRoll(+rollStep); break;
+
                 case Key.Escape:
                     System.Windows.Application.Current.Shutdown(); // Close the application
                     break;
