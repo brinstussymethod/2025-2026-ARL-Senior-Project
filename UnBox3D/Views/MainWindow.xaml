@@ -154,6 +154,7 @@
             <TreeView Grid.Column="0"
           Padding="10"
           ItemsSource="{Binding Meshes}"
+          SelectedItemChanged="TreeView_SelectedItemChanged"
           VirtualizingStackPanel.IsVirtualizing="True"
           VirtualizingStackPanel.VirtualizationMode="Recycling"
           ScrollViewer.CanContentScroll="True">
