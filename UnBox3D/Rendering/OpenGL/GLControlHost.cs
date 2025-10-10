@@ -101,37 +101,29 @@ namespace UnBox3D.Rendering.OpenGL
         private readonly string _fragShader = "Rendering/OpenGL/Shaders/lighting.frag";
 
         private ICamera _camera;
-        private MouseController _mouseController;
-        private RayCaster _rayCaster;
-        private KeyboardController _keyboardController;
-
-
 
         private RenderMode currentRenderMode;
         private ShadingModel currentShadingModel;
         private Vector4 backgroundColor;
         private float angle = 0f;
 
-        // Constructor
-        public GLControlHost(ISceneManager sceneManager, IRenderer sceneRenderer, ISettingsManager settingsManager)
+        // The GLControlHost now receives the single DI-managed Camera instance.
+        // It no longer constructs its own Camera/RayCaster/Mouse/Keyboard controllers.
+        public GLControlHost(ISceneManager sceneManager, IRenderer sceneRenderer, ISettingsManager settingsManager, ICamera camera)
         {
             Dock = DockStyle.Fill;
 
-            _sceneManager = sceneManager;
-            _sceneRenderer = sceneRenderer;
-            _settingsManager = settingsManager;
-            
+            _sceneManager       = sceneManager;
+            _sceneRenderer      = sceneRenderer;
+            _settingsManager    = settingsManager;
+            _camera             = camera;
 
             // Attach event handlers
-            Load += GlControl_Load;
-            Paint += GlControl_Paint;
-            Resize += GlControl_Resize;
-
-            // Attach mouse event handlers
-            MouseDown += OnMouseDown;
-            MouseMove += OnMouseMove;
-            MouseUp += OnMouseUp;
-            MouseWheel += OnMouseWheel;
+            // Only rendering lifecycle events are handled here.
+            // Mouse/keyboard input is subscribed by the controllers (via DI), not by this host.
+            Load    += GlControl_Load;
+            Paint   += GlControl_Paint;
+            Resize  += GlControl_Resize;
         }
 
         // Public Methods
@@ -245,21 +237,6 @@ namespace UnBox3D.Rendering.OpenGL
             GL.DepthFunc(DepthFunction.Less);
             GL.Disable(EnableCap.CullFace);
 
-            _camera = new Camera(new Vector3(0, 0, 5), GetWidth() / (float)GetHeight());
-
-            // Initialize RayCaster
-            _rayCaster = new RayCaster(this, _camera);
-
-            // Initialize MouseController with RayCaster and Default State
-            _mouseController = new MouseController(
-                _settingsManager,
-                _camera,
-                new DefaultState(_sceneManager, this, _camera, _rayCaster), 
-                _rayCaster,
-                this
-            );
-
-            _keyboardController = new KeyboardController(_camera);
             _gridRenderer = new GridPlaneRenderer(_vertShader, _fragShader);
         }
 
@@ -296,24 +273,5 @@ namespace UnBox3D.Rendering.OpenGL
                 _camera.AspectRatio = (float)Width / Height;
         }
 
-        private void OnMouseDown(object sender, MouseEventArgs e)
-        {
-            _mouseController?.OnMouseDown(sender, e);
-        }
-
-        private void OnMouseMove(object sender, MouseEventArgs e)
-        {
-            _mouseController?.OnMouseMove(sender, e);
-        }
-
-        private void OnMouseUp(object sender, MouseEventArgs e)
-        {
-            _mouseController?.OnMouseUp(sender, e);
-        }
-
-        private void OnMouseWheel(object sender, MouseEventArgs e)
-        {
-            _mouseController?.OnMouseWheel(sender, e);
-        }
     }
 }

@@ -39,6 +39,11 @@ namespace UnBox3D
 
             mainWindow.Show();
 
+            // Force construction of KeyboardController now that MainWindow exists,
+            // so it can safely hook KeyDown/KeyUp on Application.Current.MainWindow.
+            // If we constructed it earlier/later, MainWindow could be null and the hooks would fail.
+            _serviceProvider.GetRequiredService<KeyboardController>();
+
             // Initialize SettingsWindow with its needed services but hide it for now...
             var settingsWindow = _serviceProvider.GetRequiredService<SettingsWindow>();
 
@@ -82,6 +87,8 @@ namespace UnBox3D
             #region Rendering Services Registration
             services.AddSingleton<ISceneManager, SceneManager>();
             services.AddSingleton<IRayCaster, RayCaster>();
+            // Single camera instance for the entire app (unified view/projection).
+            // You can tune the starting position/aspect elsewhere (e.g., after GL loads).
             services.AddSingleton<ICamera, Camera>(provider =>
             {
                 Vector3 defaultPos = new Vector3(0, 0, 0);
@@ -95,12 +102,15 @@ namespace UnBox3D
                 var sceneManager = provider.GetRequiredService<ISceneManager>();
                 return new SceneRenderer(logger, settings, sceneManager);
             });
+            // GLControlHost is the WinForms GL surface bridge. It now receives the unified DI Camera.
+            // IMPORTANT: host no longer owns/creates its own Camera/Mouse/Ray; that was the source of duplicates.
             services.AddSingleton<GLControlHost>(provider =>
             {
                 var sceneManager = provider.GetRequiredService<ISceneManager>();
                 var sceneRenderer = provider.GetRequiredService<IRenderer>();
                 var settingsManager = provider.GetRequiredService<ISettingsManager>();
-                return new GLControlHost(sceneManager, sceneRenderer, settingsManager);
+                var camera = provider.GetRequiredService<ICamera>();
+                return new GLControlHost(sceneManager, sceneRenderer, settingsManager, camera);
             });
             services.AddSingleton<IGLControlHost>(provider => provider.GetRequiredService<GLControlHost>());
             #endregion
@@ -125,6 +135,14 @@ namespace UnBox3D
                 var glControlHost = provider.GetRequiredService<GLControlHost>();
 
                 return new MouseController(settingsManger, camera, neutralState, rayCaster, glControlHost);
+            });
+
+            // KeyboardController only needs the unified camera.
+            // It hooks MainWindow at startup (see above OnStartup()).
+            services.AddSingleton<KeyboardController>(provider =>
+            {
+                var camera = provider.GetRequiredService<ICamera>();
+                return new KeyboardController(camera);
             });
 
 
