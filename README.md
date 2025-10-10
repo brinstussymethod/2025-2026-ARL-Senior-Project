@@ -60,13 +60,23 @@ The goal is to provide a consistent, reproducible path from 3D input → simplif
 
 ```
 UnBox3D.sln
-├─ src/
-│  ├─ UnBox3D/                 # App entry (CLI and/or UI host)
-│  ├─ UnBox3D.Core/            # Algorithms: simplify, unwrap, pack, exporters
-│  ├─ UnBox3D.IO/              # Readers/Writers for OBJ/STL/PLY, DXF/SVG/PDF
-│  ├─ UnBox3D.UI/              # (Optional) Desktop UI (WPF/WinUI/Avalonia)
-│  └─ UnBox3D.Tests/           # Unit & integration tests
-└─ assets/                     # Sample meshes, fonts, templates
+├─ Assets/
+│  └─ Icons/                       # Application and UI icons
+├─ Commands/                       # Command logic (e.g., replace, export, simplify)
+├─ Controls/                       # Mouse, camera, and UI interaction handlers
+├─ Models/                         # Core 3D data structures (mesh, cylinder, simplification)
+├─ Properties/
+│  └─ PublishProfiles/             # Publishing and deployment configuration
+├─ Rendering/                      # OpenGL rendering, shaders, and scene drawing
+├─ Scripts/                        # Optional setup, build, or automation scripts
+├─ Utils/                          # Helper utilities, logging, settings, and memory management
+├─ ViewModels/                     # Data bindings between models and UI views
+├─ Views/                          # WPF/XAML views and user interface layouts
+├─ App.xaml                        # Application entry point
+├─ App.xaml.cs                     # Application startup logic
+├─ AssemblyInfo.cs                 # Assembly metadata
+├─ UnBox3D.csproj                  # Project file
+└─ UnBox3D.sln                     # Solution file
 ```
 
 * **Core** encapsulates mesh ops and unfolding algorithms.
