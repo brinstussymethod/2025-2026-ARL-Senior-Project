@@ -632,6 +632,39 @@ namespace UnBox3D.ViewModels
             await ShowWpfMessageBoxAsync("Replaced!", "Replace", MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
+        [RelayCommand]
+         private async void ReplaceWithCubeOption(IAppMesh mesh)
+         {
+             Vector3 center = _sceneManager.GetMeshCenter(mesh.GetG4Mesh());
+             Vector3 meshDimensions = _sceneManager.GetMeshDimensions(mesh.GetG4Mesh());
+        
+             AppMesh cube = GeometryGenerator.CreateBox(
+                         center,
+                         meshDimensions.X,
+                         meshDimensions.Y,
+                         meshDimensions.Z
+                     );
+        
+             var summaryToRemove = Meshes.FirstOrDefault(ms => ms.SourceMesh == mesh);
+             if (summaryToRemove != null)
+             {
+                 Meshes.Remove(summaryToRemove);
+             }
+        
+             _sceneManager.ReplaceMesh(mesh, cube);
+        
+             Meshes.Add(new MeshSummary(cube));
+         }
+
+         [RelayCommand]
+         private async void ReplaceWithCubeClick()
+         {
+             var command = new SetReplaceStateCommand(_glControlHost, _mouseController, _sceneManager, new RayCaster(_glControlHost, _camera), _camera, _commandHistory, "cube");
+             
+             command.Execute();
+             await ShowWpfMessageBoxAsync("Replaced!", "Replace", MessageBoxButton.OK, MessageBoxImage.Information);
+         }
+
 
         [RelayCommand]
         private async Task SimplifyQEC(IAppMesh mesh)
