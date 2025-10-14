@@ -15,7 +15,7 @@ namespace UnBox3D.Rendering
         Assimp.Mesh GetAssimpMesh();
         string Name { get; set; }
         int VertexCount { get; }
-        Vector3 GetColor();
+        Vector3 GetColor(); // 3rd piece of the clue 
         bool GetHighlighted();
         float[] Vertices { get; }
         List<Vector3> GetEdges();

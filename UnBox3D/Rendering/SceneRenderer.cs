@@ -28,7 +28,7 @@ namespace UnBox3D.Rendering
 
         public void RenderScene(ICamera camera, Shader shader)
         {
-            var meshes = _sceneManager.GetMeshes();
+            var meshes = _sceneManager.GetMeshes(); // 122 
 
             if (meshes == null || meshes.Count == 0)
             {
