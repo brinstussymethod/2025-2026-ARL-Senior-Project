@@ -15,7 +15,11 @@ namespace UnBox3D.Controls
             System.Windows.Application.Current.MainWindow.KeyDown += OnKeyDown;
             System.Windows.Application.Current.MainWindow.KeyUp += OnKeyUp;
         }
-
+        /* 
+         * OnKeyDoown(Object sender, System.Windows.Input.KeyEventArgs e) 
+         * Date 10/1/2025 Modified by Brian Andrade
+         * Summary of Modefication: Added Q and E keys to roll the camera appropriatly 
+         */
         private void OnKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
         {
             const float cameraSpeed = 1.5f;
@@ -42,8 +46,8 @@ namespace UnBox3D.Controls
                     _camera.Position -= _camera.Up * cameraSpeed; // Move Down
                     break;
 
-                case Key.Q: _camera.AddRoll(-rollStep); break;
-                case Key.E: _camera.AddRoll(+rollStep); break;
+                case Key.Q: _camera.AddRoll(-rollStep); break; // Roll left
+                case Key.E: _camera.AddRoll(+rollStep); break; // Roll right 
 
                 case Key.Escape:
                     System.Windows.Application.Current.Shutdown(); // Close the application
