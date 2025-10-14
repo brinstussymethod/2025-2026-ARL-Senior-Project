@@ -167,7 +167,9 @@
                                               CommandParameter="{Binding SourceMesh}" />
 
                                     <MenuItem Header="Replace with...">
-                                        <MenuItem Header="Cube" />
+                                         <MenuItem Header="Cube" Command="{Binding PlacementTarget.Tag.ReplaceWithCubeOptionCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
+                                                   CommandParameter="{Binding SourceMesh}"
+                                                   ToolTip="Replaces this mesh with a cube of the same size and orientation."/> 
                                         <MenuItem Header="Cylinder" Command="{Binding PlacementTarget.Tag.ReplaceWithCylinderOptionCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
                                                   CommandParameter="{Binding SourceMesh}"
                                                   ToolTip="Replaces this mesh with a cylinder of the same size and orientation."/>

@@ -1,4 +1,3 @@
-﻿using System.Diagnostics;
 using Assimp;
 using g3;
 using OpenTK.Mathematics;
@@ -14,19 +13,23 @@ namespace UnBox3D.Commands
         private readonly IRayCaster _rayCaster;
         private readonly IGLControlHost _glControlHost;
         private readonly ICamera _camera;
+        private readonly string _shape;
 
 
         private readonly Stack<MeshReplaceMemento> replacedMeshes;
 
-        public ReplaceCommand(IGLControlHost glControlHost, ISceneManager sceneManager, IRayCaster rayCaster, ICamera camera)
+
+        public ReplaceCommand(IGLControlHost glControlHost, ISceneManager sceneManager, IRayCaster rayCaster, ICamera camera, string shape)
         {
             _glControlHost = glControlHost;
             _rayCaster = rayCaster;
             _camera = camera;
             _sceneManager = sceneManager;
+            _shape = shape;
 
             replacedMeshes = new Stack<MeshReplaceMemento>();
         }
+
 
         public static void AppendMeshFromTriangles(DMesh3 sourceMesh, DMesh3 targetMesh, IEnumerable<int> triangleIndices)
         {
@@ -67,7 +70,45 @@ namespace UnBox3D.Commands
             // Check for intersection with the model
             if (_rayCaster.RayIntersectsMesh(_sceneManager.GetMeshes(), rayOrigin, rayWorld, out float distance, out IAppMesh clickedMesh))
             {
-                
+                // Get the index of the clicked mesh
+                int meshIndex = _sceneManager.GetMeshes().IndexOf(clickedMesh);
+                if (meshIndex == -1) return; // Safety check
+
+                // Gets the center of the mesh, its dimensions, and sets the color for the replacement mesh
+                Vector3 meshCenter = _sceneManager.GetMeshCenter(clickedMesh.GetG4Mesh());
+                Vector3 meshDimensions = _sceneManager.GetMeshDimensions(clickedMesh.GetG4Mesh());
+                Vector3 color = new Vector3(1.0f, 0.0f, 0.0f); // red color
+
+                AppMesh replacementMesh;
+
+                // When you want to replace with a cube (or rectangular prism)
+                if (_shape == "cube")
+                {
+                    // Use existing dimensions of the clicked mesh as box extents
+                    replacementMesh = GeometryGenerator.CreateBox(
+                        meshCenter,
+                        meshDimensions.X,
+                        meshDimensions.Y,
+                        meshDimensions.Z
+                    );
+                }
+                else // or replace with cylinder
+                {
+                    bool isXAligned = (meshDimensions.X < meshDimensions.Z);
+                    float radius = Math.Max(Math.Min(meshDimensions.X, meshDimensions.Z), meshDimensions.Y) / 2;
+                    float height = isXAligned ? meshDimensions.X : meshDimensions.Z;
+                    replacementMesh = GeometryGenerator.CreateRotatedCylinder(
+                        meshCenter, radius, height, 32, Vector3.UnitY
+                    );
+                }
+
+                // Whatever shape was picked to replace will then be that shape to replace with
+                var replaceMesh = new MeshReplaceMemento(clickedMesh, replacementMesh, color);
+                replacedMeshes.Push(replaceMesh);
+                replacementMesh.SetColor(color);
+                _sceneManager.ReplaceMesh(clickedMesh, replacementMesh);
+                Console.WriteLine("Replacement Complete!");
+
             }
         }
 
