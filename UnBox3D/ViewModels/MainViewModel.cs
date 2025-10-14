@@ -627,7 +627,7 @@ namespace UnBox3D.ViewModels
         [RelayCommand]
         private async void ReplaceWithCylinderClick()
         {
-            var command = new SetReplaceStateCommand(_glControlHost, _mouseController, _sceneManager, new RayCaster(_glControlHost, _camera), _camera, _commandHistory);
+            var command = new SetReplaceStateCommand(_glControlHost, _mouseController, _sceneManager, new RayCaster(_glControlHost, _camera), _camera, _commandHistory, "cylinder");
             command.Execute();
             await ShowWpfMessageBoxAsync("Replaced!", "Replace", MessageBoxButton.OK, MessageBoxImage.Information);
         }
