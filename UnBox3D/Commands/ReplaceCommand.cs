@@ -78,27 +78,44 @@ namespace UnBox3D.Commands
                 Vector3 meshCenter = _sceneManager.GetMeshCenter(clickedMesh.GetG4Mesh());
                 Vector3 meshDimensions = _sceneManager.GetMeshDimensions(clickedMesh.GetG4Mesh());
                 Vector3 color = new Vector3(1.0f, 0.0f, 0.0f); // red color
+                string name = clickedMesh.Name;
 
                 AppMesh replacementMesh;
 
                 // When you want to replace with a cube (or rectangular prism)
                 if (_shape == "cube")
                 {
+                    // when the name of the mesh doesn't contain the keyword 'Simplified', add it
+                    // otherwise, nothing happens to it
+                    if (!name.Contains("(Simplified)"))
+                    {
+                        name = name + " (Simplified)";
+                    }
+
+                    // getting the smallest dimensions of the mesh
+                    Vector3 smallMeshDimensions = _sceneManager.GetSmallestMeshDimensions(clickedMesh.GetG4Mesh());
+
                     // Use existing dimensions of the clicked mesh as box extents
                     replacementMesh = GeometryGenerator.CreateBox(
                         meshCenter,
-                        meshDimensions.X,
-                        meshDimensions.Y,
-                        meshDimensions.Z
+                        smallMeshDimensions.X,
+                        smallMeshDimensions.Y,
+                        smallMeshDimensions.Z,
+                        clickedMesh.Name + " (Simplified)"
                     );
                 }
                 else // or replace with cylinder
                 {
+                    if (!name.Contains("(Simplified)"))
+                    {
+                        name = name + " (Simplified)";
+                    }
+
                     bool isXAligned = (meshDimensions.X < meshDimensions.Z);
                     float radius = Math.Max(Math.Min(meshDimensions.X, meshDimensions.Z), meshDimensions.Y) / 2;
                     float height = isXAligned ? meshDimensions.X : meshDimensions.Z;
                     replacementMesh = GeometryGenerator.CreateRotatedCylinder(
-                        meshCenter, radius, height, 32, Vector3.UnitY
+                        meshCenter, radius, height, 32, Vector3.UnitY, clickedMesh.Name + " (Simmplified)"
                     );
                 }
 
