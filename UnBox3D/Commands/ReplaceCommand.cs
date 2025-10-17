@@ -101,7 +101,7 @@ namespace UnBox3D.Commands
                         smallMeshDimensions.X,
                         smallMeshDimensions.Y,
                         smallMeshDimensions.Z,
-                        clickedMesh.Name + " (Simplified)"
+                        name
                     );
                 }
                 else // or replace with cylinder
@@ -115,7 +115,7 @@ namespace UnBox3D.Commands
                     float radius = Math.Max(Math.Min(meshDimensions.X, meshDimensions.Z), meshDimensions.Y) / 2;
                     float height = isXAligned ? meshDimensions.X : meshDimensions.Z;
                     replacementMesh = GeometryGenerator.CreateRotatedCylinder(
-                        meshCenter, radius, height, 32, Vector3.UnitY, clickedMesh.Name + " (Simmplified)"
+                        meshCenter, radius, height, 32, Vector3.UnitY, name
                     );
                 }
 
