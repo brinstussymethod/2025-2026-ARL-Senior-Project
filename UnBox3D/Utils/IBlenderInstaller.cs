@@ -11,16 +11,19 @@ namespace UnBox3D.Utils
         Task CheckAndInstallBlender();
         Task CheckAndInstallBlender(IProgress<double> progress);
         bool IsBlenderInstalled();
+        string ExecutablePath { get; }
     }
 
     public class BlenderInstaller : IBlenderInstaller
     {
         private readonly IFileSystem _fileSystem;
 
-        private readonly string BlenderFolder;
-        private readonly string BlenderExecutable;
+        private string BlenderFolder;
+        private string BlenderExecutable;
+        private string ProgramFilesBlenderExecutable;
         private readonly string BlenderZipPath;
-        private static readonly string BlenderDownloadUrl = "https://download.blender.org/release/Blender4.2/blender-4.2.0-windows-x64.zip";
+        public string ExecutablePath => BlenderExecutable;
+        private static readonly string BlenderDownloadUrl = "https://download.blender.org/release/Blender4.5/blender-4.5.3-windows-x64.zip";
         // Quick test URL for invalid URL handling
         //private static string BlenderDownloadUrl = "https://invalid.url.fake/blender.zip";
         private Task? _blenderInstallTask;
@@ -31,8 +34,55 @@ namespace UnBox3D.Utils
 
             string baseDir = AppDomain.CurrentDomain.BaseDirectory;
             BlenderFolder = _fileSystem.CombinePaths(baseDir, "Blender");
-            BlenderExecutable = _fileSystem.CombinePaths(BlenderFolder, "blender-4.2.0-windows-x64", "blender.exe");
+            BlenderExecutable = _fileSystem.CombinePaths(BlenderFolder, "blender-4.5.3-windows-x64", "blender.exe");
+            ProgramFilesBlenderExecutable = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles)
+                    , "Blender Foundation", "blender-4.5.3", "blender.exe"); // this will be updated if found
             BlenderZipPath = _fileSystem.CombinePaths(baseDir, "blender.zip");
+
+            FindAndSetBlender();
+        }
+
+        private void FindAndSetBlender()
+        {
+            // 1. Try to find 'Blender Foundation' in Program Files
+            string blenderFoundationPath = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+                "Blender Foundation"
+                );
+
+            // 2. If it exists, look for versioned subfolders
+            if (Directory.Exists(blenderFoundationPath))
+            {
+                DirectoryInfo blenderFoundationDir = new DirectoryInfo(blenderFoundationPath);
+                DirectoryInfo[] blenderVersions = blenderFoundationDir.GetDirectories(); // Get all subfolders (Blender versions)
+
+                if (blenderVersions.Length > 0)
+                {
+                    var latestVersion = blenderVersions // find last-modified version folder
+                        .OrderByDescending(d => d.LastWriteTime)
+                        .First();
+
+                    // Construct the expected path to blender.exe    
+                    ProgramFilesBlenderExecutable = Path.Combine(
+                        latestVersion.FullName,
+                        "blender.exe"
+                        );
+                }
+            }
+            else return;
+
+            SetBlenderExecutable();
+        }
+
+        private void SetBlenderExecutable()
+        {
+            // Optional: if ProgramFilesBlenderExecutable exists, set BlenderExecutable to it
+            if (_fileSystem.DoesFileExists(ProgramFilesBlenderExecutable))
+            {
+                BlenderExecutable = ProgramFilesBlenderExecutable;
+                BlenderFolder = Path.GetDirectoryName(Path.GetDirectoryName(BlenderExecutable)) ?? BlenderFolder;
+                Debug.WriteLine($"Using Blender from Program Files: {ProgramFilesBlenderExecutable}");
+            }
         }
 
         public Task CheckAndInstallBlender()
@@ -54,20 +104,31 @@ namespace UnBox3D.Utils
         {
             if (!_fileSystem.DoesDirectoryExists(BlenderFolder) || !_fileSystem.DoesFileExists(BlenderExecutable))
             {
-                Debug.WriteLine("Blender 4.2 is not installed. Downloading now...");
+                Debug.WriteLine("Blender 4.5 is not installed. Downloading now...");
                 await DownloadAndExtractBlender();
             }
             else
             {
-                Debug.WriteLine("Blender 4.2 is already installed.");
+                Debug.WriteLine("Blender 4.5 is already installed.");
             }
         }
 
         private async Task CheckAndInstallBlenderInternal(IProgress<double>? progress = null)
         {
+
+            // If Blender exists in Program Files, just use it
+            if (_fileSystem.DoesFileExists(ProgramFilesBlenderExecutable))
+            {
+                BlenderExecutable = ProgramFilesBlenderExecutable;
+                BlenderFolder = Path.GetDirectoryName(Path.GetDirectoryName(BlenderExecutable)) ?? BlenderFolder;
+                Debug.WriteLine("Blender found in Program Files.");
+                progress?.Report(1.0);
+                return;
+            }
+            
             if (!_fileSystem.DoesDirectoryExists(BlenderFolder) || !_fileSystem.DoesFileExists(BlenderExecutable))
             {
-                Debug.WriteLine("Blender 4.2 is not installed. Downloading now...");
+                Debug.WriteLine("Blender 4.5 is not installed. Downloading now...");
 
                 try
                 {
@@ -82,7 +143,7 @@ namespace UnBox3D.Utils
             }
             else
             {
-                Debug.WriteLine("Blender 4.2 is already installed.");
+                Debug.WriteLine("Blender 4.5 is already installed.");
                 progress?.Report(1.0);
             }
         }

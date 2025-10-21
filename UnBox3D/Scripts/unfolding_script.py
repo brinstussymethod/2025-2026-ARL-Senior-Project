@@ -1,6 +1,7 @@
 ﻿import bpy
 import sys
 import pathlib
+import os
 
 def get_command_line_args() -> dict:
     argv = sys.argv[sys.argv.index("--") + 1:]
@@ -21,12 +22,28 @@ def get_command_line_args() -> dict:
 def clear_scene():
     bpy.ops.object.select_all(action='SELECT')
     bpy.ops.object.delete(use_global=False)
+    
 
-def install_addon(addon_name: str):
-    bpy.ops.extensions.userpref_allow_online()
-    bpy.ops.extensions.repo_sync_all() # <-- this missing line caused me 10 years of suffering
-    bpy.data.window_managers["WinMan"].extension_search = addon_name
-    bpy.ops.extensions.package_install(repo_index=0, pkg_id=addon_name)
+def install_and_enable_addon(addon_name: str):
+
+    # If already enabled, do nothing
+    if addon_name in bpy.context.preferences.addons:
+        print(f"Addon '{addon_name}' already enabled.")
+        return
+    
+    # If addon not installed, install it
+    addon_path = os.path.join(bpy.utils.user_resource('SCRIPTS', "addons"), addon_name)
+    if not os.path.exists(addon_path):
+        print(f"Addon '{addon_name}' not installed. Installing...")
+        bpy.ops.extensions.package_install(repo_index=0, pkg_id=addon_name)
+
+    # Enable the addon
+    try:
+        bpy.ops.preferences.addon_enable(module=addon_name)
+        print(f"Addon '{addon_name}' installed and enabled.")
+    except Exception as e:
+        print(f"Failed to enable add-on '{addon_name}': {e}")
+
 
 def import_model(filepath: pathlib.Path):
     if filepath.exists():
@@ -35,6 +52,7 @@ def import_model(filepath: pathlib.Path):
         print(f"Model loaded and transformed: {filepath}")
     else:
         print(f"Model file not found: {filepath}")
+
 
 def unfold(output_path: pathlib.Path):
     val = get_command_line_args()
@@ -109,10 +127,22 @@ def main():
     paths = get_command_line_args()
     
     clear_scene()
-    install_addon("export_paper_model")
+    addon_name = "export_paper_model"
+    install_and_enable_addon(addon_name)
+    if addon_name in bpy.context.preferences.addons:
+        bpy.ops.preferences.addon_enable(module=addon_name)
+    else:
+        print(f"Failed to install or enable addon '{addon_name}'. Exiting.")
+        return
+
+    downloads_path = pathlib.Path.home() / "Downloads"
+    downloads_path.mkdir(parents=True, exist_ok=True)  # ensure it exists
     
     import_model(paths['input_model'])
-    unfold(paths['output_model'])
+    
+    # Pass Downloads folder as output_path (for now)
+    unfold(downloads_path)
+
 
 if __name__ == "__main__":
     main()
