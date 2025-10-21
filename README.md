@@ -56,7 +56,7 @@ The goal is to provide a consistent, reproducible path from 3D input → simplif
 
 ## Architecture at a Glance
 
-> Names may differ slightly depending on your solution. Adjust paths as needed.
+
 
 ```
 UnBox3D.sln
