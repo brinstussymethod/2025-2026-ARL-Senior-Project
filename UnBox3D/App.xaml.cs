@@ -39,6 +39,11 @@ namespace UnBox3D
 
             mainWindow.Show();
 
+            // Force construction of KeyboardController now that MainWindow exists,
+            // so it can safely hook KeyDown/KeyUp on Application.Current.MainWindow.
+            // If we constructed it earlier/later, MainWindow could be null and the hooks would fail.
+            _serviceProvider.GetRequiredService<KeyboardController>();
+
             // Initialize SettingsWindow with its needed services but hide it for now...
             var settingsWindow = _serviceProvider.GetRequiredService<SettingsWindow>();
 
@@ -55,8 +60,8 @@ namespace UnBox3D
             var services = new ServiceCollection();
 
             #region Core Utilities Registration
-            services.AddSingleton<IFileSystem, FileSystem>();
-            services.AddSingleton<ILogger, Logger>(provider =>
+            services.AddSingleton<IFileSystem, FileSystem>();                       // IFileSystem, FileSystem
+            services.AddSingleton<ILogger, Logger>(provider =>                      // ILogger,     Logger
             {
                 var fileSystem = provider.GetRequiredService<IFileSystem>();
                 return new Logger(
@@ -66,85 +71,95 @@ namespace UnBox3D
                 );
             });
 
-            services.AddSingleton<ICommandHistory, CommandHistory>();
-            services.AddSingleton<IState, DefaultState>(provider =>
+            services.AddSingleton<ICommandHistory, CommandHistory>();               // ICommandHistory, CommandHistory
+            services.AddSingleton<IState, DefaultState>(provider =>                 // IState,          DefaultState
             {
-                var sceneManager = provider.GetRequiredService<ISceneManager>();
-                var glHost = provider.GetRequiredService<IGLControlHost>();
-                var camera = provider.GetRequiredService<ICamera>();
-                var rayCaster = provider.GetRequiredService<IRayCaster>();
-
+                var sceneManager    = provider.GetRequiredService<ISceneManager>();
+                var glHost          = provider.GetRequiredService<IGLControlHost>();
+                var camera          = provider.GetRequiredService<ICamera>();
+                var rayCaster       = provider.GetRequiredService<IRayCaster>();
                 return new DefaultState(sceneManager, glHost, camera, rayCaster);
             });
-            services.AddSingleton<ISettingsManager, SettingsManager>();
+            services.AddSingleton<ISettingsManager, SettingsManager>();             // ISettingsManager, SettingsManager
             #endregion
 
             #region Rendering Services Registration
-            services.AddSingleton<ISceneManager, SceneManager>();
-            services.AddSingleton<IRayCaster, RayCaster>();
-            services.AddSingleton<ICamera, Camera>(provider =>
+            services.AddSingleton<ISceneManager, SceneManager>();                   // ISceneManager,   SceneManager
+            services.AddSingleton<IRayCaster, RayCaster>();                         // IRayCaster,      RayCaster
+            // Single camera instance for the entire app (unified view/projection).
+            // You can tune the starting position/aspect elsewhere (e.g., after GL loads).
+            services.AddSingleton<ICamera, Camera>(provider =>                      // ICamera, Camera
             {
                 Vector3 defaultPos = new Vector3(0, 0, 0);
                 float defaultAspectRatio = 16f / 9f;
                 return new Camera(defaultPos, defaultAspectRatio);
             });
-            services.AddSingleton<IRenderer, SceneRenderer>(provider =>
+            services.AddSingleton<IRenderer, SceneRenderer>(provider =>             // IRenderer, SceneRenderer
             {
-                var logger = provider.GetRequiredService<ILogger>();
-                var settings = provider.GetRequiredService<ISettingsManager>();
-                var sceneManager = provider.GetRequiredService<ISceneManager>();
+                var logger          = provider.GetRequiredService<ILogger>();
+                var settings        = provider.GetRequiredService<ISettingsManager>();
+                var sceneManager    = provider.GetRequiredService<ISceneManager>();
                 return new SceneRenderer(logger, settings, sceneManager);
             });
-            services.AddSingleton<GLControlHost>(provider =>
+            // GLControlHost is the WinForms GL surface bridge. It now receives the unified DI Camera.
+            // IMPORTANT: host no longer owns/creates its own Camera/Mouse/Ray; that was the source of duplicates.
+            services.AddSingleton<GLControlHost>(provider =>                        // GLControlHost
             {
-                var sceneManager = provider.GetRequiredService<ISceneManager>();
-                var sceneRenderer = provider.GetRequiredService<IRenderer>();
+                var sceneManager    = provider.GetRequiredService<ISceneManager>();
+                var sceneRenderer   = provider.GetRequiredService<IRenderer>();
                 var settingsManager = provider.GetRequiredService<ISettingsManager>();
-                return new GLControlHost(sceneManager, sceneRenderer, settingsManager);
+                var camera = provider.GetRequiredService<ICamera>();
+                return new GLControlHost(sceneManager, sceneRenderer, settingsManager, camera);
             });
-            services.AddSingleton<IGLControlHost>(provider => provider.GetRequiredService<GLControlHost>());
+            services.AddSingleton<IGLControlHost>(provider => provider.GetRequiredService<GLControlHost>());    // IGLControlHost
             #endregion
 
             #region UI and ViewModel Registration
-            services.AddSingleton<IBlenderInstaller, BlenderInstaller>(provider =>
+            services.AddSingleton<IBlenderInstaller, BlenderInstaller>(provider =>          // IBlenderInstaller, BlenderInstaller
             {
                 var fileSystem = provider.GetRequiredService<IFileSystem>();
                 return new BlenderInstaller(fileSystem);
             });
-            services.AddSingleton<ModelExporter>(provider => {
+            services.AddSingleton<ModelExporter>(provider => {                              // ModelExporter
                 var settingsManager = provider.GetRequiredService<ISettingsManager>();
                 return new ModelExporter(settingsManager);
             });
 
-            services.AddSingleton<MouseController>(provider =>
+            services.AddSingleton<MouseController>(provider =>                              // MouseController
             {
-                var settingsManger = provider.GetRequiredService<ISettingsManager>();
-                var camera = provider.GetRequiredService<ICamera>();
-                var neutralState = provider.GetRequiredService<IState>();
-                var rayCaster = provider.GetRequiredService<IRayCaster>();
-                var glControlHost = provider.GetRequiredService<GLControlHost>();
-
+                var settingsManger  = provider.GetRequiredService<ISettingsManager>();
+                var camera          = provider.GetRequiredService<ICamera>();
+                var neutralState    = provider.GetRequiredService<IState>();
+                var rayCaster       = provider.GetRequiredService<IRayCaster>();
+                var glControlHost   = provider.GetRequiredService<GLControlHost>();
                 return new MouseController(settingsManger, camera, neutralState, rayCaster, glControlHost);
             });
 
-
-            services.AddSingleton<BlenderIntegration>();
-            services.AddSingleton<SettingsWindow>();
-            services.AddSingleton<MainWindow>();
-
-            services.AddSingleton<MainViewModel>(provider =>
+            // KeyboardController only needs the unified camera.
+            // It hooks MainWindow at startup (see above OnStartup()).
+            services.AddSingleton<KeyboardController>(provider =>       // KeyboardController
             {
-                var logger = provider.GetRequiredService<ILogger>();
-                var settings = provider.GetRequiredService<ISettingsManager>();
-                var sceneManager = provider.GetRequiredService<ISceneManager>();
-                var fileSystem = provider.GetRequiredService<IFileSystem>();
-                var blenderIntegration = provider.GetRequiredService<BlenderIntegration>();
-                var blenderInstaller = provider.GetRequiredService<IBlenderInstaller>();
-                var modelExporter = provider.GetRequiredService<ModelExporter>();
-                var mouseController = provider.GetRequiredService<MouseController>();
                 var camera = provider.GetRequiredService<ICamera>();
-                var glControlHost = provider.GetRequiredService<IGLControlHost>();
-                var commandHistory = provider.GetRequiredService<ICommandHistory>();
+                return new KeyboardController(camera);
+            });
+
+            services.AddSingleton<BlenderIntegration>();        // BlenderIntegration
+            services.AddSingleton<SettingsWindow>();            // SettingsWindow
+            services.AddSingleton<MainWindow>();                // MainWindow
+
+            services.AddSingleton<MainViewModel>(provider =>    // MainViewModel
+            {
+                var logger              = provider.GetRequiredService<ILogger>();
+                var settings            = provider.GetRequiredService<ISettingsManager>();
+                var sceneManager        = provider.GetRequiredService<ISceneManager>();
+                var fileSystem          = provider.GetRequiredService<IFileSystem>();
+                var blenderIntegration  = provider.GetRequiredService<BlenderIntegration>();
+                var blenderInstaller    = provider.GetRequiredService<IBlenderInstaller>();
+                var modelExporter       = provider.GetRequiredService<ModelExporter>();
+                var mouseController     = provider.GetRequiredService<MouseController>();
+                var camera              = provider.GetRequiredService<ICamera>();
+                var glControlHost       = provider.GetRequiredService<IGLControlHost>();
+                var commandHistory      = provider.GetRequiredService<ICommandHistory>();
                 return new MainViewModel(logger, settings, sceneManager, fileSystem, blenderIntegration, blenderInstaller, modelExporter, mouseController, glControlHost, camera, commandHistory);
             });
             #endregion

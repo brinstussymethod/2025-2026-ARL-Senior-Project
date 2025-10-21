@@ -6,6 +6,7 @@ using System.Windows.Input;
 using TextBox = System.Windows.Controls.TextBox;
 using UnBox3D.Rendering;
 using UnBox3D.ViewModels;
+using UnBox3D.Models;
 
 namespace UnBox3D.Views
 {
@@ -263,7 +264,29 @@ namespace UnBox3D.Views
                     vm.ApplyMeshThreshold();
                 }
             }
-
         }
+
+        // Runs whenever the user left-clicks a different item in the TreeView.
+        // e.NewValue is a MeshSummary, not the raw mesh object, so we pull the underlying SourceMesh.
+        private void TreeView_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
+        {
+            if (DataContext is not MainViewModel vm) return;
+
+
+            // The TreeView is bound to MeshSummary items. Select the *real* mesh:
+            if (e.NewValue is MeshSummary summary && summary.SourceMesh != null)
+            {
+                vm.SelectedMesh = summary.SourceMesh;   // -> triggers OnSelectedMeshChanged in the VM (/ViewModels/MainViewModel.cs)
+            }
+            else if (e.NewValue is IAppMesh mesh)       // (handles the case you ever bind meshes directly)
+            {
+                vm.SelectedMesh = mesh;
+            }
+            else
+            {
+                vm.SelectedMesh = null;                 // clicked a non-mesh node
+            }
+        }
+
     }
 }
