@@ -39,7 +39,11 @@ namespace UnBox3D.Utils
                     , "Blender Foundation", "blender-4.2", "blender.exe"); // this will be updated if found
             BlenderZipPath = _fileSystem.CombinePaths(baseDir, "blender.zip");
 
-            #region Standard Program Files path (version-independent)
+            FindAndSetBlender();
+        }
+
+        private void FindAndSetBlender()
+        {
             // 1. Try to find 'Blender Foundation' in Program Files
             string blenderFoundationPath = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
@@ -65,7 +69,13 @@ namespace UnBox3D.Utils
                         );
                 }
             }
+            else return;
 
+            SetBlenderExecutable();
+        }
+
+        private void SetBlenderExecutable()
+        {
             // Optional: if ProgramFilesBlenderExecutable exists, set BlenderExecutable to it
             if (_fileSystem.DoesFileExists(ProgramFilesBlenderExecutable))
             {
@@ -73,10 +83,7 @@ namespace UnBox3D.Utils
                 BlenderFolder = Path.GetDirectoryName(Path.GetDirectoryName(BlenderExecutable)) ?? BlenderFolder;
                 Debug.WriteLine($"Using Blender from Program Files: {ProgramFilesBlenderExecutable}");
             }
-
         }
-
-            #endregion
 
         public Task CheckAndInstallBlender()
         {
