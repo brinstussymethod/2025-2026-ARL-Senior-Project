@@ -38,12 +38,12 @@ namespace UnBox3D.Views
         #region Lifecycle Handlers
         private void SettingsWindow_Loaded(object sender, RoutedEventArgs args)
         {
-            _logger.Info("SettingsWindow loaded.");
+            _logger?.Info("SettingsWindow loaded.");
         }
 
         private void SettingsWindow_Closed(object? sender, EventArgs args)
         {
-            _logger.Info("SettingsWindow closed.");
+            _logger?.Info("SettingsWindow closed.");
         }
 
         public void Initialize(ILogger logger, ISettingsManager settingsManager)
