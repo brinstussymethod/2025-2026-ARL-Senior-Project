@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection;
 using OpenTK.Mathematics;
 using System.IO;
 using System.Windows;
@@ -10,193 +10,127 @@ using UnBox3D.Rendering.OpenGL;
 using UnBox3D.Utils;
 using UnBox3D.ViewModels;
 using UnBox3D.Views;
+using UnBox3D.Theming;
 using Application = System.Windows.Application;
 
 namespace UnBox3D
 {
     public partial class App : Application
     {
-        private ServiceProvider? _serviceProvider;
+        private static ServiceProvider? _serviceProvider;
+        public static ServiceProvider Services => _serviceProvider!;
 
         protected override void OnStartup(StartupEventArgs e)
         {
             base.OnStartup(e);
-
-            // Configure the service provider (Dependency Injection container)
             _serviceProvider = ConfigureServices();
 
-            // Resolve MainWindow and MainViewModel from the DI container
-            var mainWindow = _serviceProvider.GetRequiredService<MainWindow>();
-            var mainViewModel = _serviceProvider.GetRequiredService<MainViewModel>();
-            mainWindow.DataContext = mainViewModel;
+            // Apply theme early
+            var themeManager = _serviceProvider.GetRequiredService<IThemeManager>();
+            themeManager.ApplySavedTheme(false);
 
-            // Initialize MainWindow with required services and show it
-            mainWindow.Initialize(
-                _serviceProvider.GetRequiredService<IGLControlHost>(),
-                _serviceProvider.GetRequiredService<ILogger>(),
-                _serviceProvider.GetRequiredService<IBlenderInstaller>()
-            );
-
-            mainWindow.Show();
-
-            // Initialize SettingsWindow with its needed services but hide it for now...
-            var settingsWindow = _serviceProvider.GetRequiredService<SettingsWindow>();
-
-            settingsWindow.Initialize(
-                _serviceProvider.GetRequiredService<ILogger>(),
-                _serviceProvider.GetRequiredService<ISettingsManager>()
-            );
-            settingsWindow.Owner = mainWindow;
-            settingsWindow.Hide();
+            var menu = _serviceProvider.GetRequiredService<MainMenuWindow>();
+            Current.MainWindow = menu;
+            menu.Show();
         }
 
         private ServiceProvider ConfigureServices()
         {
             var services = new ServiceCollection();
 
-            #region Core Utilities Registration
+            // Core
             services.AddSingleton<IFileSystem, FileSystem>();
             services.AddSingleton<ILogger, Logger>(provider =>
             {
-                var fileSystem = provider.GetRequiredService<IFileSystem>();
-                return new Logger(
-                    fileSystem,
-                    logDirectory: @"C:\\ProgramData\\UnBox3D\\Logs",
-                    logFileName: "UnBox3D.log"
-                );
+                var fs = provider.GetRequiredService<IFileSystem>();
+                return new Logger(fs, logDirectory: @"C:\\ProgramData\\UnBox3D\\Logs", logFileName: "UnBox3D.log");
             });
-
             services.AddSingleton<ICommandHistory, CommandHistory>();
-            services.AddSingleton<IState, DefaultState>(provider =>
-            {
-                var sceneManager = provider.GetRequiredService<ISceneManager>();
-                var glHost = provider.GetRequiredService<IGLControlHost>();
-                var camera = provider.GetRequiredService<ICamera>();
-                var rayCaster = provider.GetRequiredService<IRayCaster>();
-
-                return new DefaultState(sceneManager, glHost, camera, rayCaster);
-            });
             services.AddSingleton<ISettingsManager, SettingsManager>();
-            #endregion
+            services.AddSingleton<IThemeManager, ThemeManager>();
 
-            #region Rendering Services Registration
+            // Rendering
             services.AddSingleton<ISceneManager, SceneManager>();
             services.AddSingleton<IRayCaster, RayCaster>();
             services.AddSingleton<ICamera, Camera>(provider =>
             {
-                Vector3 defaultPos = new Vector3(0, 0, 0);
-                float defaultAspectRatio = 16f / 9f;
+                Vector3 defaultPos = new Vector3(0,0,0);
+                float defaultAspectRatio = 16f/9f;
                 return new Camera(defaultPos, defaultAspectRatio);
             });
             services.AddSingleton<IRenderer, SceneRenderer>(provider =>
             {
                 var logger = provider.GetRequiredService<ILogger>();
                 var settings = provider.GetRequiredService<ISettingsManager>();
-                var sceneManager = provider.GetRequiredService<ISceneManager>();
-                return new SceneRenderer(logger, settings, sceneManager);
+                var scene = provider.GetRequiredService<ISceneManager>();
+                return new SceneRenderer(logger, settings, scene);
             });
             services.AddSingleton<GLControlHost>(provider =>
             {
-                var sceneManager = provider.GetRequiredService<ISceneManager>();
-                var sceneRenderer = provider.GetRequiredService<IRenderer>();
-                var settingsManager = provider.GetRequiredService<ISettingsManager>();
-                return new GLControlHost(sceneManager, sceneRenderer, settingsManager);
+                var scene = provider.GetRequiredService<ISceneManager>();
+                var renderer = provider.GetRequiredService<IRenderer>();
+                var settings = provider.GetRequiredService<ISettingsManager>();
+                return new GLControlHost(scene, renderer, settings);
             });
-            services.AddSingleton<IGLControlHost>(provider => provider.GetRequiredService<GLControlHost>());
-            #endregion
+            services.AddSingleton<IGLControlHost>(sp => sp.GetRequiredService<GLControlHost>());
 
-            #region UI and ViewModel Registration
+            // UI + VM
             services.AddSingleton<IBlenderInstaller, BlenderInstaller>(provider =>
             {
-                var fileSystem = provider.GetRequiredService<IFileSystem>();
-                return new BlenderInstaller(fileSystem);
+                var fs = provider.GetRequiredService<IFileSystem>();
+                return new BlenderInstaller(fs);
             });
-            services.AddSingleton<ModelExporter>(provider => {
-                var settingsManager = provider.GetRequiredService<ISettingsManager>();
-                return new ModelExporter(settingsManager);
+            services.AddSingleton<ModelExporter>(provider =>
+            {
+                var settings = provider.GetRequiredService<ISettingsManager>();
+                return new ModelExporter(settings);
             });
-
             services.AddSingleton<MouseController>(provider =>
             {
-                var settingsManger = provider.GetRequiredService<ISettingsManager>();
+                var settings = provider.GetRequiredService<ISettingsManager>();
                 var camera = provider.GetRequiredService<ICamera>();
-                var neutralState = provider.GetRequiredService<IState>();
-                var rayCaster = provider.GetRequiredService<IRayCaster>();
-                var glControlHost = provider.GetRequiredService<GLControlHost>();
-
-                return new MouseController(settingsManger, camera, neutralState, rayCaster, glControlHost);
+                var state = provider.GetRequiredService<IState>();
+                var ray = provider.GetRequiredService<IRayCaster>();
+                var host = provider.GetRequiredService<GLControlHost>();
+                return new MouseController(settings, camera, state, ray, host);
+            });
+            services.AddSingleton<IState, DefaultState>(provider =>
+            {
+                var scene = provider.GetRequiredService<ISceneManager>();
+                var host = provider.GetRequiredService<IGLControlHost>();
+                var camera = provider.GetRequiredService<ICamera>();
+                var ray = provider.GetRequiredService<IRayCaster>();
+                return new DefaultState(scene, host, camera, ray);
             });
 
+            // IMPORTANT: SettingsWindow must be transient.
+            services.AddTransient<SettingsWindow>();
 
-            services.AddSingleton<BlenderIntegration>();
-            services.AddSingleton<SettingsWindow>();
             services.AddSingleton<MainWindow>();
-
             services.AddSingleton<MainViewModel>(provider =>
             {
                 var logger = provider.GetRequiredService<ILogger>();
                 var settings = provider.GetRequiredService<ISettingsManager>();
-                var sceneManager = provider.GetRequiredService<ISceneManager>();
-                var fileSystem = provider.GetRequiredService<IFileSystem>();
-                var blenderIntegration = provider.GetRequiredService<BlenderIntegration>();
-                var blenderInstaller = provider.GetRequiredService<IBlenderInstaller>();
-                var modelExporter = provider.GetRequiredService<ModelExporter>();
-                var mouseController = provider.GetRequiredService<MouseController>();
+                var scene = provider.GetRequiredService<ISceneManager>();
+                var fs = provider.GetRequiredService<IFileSystem>();
+                var blender = provider.GetRequiredService<BlenderIntegration>();
+                var installer = provider.GetRequiredService<IBlenderInstaller>();
+                var exporter = provider.GetRequiredService<ModelExporter>();
+                var mouse = provider.GetRequiredService<MouseController>();
                 var camera = provider.GetRequiredService<ICamera>();
-                var glControlHost = provider.GetRequiredService<IGLControlHost>();
-                var commandHistory = provider.GetRequiredService<ICommandHistory>();
-                return new MainViewModel(logger, settings, sceneManager, fileSystem, blenderIntegration, blenderInstaller, modelExporter, mouseController, glControlHost, camera, commandHistory);
+                var host = provider.GetRequiredService<IGLControlHost>();
+                var history = provider.GetRequiredService<ICommandHistory>();
+                return new MainViewModel(logger, settings, scene, fs, blender, installer, exporter, mouse, host, camera, history);
             });
-            #endregion
+
+            services.AddSingleton<BlenderIntegration>();
+            services.AddSingleton<MainMenuWindow>(provider => new MainMenuWindow(provider));
 
             return services.BuildServiceProvider();
         }
 
         protected override void OnExit(ExitEventArgs e)
         {
-            // 1. Read the "CleanupExportOnExit" setting
-            var settingsManager = _serviceProvider?.GetRequiredService<ISettingsManager>();
-            if (settingsManager != null)
-            {
-                bool cleanupOnExit = settingsManager.GetSetting<bool>(
-                    new AppSettings().GetKey(),
-                    AppSettings.CleanupExportOnExit
-                );
-
-                // 2. If the user wants cleanup, do it
-                if (cleanupOnExit)
-                {
-                    // Also fetch the export directory from settings
-                    string? exportDir = settingsManager.GetSetting<string>(
-                        new AppSettings().GetKey(),
-                        AppSettings.ExportDirectory
-                    );
-
-                    // Fallback if it doesn't exist
-                    if (string.IsNullOrWhiteSpace(exportDir) || !Directory.Exists(exportDir))
-                    {
-                        exportDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Export");
-                    }
-
-                    try
-                    {
-                        //Remove only .obj files
-                        foreach (var file in Directory.GetFiles(exportDir, "*.obj"))
-                        {
-                            File.Delete(file);
-                        }
-                        foreach (var file in Directory.GetFiles(exportDir, "*.mtl"))
-                        {
-                            File.Delete(file);
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"Failed to clean up export directory: {ex.Message}");
-                    }
-                }
-            }
-            // Clean up the service provider on exit
             _serviceProvider?.Dispose();
             base.OnExit(e);
         }
