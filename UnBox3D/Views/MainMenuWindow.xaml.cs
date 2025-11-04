@@ -82,9 +82,30 @@ namespace UnBox3D.Views
             settings.ShowDialog();
         }
 
+
         private void Open_Click(object? sender, RoutedEventArgs e)
         {
-            WpfMessageBox.Show("Open existing Project… (wire to your import/open flow).", "UnBox3D");
+            var picker = new OpenExistingWindow { Owner = this };
+            if (picker.ShowDialog() == true && !string.IsNullOrWhiteSpace(picker.ImportedFilePath))
+            {
+                var main = Application.Current.Windows.OfType<MainWindow>().FirstOrDefault()
+                           ?? App.Services.GetRequiredService<MainWindow>();
+
+                var glHost = App.Services.GetService<IGLControlHost>();
+                var logger = App.Services.GetService<ILogger>();
+                var blender = App.Services.GetService<IBlenderInstaller>();
+                if (glHost != null && logger != null && blender != null)
+                    main.Initialize(glHost, logger, blender);
+
+                if (!main.IsVisible) main.Show();
+                main.Activate();
+
+                // Pass the path directly
+                main.OpenFromPath(picker.ImportedFilePath);
+
+                Close();
+            }
+
         }
 
         private void Help_Click(object? sender, RoutedEventArgs e)
@@ -94,7 +115,7 @@ namespace UnBox3D.Views
             helpWindow.Show();
             this.Close();
         }
- 
+
         private void Exit_Click(object? sender, RoutedEventArgs e) => Application.Current.Shutdown();
     }
 }

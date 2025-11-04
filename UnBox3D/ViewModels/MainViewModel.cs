@@ -1,18 +1,20 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+﻿using Assimp.Configs;
+using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using System.Collections.ObjectModel;
-using UnBox3D.Models;
-using UnBox3D.Utils;
-using UnBox3D.Rendering;
-using System.Diagnostics;
-using System.IO;
-using System.Windows;
-using UnBox3D.Views;
-using UnBox3D.Controls;
-using UnBox3D.Rendering.OpenGL;
-using UnBox3D.Commands;
 using OpenTK.Mathematics;
 using PdfSharpCore.Pdf;
+using System.Collections.ObjectModel;
+using System.Diagnostics;
+using System.IO;
+using System.Security.Cryptography;
+using System.Windows;
+using UnBox3D.Commands;
+using UnBox3D.Controls;
+using UnBox3D.Models;
+using UnBox3D.Rendering;
+using UnBox3D.Rendering.OpenGL;
+using UnBox3D.Utils;
+using UnBox3D.Views;
 
 namespace UnBox3D.ViewModels
 {
@@ -131,6 +133,7 @@ namespace UnBox3D.ViewModels
             }
 
             string destinationPath = _fileSystem.CombinePaths(importDirectory, Path.GetFileName(filePath));
+            
             try
             {
                 File.Copy(filePath, destinationPath, overwrite: true);
@@ -143,6 +146,84 @@ namespace UnBox3D.ViewModels
 
             return destinationPath;
         }
+
+        public void ImportModelFromPath(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+                throw new FileNotFoundException("Model file not found.", path);
+
+            var importedMeshes = TryImportWithShadowCopy(path);
+
+            _latestImportedModel = importedMeshes;
+
+            foreach (var mesh in importedMeshes)
+            {
+                _sceneManager.AddMesh(mesh);
+                Meshes.Add(new MeshSummary(mesh));
+            }
+
+            _importedFilePath = path;
+
+            if (_modelImporter.WasScaled)
+            {
+                var exportPath = _modelExporter.ExportToObj(_sceneManager.GetMeshes().ToList());
+                if (!string.IsNullOrEmpty(exportPath))
+                    _importedFilePath = exportPath;
+            }
+        }
+
+        private List<IAppMesh> TryImportWithShadowCopy(string sourcePath)
+        {
+            try
+            {
+                return _modelImporter.ImportModel(sourcePath);
+            }
+            catch (IOException ioEx) when (IsSharingViolation(ioEx))
+            {
+                var tempDir = Path.Combine(Path.GetTempPath(), "UnBox3D", "ShadowCopies");
+                Directory.CreateDirectory(tempDir);
+                var tempPath = Path.Combine(
+                    tempDir, $"{Path.GetFileNameWithoutExtension(sourcePath)}_{Guid.NewGuid():N}{Path.GetExtension(sourcePath)}");
+
+                SafeCopyWithRetry(sourcePath, tempPath, attempts: 10, delayMs: 80);
+                try
+                {
+                    return _modelImporter.ImportModel(tempPath);
+                }
+                finally
+                {
+                    try { File.Delete(tempPath); } catch { /* best-effort cleanup */ }
+                }
+            }
+        }
+
+        private static bool IsSharingViolation(IOException ex) =>
+            (ex.HResult & 0xFFFF) == 32           // ERROR_SHARING_VIOLATION
+         || (ex.HResult & 0xFFFF) == 33           // ERROR_LOCK_VIOLATION
+         || ex.Message.IndexOf("being used by another process", StringComparison.OrdinalIgnoreCase) >= 0;
+
+        private static void SafeCopyWithRetry(string src, string dst, int attempts, int delayMs)
+        {
+            for (int i = 0; i < attempts; i++)
+            {
+                try
+                {
+                    using var s = new FileStream(src, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                    using var d = new FileStream(dst, FileMode.Create, FileAccess.Write, FileShare.Read);
+                    s.CopyTo(d);
+                    return;
+                }
+                catch (IOException) when (i < attempts - 1)
+                {
+                    Thread.Sleep(delayMs * (i + 1));
+                }
+            }
+
+            using var sFinal = new FileStream(src, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            using var dFinal = new FileStream(dst, FileMode.Create, FileAccess.Write, FileShare.Read);
+            sFinal.CopyTo(dFinal);
+        }
+
 
         #endregion
 
@@ -627,43 +708,10 @@ namespace UnBox3D.ViewModels
         [RelayCommand]
         private async void ReplaceWithCylinderClick()
         {
-            var command = new SetReplaceStateCommand(_glControlHost, _mouseController, _sceneManager, new RayCaster(_glControlHost, _camera), _camera, _commandHistory, "cylinder");
+            var command = new SetReplaceStateCommand(_glControlHost, _mouseController, _sceneManager, new RayCaster(_glControlHost, _camera), _camera, _commandHistory);
             command.Execute();
             await ShowWpfMessageBoxAsync("Replaced!", "Replace", MessageBoxButton.OK, MessageBoxImage.Information);
         }
-
-        [RelayCommand]
-         private async void ReplaceWithCubeOption(IAppMesh mesh)
-         {
-             Vector3 center = _sceneManager.GetMeshCenter(mesh.GetG4Mesh());
-             Vector3 meshDimensions = _sceneManager.GetMeshDimensions(mesh.GetG4Mesh());
-        
-             AppMesh cube = GeometryGenerator.CreateBox(
-                         center,
-                         meshDimensions.X,
-                         meshDimensions.Y,
-                         meshDimensions.Z
-                     );
-        
-             var summaryToRemove = Meshes.FirstOrDefault(ms => ms.SourceMesh == mesh);
-             if (summaryToRemove != null)
-             {
-                 Meshes.Remove(summaryToRemove);
-             }
-        
-             _sceneManager.ReplaceMesh(mesh, cube);
-        
-             Meshes.Add(new MeshSummary(cube));
-         }
-
-         [RelayCommand]
-         private async void ReplaceWithCubeClick()
-         {
-             var command = new SetReplaceStateCommand(_glControlHost, _mouseController, _sceneManager, new RayCaster(_glControlHost, _camera), _camera, _commandHistory, "cube");
-             
-             command.Execute();
-             await ShowWpfMessageBoxAsync("Replaced!", "Replace", MessageBoxButton.OK, MessageBoxImage.Information);
-         }
 
 
         [RelayCommand]

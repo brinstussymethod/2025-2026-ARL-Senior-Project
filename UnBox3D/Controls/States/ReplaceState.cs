@@ -1,4 +1,4 @@
-using OpenTK;
+﻿using OpenTK;
 using System.Collections.Generic;
 using System.Windows.Forms;
 using g3;
@@ -19,22 +19,20 @@ namespace UnBox3D.Controls.States
         private readonly IRayCaster _rayCaster;
         private readonly ICamera _camera;
         private ICommandHistory _commandHistory;
-        private readonly string _shape;
 
 
-        public ReplaceState(IGLControlHost glControlHost, ISceneManager sceneManager, ICamera camera, IRayCaster rayCaster, ICommandHistory commandHistory, string shape)
+        public ReplaceState(IGLControlHost glControlHost, ISceneManager sceneManager, ICamera camera, IRayCaster rayCaster, ICommandHistory commandHistory)
         {
             _glControlHost = glControlHost;
             _sceneManager = sceneManager;
             _camera = camera;
             _rayCaster = rayCaster;
             _commandHistory = commandHistory;
-            _shape = shape;
         }
 
         public void OnMouseDown(MouseEventArgs e)
         {
-            ICommand replaceCommand = new ReplaceCommand(_glControlHost, _sceneManager, _rayCaster, _camera, _shape);
+            ICommand replaceCommand = new ReplaceCommand(_glControlHost, _sceneManager, _rayCaster, _camera);
             _commandHistory.PushCommand(replaceCommand);
             replaceCommand.Execute();
         }

@@ -1,5 +1,4 @@
-﻿using System.Printing;
-using OpenTK.Mathematics;
+﻿using OpenTK.Mathematics;
 
 // Borrowed from https://github.com/opentk/LearnOpenTK/blob/master/Common/Camera.cs
 namespace UnBox3D.Rendering
@@ -11,13 +10,11 @@ namespace UnBox3D.Rendering
         float Pitch { get; set; }
         float Yaw { get; set; }
         float Fov { get; set; }
-        float Roll { get; set; }
         Vector3 Front { get; }
         Vector3 Up { get; }
         Vector3 Right { get; }
         Matrix4 GetViewMatrix();
         Matrix4 GetProjectionMatrix();
-        void AddRoll(float deltaDegrees); 
     }
     public class Camera: ICamera
     {
@@ -28,7 +25,6 @@ namespace UnBox3D.Rendering
         private float _pitch = 0; // Rotation around the X axis (radians)
         private float _yaw = -MathHelper.PiOver2; // Rotaion around the Y axis (radians)
         private float _fov;  // The field of view of the camera (radians)
-        private float _roll = 0f; 
 
         // Constructor that loads the FOV from settings
         public Camera(Vector3 position, float aspectRatio)
@@ -67,18 +63,6 @@ namespace UnBox3D.Rendering
             }
         }
 
-
-        
-        public float Roll
-        {
-            get => MathHelper.RadiansToDegrees(_roll);
-            set 
-            {
-                _roll = MathHelper.DegreesToRadians(value);
-                UpdateVectors(); 
-            }
-        }
-
         // The field of view (FOV) is the vertical angle of the camera view.
         // We convert from degrees to radians as soon as the property is set to improve performance.
         public float Fov
@@ -89,11 +73,6 @@ namespace UnBox3D.Rendering
                 var angle = MathHelper.Clamp(value, 1f, 90f);
                 _fov = MathHelper.DegreesToRadians(angle);
             }
-        }
-        public void AddRoll(float deltaDegrees)
-        {
-            _roll += MathHelper.DegreesToRadians(deltaDegrees);
-            UpdateVectors();
         }
 
         public Matrix4 GetViewMatrix()
@@ -112,23 +91,10 @@ namespace UnBox3D.Rendering
             _front.X = (float)(Math.Cos(_pitch) * Math.Cos(_yaw));
             _front.Y = (float)Math.Sin(_pitch);
             _front.Z = (float)(Math.Cos(_pitch) * Math.Sin(_yaw));
-            _front = _front.Normalized();
 
-            Vector3 worldUp = Vector3.UnitY;
-            if (System.Math.Abs(Vector3.Dot(_front, worldUp)) > 0.999f)
-                worldUp = Vector3.UnitX;
-
-            _right = Vector3.Normalize(Vector3.Cross(_front, worldUp));
+            _front = Vector3.Normalize(_front);
+            _right = Vector3.Normalize(Vector3.Cross(_front, Vector3.UnitY));
             _up = Vector3.Normalize(Vector3.Cross(_right, _front));
-
-
-            if (_roll != 0f)
-            {
-                // Matrix3 is sufficient for rotating vectors
-                var rollMat = Matrix4.CreateFromAxisAngle(_front, _roll);
-                _right = Vector3.TransformVector(_right, rollMat).Normalized();
-                _up = Vector3.TransformVector(_up, rollMat).Normalized();
-            }
         }
     }
 }

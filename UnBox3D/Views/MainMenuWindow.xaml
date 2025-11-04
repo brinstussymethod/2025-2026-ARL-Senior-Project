@@ -55,10 +55,10 @@
                                 IsDefault="True"
                                 Height="52" Margin="0,12,0,0" Click="Start_Click"
                                 Style="{StaticResource MenuButtonStyle}">
-                            <AccessText Text="_Start New Project    [Enter]" />
+                            <AccessText Text="_Start new session    [Enter]" />
                         </Button>
                         <Button x:Name="BtnOpen" Height="52" Margin="0,12,0,0" Click="Open_Click" Style="{StaticResource MenuButtonStyle}">
-                            <AccessText Text="_Open Existing Project...    [Alt+O]" />
+                            <AccessText Text="_Open existing...    [Alt+O]" />
                         </Button>
                         <Button x:Name="BtnSettings" Height="52" Margin="0,12,0,0" Click="Settings_Click" Style="{StaticResource MenuButtonStyle}">
                             <AccessText Text="_Settings    [Alt+S]" />

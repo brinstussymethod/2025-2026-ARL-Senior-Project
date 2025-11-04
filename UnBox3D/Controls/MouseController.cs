@@ -61,26 +61,11 @@ namespace UnBox3D.Controls
                 case MouseButtons.Left:
                     _currentState?.OnMouseDown(e);
                     break;
-                case MouseButtons.Middle:
+                case MouseButtons.Right:
                     _isPanning = true;
                     break;
-                case MouseButtons.Right:
-                    _isYawingAndPitching = true;
-                    break;
-            }
-        }
-        public void OnMouseUp(object sender, MouseEventArgs e)
-        {
-            switch (e.Button)
-            {
-                case MouseButtons.Left:
-                    _currentState?.OnMouseUp(e);
-                    break;
                 case MouseButtons.Middle:
-                    _isPanning = false;
-                    break;
-                case MouseButtons.Right:
-                    _isYawingAndPitching = false;
+                    _isYawingAndPitching = true;
                     break;
             }
         }
@@ -106,7 +91,21 @@ namespace UnBox3D.Controls
             _lastMousePosition = currentMousePosition;
         }
 
-        
+        public void OnMouseUp(object sender, MouseEventArgs e)
+        {
+            switch (e.Button)
+            {
+                case MouseButtons.Left:
+                    _currentState?.OnMouseUp(e);
+                    break;
+                case MouseButtons.Right:
+                    _isPanning = false;
+                    break;
+                case MouseButtons.Middle:
+                    _isYawingAndPitching = false;
+                    break;
+            }
+        }
 
         public void OnMouseWheel(object sender, MouseEventArgs e)
         {
@@ -122,36 +121,11 @@ namespace UnBox3D.Controls
             _camera.Position += _camera.Up * deltaY * _cameraPanSensitivity;
         }
 
-        /* AdjustCameraYawAndPitch(Vector 2 delta)
-         * Date 10/1/2025 Added by Brian Andrade (Project Lead)
-         * 
-         * Summary: Adjusts the Camera Yaw and Pitch relative to the amount the camera have rolled. 
-         * 
-         * Param (Delta) is the roll amount givin from KeyboardController class where Q and E are 
-         * pressed
-         * 
-         * Returns: Nothing just manually rotates camera object on it's own. 
-         */
         private void AdjustCameraYawAndPitch(Vector2 delta)
         {
-            
-            
-            float r = MathHelper.DegreesToRadians(_camera.Roll);
-
-            // Rotate the mouse delta by the roll so screen X/Y map to the rolled camera axes
-            // [dx'; dy'] = R(-roll) * [dx; dy]
-            // We want “move mouse right” to still mean yaw-right *on screen* even when rolled.
-            float dx = delta.X;
-            float dy = delta.Y;
-
-            float dxAligned = dx * (float)Math.Cos(r) - dy * (float)Math.Sin(r);
-            float dyAligned = dx * (float)Math.Sin(r) + dy * (float)Math.Cos(r);
-
-            // Apply sensitivities as usual (note the minus for pitch to keep “move up -> look up”)
-            _camera.Yaw += dxAligned * _cameraYawSensitivity;   // degrees
-            _camera.Pitch -= dyAligned * _cameraPitchSensitivity; // degrees
+            _camera.Yaw += delta.X * _cameraYawSensitivity;
+            _camera.Pitch -= delta.Y * _cameraPitchSensitivity;
         }
-
 
         private void AdjustCameraZoom(float delta)
         {

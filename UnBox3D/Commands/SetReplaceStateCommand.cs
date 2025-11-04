@@ -1,4 +1,4 @@
-using UnBox3D.Controls.States;
+﻿using UnBox3D.Controls.States;
 using UnBox3D.Controls;
 using UnBox3D.Models;
 using UnBox3D.Rendering;
@@ -15,9 +15,8 @@ namespace UnBox3D.Commands
         private ICamera _camera;
         private IRayCaster _rayCaster;
         private ICommandHistory _moveCommandHistory;
-        private string _shape;
 
-        public SetReplaceStateCommand(IGLControlHost glControlHost, MouseController mouseController, ISceneManager sceneManager, IRayCaster rayCaster, ICamera camera, ICommandHistory commandHistory, string shape)
+        public SetReplaceStateCommand(IGLControlHost glControlHost, MouseController mouseController, ISceneManager sceneManager, IRayCaster rayCaster, ICamera camera, ICommandHistory commandHistory)
         {
             _mouseController = mouseController;
             _sceneManager = sceneManager;
@@ -25,12 +24,11 @@ namespace UnBox3D.Commands
             _camera = camera;
             _moveCommandHistory = commandHistory;
             _gLControlHost = glControlHost;
-            _shape = shape;
         }
 
         public void Execute()
         {
-            var replaceState = new ReplaceState(_gLControlHost, _sceneManager, _camera, new RayCaster(_gLControlHost, _camera), _moveCommandHistory, _shape);
+            var replaceState = new ReplaceState(_gLControlHost, _sceneManager, _camera, new RayCaster(_gLControlHost, _camera), _moveCommandHistory);
             _mouseController.SetState(replaceState);
         }
 
