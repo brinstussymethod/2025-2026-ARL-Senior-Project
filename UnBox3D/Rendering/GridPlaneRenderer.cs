@@ -5,7 +5,7 @@ using UnBox3D.Rendering.OpenGL;
 
 namespace UnBox3D.Rendering
 {
-    public class GridPlaneRenderer
+    public sealed class GridPlaneRenderer : IDisposable
     {
         private int _vao, _vbo;
         private Shader _shader;
@@ -16,7 +16,7 @@ namespace UnBox3D.Rendering
         public GridPlaneRenderer(string vertexShaderPath, string fragmentShaderPath)
         {
             _gridSize = 1000.0f;
-            _gridLines = 100;
+            _gridLines = 1000;   // grid lines in ONE quadrant at one axis | Ex. 10 _gridLines = total 20 lines in 1 quadrant (10 x-axis & 10 z-axis)
             _transparency = 0.3f;
 
             // Load Shader using your Shader class
@@ -47,26 +47,24 @@ namespace UnBox3D.Rendering
 
         private float[] GenerateGridVertices(float gridSize, int gridLines)
         {
-            int numLines = (gridLines * 4) + 4;
-            float[] vertices = new float[numLines * 6];
+            int numLines = (gridLines * 4) + 2; // 4 quadrants,  +2 main axes (X, Z)
+            float[] vertices = new float[numLines * 2 * 3]; // each line = 2 vertices (points) | each vertex = 3 floats (X, Y, Z)
 
             int index = 0;
             float step = gridSize / gridLines;
 
             // Vertical lines (X direction)
-            for (int i = -gridLines; i <= gridLines; i++)
+            for (float x = -gridSize; x <= gridSize; x += step)
             {
-                float x = i * step;
                 vertices[index++] = x; vertices[index++] = 0; vertices[index++] = -gridSize;
                 vertices[index++] = x; vertices[index++] = 0; vertices[index++] = gridSize;
             }
 
             // Horizontal lines (Z direction)
-            for (int i = -gridLines; i <= gridLines; i++)
+            for (float z = -gridSize; z <= gridSize; z += step)
             {
-                float z = i * step;
                 vertices[index++] = -gridSize; vertices[index++] = 0; vertices[index++] = z;
-                vertices[index++] = gridSize; vertices[index++] = 0; vertices[index++] = z;
+                vertices[index++] =  gridSize; vertices[index++] = 0; vertices[index++] = z;
             }
 
             return vertices;
@@ -76,26 +74,27 @@ namespace UnBox3D.Rendering
         {
             //GL.Enable(EnableCap.Blend);
             //GL.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
-            //GL.Disable(EnableCap.DepthTest);
+            GL.Enable(EnableCap.DepthTest);
+            GL.DepthMask(false);
 
             _shader.Use();
 
             _shader.SetMatrix4("view", view);
             _shader.SetMatrix4("projection", projection);
-            _shader.SetVector3("objectColor", new Vector3(0.5f, 0.5f, 0.5f)); // Light gray color
+            _shader.SetMatrix4("model", Matrix4.Identity);
 
             // Bind VAO and draw
             GL.BindVertexArray(_vao);
-            GL.DrawArrays(PrimitiveType.Lines, 0, (_gridLines * 4) + 4);
+            GL.DrawArrays(PrimitiveType.Lines, 0, (_gridLines * 4 + 2) * 2) ; // numLines * 2
             GL.BindVertexArray(0);
 
             GL.UseProgram(0);
 
-            GL.Enable(EnableCap.DepthTest);
+            GL.DepthMask(true);
             GL.Disable(EnableCap.Blend);
         }
 
-        public void Cleanup()
+        public void Dispose()
         {
             GL.DeleteVertexArray(_vao);
             GL.DeleteBuffer(_vbo);
