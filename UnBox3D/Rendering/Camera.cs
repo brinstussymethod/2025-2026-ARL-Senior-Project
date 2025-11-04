@@ -1,5 +1,4 @@
-﻿using System.Printing;
-using OpenTK.Mathematics;
+﻿using OpenTK.Mathematics;
 
 // Borrowed from https://github.com/opentk/LearnOpenTK/blob/master/Common/Camera.cs
 namespace UnBox3D.Rendering
@@ -50,8 +49,8 @@ namespace UnBox3D.Rendering
             get => MathHelper.RadiansToDegrees(_pitch);
             set
             {
-                var angle = MathHelper.Clamp(value, -89f, 89f);
-                _pitch = MathHelper.DegreesToRadians(angle);
+                // Allow full rotation: do not clamp pitch here. Store the angle in radians.
+                _pitch = MathHelper.DegreesToRadians(value);
                 UpdateVectors();
             }
         }
@@ -109,26 +108,23 @@ namespace UnBox3D.Rendering
 
         private void UpdateVectors()
         {
-            _front.X = (float)(Math.Cos(_pitch) * Math.Cos(_yaw));
-            _front.Y = (float)Math.Sin(_pitch);
-            _front.Z = (float)(Math.Cos(_pitch) * Math.Sin(_yaw));
-            _front = _front.Normalized();
+            // Compute orientation as quaternion from yaw (Y), pitch (X) and roll (Z).
+            // _yaw, _pitch and _roll are stored in radians.
+            var qYaw = Quaternion.FromAxisAngle(Vector3.UnitY, _yaw);
+            var qPitch = Quaternion.FromAxisAngle(Vector3.UnitX, _pitch);
+            var qRoll = Quaternion.FromAxisAngle(Vector3.UnitZ, _roll);
 
-            Vector3 worldUp = Vector3.UnitY;
-            if (System.Math.Abs(Vector3.Dot(_front, worldUp)) > 0.999f)
-                worldUp = Vector3.UnitX;
+            // Apply yaw then pitch then roll. The multiplication order below applies
+            // q = qYaw * qPitch * qRoll.
+            var q = qYaw * qPitch * qRoll;
 
-            _right = Vector3.Normalize(Vector3.Cross(_front, worldUp));
-            _up = Vector3.Normalize(Vector3.Cross(_right, _front));
+            // Create rotation matrix from quaternion and transform the basis vectors.
+            var rot = Matrix4.CreateFromQuaternion(q);
 
-
-            if (_roll != 0f)
-            {
-                // Matrix3 is sufficient for rotating vectors
-                var rollMat = Matrix4.CreateFromAxisAngle(_front, _roll);
-                _right = Vector3.TransformVector(_right, rollMat).Normalized();
-                _up = Vector3.TransformVector(_up, rollMat).Normalized();
-            }
+            // Camera's default forward is -Z in our conventions.
+            _front = Vector3.Normalize(Vector3.TransformVector(-Vector3.UnitZ, rot));
+            _right = Vector3.Normalize(Vector3.TransformVector(Vector3.UnitX, rot));
+            _up = Vector3.Normalize(Vector3.TransformVector(Vector3.UnitY, rot));
         }
     }
 }
