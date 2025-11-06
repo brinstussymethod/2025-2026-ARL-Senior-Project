@@ -9,10 +9,12 @@ namespace UnBox3D.Utils
     public class BlenderIntegration
     {
         private readonly ILogger _logger;
+        private readonly IBlenderInstaller _installer;
 
-        public BlenderIntegration(ILogger logger)
+        public BlenderIntegration(ILogger logger, IBlenderInstaller installer)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _installer = installer ?? throw new ArgumentNullException(nameof(installer));
         }
 
         public bool RunBlenderScript(string inputModelPath, string outputModelPath, string scriptPath, 
@@ -22,15 +24,11 @@ namespace UnBox3D.Utils
             Debug.WriteLine("baseDirectory: " + baseDirectory);
 
             // Fix Blender path construction for publishing
-            string blenderExePath = Path.Combine(baseDirectory, "Blender", "blender-4.2.0-windows-x64", "blender.exe");
-            Debug.WriteLine("blenderExePath: " + blenderExePath);
-
-            _logger.Info($"Base Directory: {baseDirectory}");
-            _logger.Info($"Blender Path: {blenderExePath}");
+            string blenderExePath = _installer.ExecutablePath;
 
             if (!File.Exists(blenderExePath))
             {
-                errorMessage = $"Blender executable not found at path: {blenderExePath}";
+                errorMessage = $"Blender executable not found. Expected at: {blenderExePath}";
                 _logger.Error(errorMessage);
                 return false;
             }
