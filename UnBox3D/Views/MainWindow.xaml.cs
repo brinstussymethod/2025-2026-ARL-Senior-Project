@@ -1,3 +1,4 @@
+// MainWindow.xaml.cs â€” MERGED
 using Microsoft.Extensions.DependencyInjection;
 using System;
 using System.Diagnostics;
@@ -10,9 +11,11 @@ using Control = System.Windows.Forms.Control;
 using UnBox3D.Rendering.OpenGL;
 using UnBox3D.Utils;
 using UnBox3D.ViewModels;
+using UnBox3D.Models; // added for MeshSummary/IAppMesh
 using TextBox = System.Windows.Controls.TextBox;
 using Application = System.Windows.Application;
 
+using UnBox3D.Rendering;
 namespace UnBox3D.Views
 {
     public partial class MainWindow : Window
@@ -28,7 +31,6 @@ namespace UnBox3D.Views
         {
             InitializeComponent();
 
-            // Ensure DataContext from DI so ICommand bindings resolve.
             try
             {
                 DataContext ??= App.Services.GetRequiredService<MainViewModel>();
@@ -48,7 +50,6 @@ namespace UnBox3D.Views
 
         public void Initialize(IGLControlHost controlHost, ILogger logger, IBlenderInstaller blenderInstaller)
         {
-            // Keep your field assignments
             _controlHost = controlHost ?? throw new ArgumentNullException(nameof(controlHost));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _blenderInstaller = blenderInstaller ?? throw new ArgumentNullException(nameof(blenderInstaller));
@@ -59,10 +60,7 @@ namespace UnBox3D.Views
                 if (m != null && VM != null)
                     m.Invoke(VM, new object[] { controlHost, logger, blenderInstaller });
             }
-            catch
-            {
-                // optional: _logger?.Warn("VM.Initialize reflection failed");
-            }
+            catch { }
         }
 
         private async void MainWindow_Loaded(object? sender, RoutedEventArgs e)
@@ -71,7 +69,6 @@ namespace UnBox3D.Views
             {
                 _logger?.Info("MainWindow loaded. Initializing OpenGL...");
 
-                // Show progress for Blender install
                 var loadingWindow = new LoadingWindow
                 {
                     StatusHint = "Installing Blender...",
@@ -99,7 +96,6 @@ namespace UnBox3D.Views
 
                 if (_controlHost is not null)
                 {
-                    // Requires a WindowsFormsHost named 'openGLHost' in the XAML
                     openGLHost.Child = (Control)_controlHost;
                     _logger?.Info("GLControlHost successfully attached to WindowsFormsHost.");
                     StartUpdateLoop();
@@ -138,7 +134,7 @@ namespace UnBox3D.Views
             while (IsLoaded)
             {
                 _controlHost?.Render();
-                await Task.Delay(16); // ~60 FPS
+                await Task.Delay(16);
             }
         }
 
@@ -173,44 +169,24 @@ namespace UnBox3D.Views
 
                 if (vm != null)
                 {
-                    // Project open
-                    if (ext == ".ub3d")
+                    var importMethod = vm.GetType().GetMethod("ImportModelFromPath");
+                    if (importMethod != null)
                     {
-                        var openProj = vm.GetType().GetMethod("ImportModelFromPath");
-                        if (openProj != null)
-                        {
-                            openProj.Invoke(vm, new object[] { path });
-                        }
-                        else
-                        {
-                            // No project-open method available
-                            _logger?.Warn("ImportModelFromPath not found on MainViewModel.");
-                        }
+                        importMethod.Invoke(vm, new object[] { path });
                     }
                     else
                     {
-                        // Model import — REQUIRE a path-based method; do NOT execute the command here
-                        var importMethod = vm.GetType().GetMethod("ImportModelFromPath");
-                        if (importMethod != null)
-                        {
-                            importMethod.Invoke(vm, new object[] { path });
-                        }
-                        else
-                        {
-                            // If you reach here, the VM doesn’t expose a path-based import yet.
-                            _logger?.Warn("ImportModelFromPath not found on MainViewModel; cannot import without popping a dialog.");
-                            System.Windows.MessageBox.Show(this,
-                                "This build doesn’t support path-based import yet. Ask your team to add MainViewModel.ImportModelFromPath(string).",
-                                "UnBox3D", MessageBoxButton.OK, MessageBoxImage.Information);
-                            return;
-                        }
+                        _logger?.Warn("ImportModelFromPath not found on MainViewModel; cannot import without popping a dialog.");
+                        System.Windows.MessageBox.Show(this,
+                            "This build doesnâ€™t support path-based import yet. Ask your team to add MainViewModel.ImportModelFromPath(string).",
+                            "UnBox3D", MessageBoxButton.OK, MessageBoxImage.Information);
+                        return;
                     }
 
-                    // Optional: reframe camera if the VM exposes it
                     vm.GetType().GetMethod("FrameScene")?.Invoke(vm, null);
                 }
 
-                this.Title = $"UnBox3D — {System.IO.Path.GetFileName(path)}";
+                this.Title = $"UnBox3D â€” {System.IO.Path.GetFileName(path)}";
             }
             catch (Exception ex)
             {
@@ -218,6 +194,20 @@ namespace UnBox3D.Views
                     $"Failed to open '{System.IO.Path.GetFileName(path)}':\n{ex.Message}",
                     "UnBox3D", MessageBoxButton.OK, MessageBoxImage.Error);
                 _logger?.Error($"Open failed: {ex}");
+            }
+        }
+
+        // Back to Main Menu (XAML button may exist elsewhere)
+        private void BackToMainMenu_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var mainMenu = new MainMenuWindow(App.Services);
+                mainMenu.Show();
+            }
+            finally
+            {
+                this.Close();
             }
         }
 
@@ -268,13 +258,13 @@ namespace UnBox3D.Views
 
         private void NumericTextBox_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
         {
-            if (e.Key == Key.Back || e.Key == Key.Delete || e.Key == Key.Left ||
-                e.Key == Key.Right || e.Key == Key.Tab)
+            if (e.Key == System.Windows.Input.Key.Back || e.Key == System.Windows.Input.Key.Delete || e.Key == System.Windows.Input.Key.Left ||
+                e.Key == System.Windows.Input.Key.Right || e.Key == System.Windows.Input.Key.Tab)
             {
                 return;
             }
 
-            if (Keyboard.Modifiers == ModifierKeys.Control && e.Key == Key.V)
+            if (Keyboard.Modifiers == ModifierKeys.Control && e.Key == System.Windows.Input.Key.V)
             {
                 var textBox = sender as TextBox;
 
@@ -370,13 +360,43 @@ namespace UnBox3D.Views
             }
         }
 
-        // Keep teammate's signature so it matches XAML event hookup
+        // Slider hook -> SmallMeshThreshold + reapply filter (fixes mismatch)
         private void MeshThreshold_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
             if (VM != null)
             {
-                var prop = VM.GetType().GetProperty("MeshThreshold");
-                if (prop != null && prop.CanWrite) prop.SetValue(VM, e.NewValue);
+                var prop = VM.GetType().GetProperty("SmallMeshThreshold");
+                if (prop != null && prop.CanWrite) prop.SetValue(VM, (float)e.NewValue);
+                VM.GetType().GetMethod("ApplyMeshThreshold")?.Invoke(VM, null);
+            }
+        }
+
+        // Extra signature for teammate XAML using EventArgs
+        private void MeshThreshold_ValueChanged(object sender, EventArgs e)
+        {
+            if (sender is System.Windows.Controls.Slider slider && DataContext is MainViewModel vm)
+            {
+                vm.SmallMeshThreshold = (float)slider.Value;
+                vm.ApplyMeshThreshold();
+            }
+        }
+
+        // Tree selection -> VM.SelectedMesh (adds back original behavior)
+        private void TreeView_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
+        {
+            if (DataContext is not MainViewModel vm) return;
+
+            if (e.NewValue is MeshSummary summary && summary.SourceMesh != null)
+            {
+                vm.SelectedMesh = summary.SourceMesh;
+            }
+            else if (e.NewValue is IAppMesh mesh)
+            {
+                vm.SelectedMesh = mesh;
+            }
+            else
+            {
+                vm.SelectedMesh = null;
             }
         }
     }
