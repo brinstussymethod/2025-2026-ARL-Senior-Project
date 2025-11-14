@@ -16,6 +16,8 @@ using UnBox3D.Rendering.OpenGL;
 using UnBox3D.Utils;
 using UnBox3D.Views;
 
+using System.Linq;
+using System.Threading;
 namespace UnBox3D.ViewModels
 {
     public partial class MainViewModel : ObservableObject
@@ -35,7 +37,11 @@ namespace UnBox3D.ViewModels
         private readonly ModelExporter _modelExporter;
         private readonly ICommandHistory _commandHistory;
         private string _importedFilePath; // Global filepath that should be referenced when simplifying
-        private List<IAppMesh> _latestImportedModel; // This is so we can keep track of the original model when playing around with small mesh thresholds.
+        private List<IAppMesh> _latestImportedModel; 
+        private IAppMesh _lastSelectedMesh;
+        private Vector3 _normalColor;
+        private Vector3 _highlightColor;
+// This is so we can keep track of the original model when playing around with small mesh thresholds.
 
         [ObservableProperty]
         private IAppMesh selectedMesh;
@@ -79,6 +85,8 @@ namespace UnBox3D.ViewModels
             _glControlHost = glControlHost;
             _camera = camera;
             _commandHistory = commandHistory;
+            // setup selection highlight colors
+            LoadColors();
         }
 
         #endregion
@@ -714,7 +722,38 @@ namespace UnBox3D.ViewModels
         }
 
 
+        
+
         [RelayCommand]
+        private async void ReplaceWithCubeOption(IAppMesh mesh)
+        {
+            Vector3 center = _sceneManager.GetMeshCenter(mesh.GetG4Mesh());
+            Vector3 dims   = _sceneManager.GetMeshDimensions(mesh.GetG4Mesh());
+
+            AppMesh cube = GeometryGenerator.CreateBox(center, dims.X, dims.Y, dims.Z);
+
+            var toRemove = Meshes.FirstOrDefault(ms => ms.SourceMesh == mesh);
+            if (toRemove != null) Meshes.Remove(toRemove);
+
+            _sceneManager.ReplaceMesh(mesh, cube);
+            Meshes.Add(new MeshSummary(cube));
+        }
+
+        [RelayCommand]
+private async void ReplaceWithCubeClick()
+{
+    if (SelectedMesh != null)
+    {
+        ReplaceWithCubeOption(SelectedMesh);
+        await ShowWpfMessageBoxAsync("Replaced!", "Replace", MessageBoxButton.OK, MessageBoxImage.Information);
+    }
+    else
+    {
+        await ShowWpfMessageBoxAsync("Select a mesh first.", "Replace", MessageBoxButton.OK, MessageBoxImage.Information);
+    }
+}
+    
+[RelayCommand]
         private async Task SimplifyQEC(IAppMesh mesh)
         {
             await RunPythonSimplificationSingle(mesh, "quadric_edge_collapse");
@@ -970,7 +1009,53 @@ namespace UnBox3D.ViewModels
             }
             return null;
         }
-        #endregion
+        
+        // Selection highlighting: called when SelectedMesh changes via ObservableProperty partial
+        partial void OnSelectedMeshChanged(IAppMesh value)
+        {
+            if (_lastSelectedMesh != null) _lastSelectedMesh.SetColor(_normalColor);
+            if (value != null) value.SetColor(_highlightColor);
+            _lastSelectedMesh = value;
+            _glControlHost.Render();
+        }
+
+        private void LoadColors()
+        {
+            var rs = new RenderingSettings();
+
+            _normalColor = ReadColorOrDefault(
+                sectionKey: rs.GetKey(),
+                settingName: RenderingSettings.MeshColor,
+                fallback: Colors.Red,
+                labelForLogs: "Mesh color"
+            );
+
+            _highlightColor = ReadColorOrDefault(
+                sectionKey: rs.GetKey(),
+                settingName: RenderingSettings.MeshHighlightColor,
+                fallback: Colors.Blue,
+                labelForLogs: "Mesh highlight color"
+            );
+        }
+
+        private Vector3 ReadColorOrDefault(string sectionKey, string settingName, Vector3 fallback, string labelForLogs)
+        {
+            string? raw = _settingsManager.GetSetting<string>(sectionKey, settingName);
+            if (TryParseColor(raw, out var parsedColor)) return parsedColor;
+            if (!string.IsNullOrWhiteSpace(raw)) Debug.WriteLine($"Warning: {labelForLogs} '{raw}' not recognized. Using fallback.");
+            return fallback;
+        }
+
+        private static bool TryParseColor(string? raw, out Vector3 color)
+        {
+            color = default;
+            if (string.IsNullOrWhiteSpace(raw)) return false;
+            string key = raw.Trim().ToLowerInvariant().Replace(" ", "");
+            if (Colors.colorMap.TryGetValue(key, out color)) return true;
+            return false;
+        }
+
+#endregion
 
         [RelayCommand]
         private void Exit()
