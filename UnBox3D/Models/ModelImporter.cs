@@ -73,12 +73,12 @@ namespace UnBox3D.Models
 
             // Step 1: Convert Assimp meshes into g4 meshes and calculate the total model bounds
             AxisAlignedBox3d modelBounds = AxisAlignedBox3d.Empty;
-            List<(DMesh3 dmesh, Mesh assimpMesh)> meshPairs = new();
+            List<(DMesh3WithTextures dmesh, Mesh assimpMesh)> meshPairs = new();
 
             for (int i = 0; i < scene.MeshCount; i++)
             {
                 Mesh mesh = scene.Meshes[i];
-                DMesh3 dmesh = new DMesh3();
+                DMesh3WithTextures dmesh = new DMesh3WithTextures();
 
                 // Copy vertices from Assimp mesh to g4 mesh
                 for (int j = 0; j < mesh.VertexCount; j++)
@@ -94,6 +94,16 @@ namespace UnBox3D.Models
                     if (face.HasIndices && face.IndexCount == 3)
                     {
                         dmesh.AppendTriangle(face.Indices[0], face.Indices[1], face.Indices[2]);
+                    }
+                }
+
+                // Copy UVs if present
+                if (mesh.HasTextureCoords(0))
+                {
+                    for (int j = 0; j < mesh.VertexCount; j++)
+                    {
+                        var uv = mesh.TextureCoordinateChannels[0][j];
+                        dmesh.SetUV(j, new g4.Vector2d(uv.X, uv.Y));
                     }
                 }
 
@@ -140,6 +150,19 @@ namespace UnBox3D.Models
                 // Create and color final IAppMesh instance
                 IAppMesh appMesh = new AppMesh(dmesh, assimpMesh);
                 appMesh.SetColor(defaultColor);
+
+                // Store the diffuse texture path if present
+                int matIndex = assimpMesh.MaterialIndex;
+                if (matIndex >= 0 && matIndex < scene.MaterialCount)
+                {
+                    var material = scene.Materials[matIndex];
+                    if (material.HasTextureDiffuse)
+                    {
+                        var texFile = material.TextureDiffuse.FilePath;
+                        ((AppMesh)appMesh).DiffuseTexturePath = texFile;
+                    }
+                }
+
                 importedMeshes.Add(appMesh);
             }
 
