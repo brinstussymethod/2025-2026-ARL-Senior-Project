@@ -2,23 +2,26 @@
 ///  DMesh3 subclass that supports texture coordinates (UVs).
 /// </summary>
 
-public class DMesh3WithTextures : DMesh3
+namespace UnBox3D.Models
 {
-    private List<g4.Vector2d> uvs = new();
-
-    public void AppendVertexWithUV(g4.Vector3d v, g4.Vector2d uv)
+    public class DMesh3WithTextures : DMesh3
     {
-        int idx = AppendVertex(v); // from DMesh3
-        if (idx != uvs.Count) uvs.Add(uv); // make sure list matches vertex count
-    }
+        private List<g4.Vector2d> uvs = new();
 
-    public void SetUV(int vertexIndex, g4.Vector2d uv)
-    {
-        if (vertexIndex >= 0 && vertexIndex < uvs.Count)
-            uvs[vertexIndex] = uv;
-        else
-            uvs.Add(uv);
-    }
+        public void AppendVertexWithUV(g4.Vector3d v, g4.Vector2d uv)
+        {
+            int idx = AppendVertex(v); // from DMesh3
+            if (idx != uvs.Count) uvs.Add(uv); // make sure list matches vertex count
+        }
 
-    public g4.Vector2d GetUV(int vertexIndex) => uvs[vertexIndex];
+        public void SetUV(int vertexIndex, g4.Vector2d uv)
+        {
+            if (vertexIndex >= 0 && vertexIndex < uvs.Count)
+                uvs[vertexIndex] = uv;
+            else
+                uvs.Add(uv);
+        }
+
+        public g4.Vector2d GetUV(int vertexIndex) => uvs[vertexIndex];
+    }
 }
