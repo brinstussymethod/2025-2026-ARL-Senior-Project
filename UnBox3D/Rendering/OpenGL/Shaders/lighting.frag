@@ -46,5 +46,5 @@ void main()
     vec4 texColor = texture(texture_diffuse, TexCoord);
 
     // Multiple lighting with texture and object color
-    FragColor = vec4(objectColor, 1.0) * texColor * vec4(lighting, 1.0)
+    FragColor = vec4(objectColor, 1.0) * texColor * vec4(lighting, 1.0);
 }
