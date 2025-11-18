@@ -84,9 +84,9 @@ namespace UnBox3D.Rendering
             return appMesh;
         }
 
-        public static AppMesh CreateCylinder(Vector3 center, float radius, float height, int segments)
+        public static AppMesh CreateCylinder(Vector3 center, float radius, float height, int segments, string name="Generated Cylinder")
         {
-            Mesh assimpMesh = new Mesh("Cylinder", PrimitiveType.Triangle);
+            Mesh assimpMesh = new Mesh(name, PrimitiveType.Triangle);
             DMesh3 g4Mesh = new DMesh3();
             float halfHeight = height * 0.5f;
             List<Vector3> vertices = new List<Vector3>();
@@ -151,9 +151,9 @@ namespace UnBox3D.Rendering
             return new AppMesh(g4Mesh, assimpMesh);
         }
 
-        public static AppMesh CreateRotatedCylinder(Vector3 center, float radius, float height, int segments, Vector3 direction)
+        public static AppMesh CreateRotatedCylinder(Vector3 center, float radius, float height, int segments, Vector3 direction, string name="Generated Cylinder")
         {
-            Mesh assimpMesh = new Mesh("GeneratedCylinder", PrimitiveType.Triangle);
+            Mesh assimpMesh = new Mesh(name, PrimitiveType.Triangle);
             DMesh3 g4Mesh = new DMesh3();
             float halfHeight = height * 0.5f;
             List<Vector3> vertices = new List<Vector3>();
