@@ -3,6 +3,7 @@ using g4;
 using OpenTK.Graphics.OpenGL4;
 using OpenTK.Mathematics;
 using System.Diagnostics;
+using UnBox3D.Models;
 using UnBox3D.Rendering.OpenGL;
 using Quaternion = OpenTK.Mathematics.Quaternion;
 
@@ -11,7 +12,7 @@ namespace UnBox3D.Rendering
     public interface IAppMesh
     {
         #region Properties
-        DMesh3 GetG4Mesh();
+        DMesh3WithTextures GetG4Mesh();
         Assimp.Mesh GetAssimpMesh();
         string Name { get; set; }
         int VertexCount { get; }
@@ -37,7 +38,7 @@ namespace UnBox3D.Rendering
     public class AppMesh : IAppMesh, IDisposable
     {
         #region Fields
-        private DMesh3 _g4Mesh;
+        private DMesh3WithTextures _g4Mesh;
         private Mesh _assimpMesh;
         private string _name;
         private bool _highlighted = false;
@@ -45,6 +46,10 @@ namespace UnBox3D.Rendering
         private float[] _vertices;
         private List<Vector3> _edges;
         private int _vao, _vertexBufferObject;
+        private float[]? _uvs;
+        private int _uvBufferObject;
+        public string? DiffuseTexturePath;
+        private Texture? _diffuseTexture;
         private bool _disposed = false;
         private Quaternion _transform = Quaternion.Identity;
         private int _ebo;
@@ -54,7 +59,7 @@ namespace UnBox3D.Rendering
         #region Constructor
         public AppMesh(DMesh3 g4mesh, Assimp.Mesh assimpMesh)
         {
-            _g4Mesh = g4mesh;
+            _g4Mesh = (DMesh3WithTextures)g4mesh;
             _assimpMesh = assimpMesh;
             _name = assimpMesh.Name;
             _edges = new List<Vector3>();
@@ -103,6 +108,18 @@ namespace UnBox3D.Rendering
                     (float)_g4Mesh.GetVertex(edgeVertices.b).x,
                     (float)_g4Mesh.GetVertex(edgeVertices.b).y,
                     (float)_g4Mesh.GetVertex(edgeVertices.b).z));
+            }
+
+            // Add UVs if present
+            if (assimpMesh.TextureCoordinateChannelCount > 0)
+            {
+                _uvs = new float[assimpMesh.VertexCount * 2];
+                for (int i = 0; i < assimpMesh.VertexCount; i++)
+                {
+                    var uv = assimpMesh.TextureCoordinateChannels[0][i];
+                    _uvs[i * 2] = uv.X;
+                    _uvs[i * 2 + 1] = uv.Y;
+                }
             }
 
             SetupMesh();
@@ -163,6 +180,29 @@ namespace UnBox3D.Rendering
                 GL.VertexAttribPointer(positionLocation, 3, VertexAttribPointerType.Float, false, 3 * sizeof(float), 0);
             }
 
+            if (_uvs != null)
+            {
+                _uvBufferObject = GL.GenBuffer();
+                GL.BindBuffer(BufferTarget.ArrayBuffer, _uvBufferObject);
+                GL.BufferData(BufferTarget.ArrayBuffer, _uvs.Length * sizeof(float), _uvs, BufferUsageHint.StaticDraw);
+
+                var texCoordLocation = _lightingShader.GetAttribLocation("aTexCoord");
+                GL.EnableVertexAttribArray(texCoordLocation);
+                GL.VertexAttribPointer(texCoordLocation, 2, VertexAttribPointerType.Float, false, 2 * sizeof(float), 0);
+
+                if (_g4Mesh is DMesh3WithTextures texMesh && !string.IsNullOrEmpty(texMesh.DiffuseTexturePath))
+                {
+                    // Create the texture object
+                    _diffuseTexture = new Texture(texMesh.DiffuseTexturePath);
+
+                    // Bind it to Texture Unit 0
+                    _diffuseTexture.Bind(TextureUnit.Texture0);
+                    
+                    ShaderManager.LightingShader.Use();
+                    ShaderManager.LightingShader.SetInt("texture_diffuse", 0);
+                }
+            }
+
             // Unbind for safety
             GL.BindBuffer(BufferTarget.ArrayBuffer, 0);
             GL.BindVertexArray(0);
@@ -183,7 +223,7 @@ namespace UnBox3D.Rendering
         #endregion
 
         #region Getters
-        public DMesh3 GetG4Mesh() => _g4Mesh;
+        public DMesh3WithTextures GetG4Mesh() => _g4Mesh;
         public Assimp.Mesh GetAssimpMesh() => _assimpMesh;
         public Vector3 GetColor() => _color;
         public bool GetHighlighted() => _highlighted;
@@ -281,7 +321,7 @@ namespace UnBox3D.Rendering
                 remesh.BasicRemeshPass();
 
             // Assign the new (remeshed) DMesh3 back to your app's internal mesh
-            _g4Mesh = newMesh;
+            _g4Mesh = (DMesh3WithTextures)newMesh;
             RefreshAssimpMesh();
             SetupMesh();
         }
@@ -354,6 +394,12 @@ namespace UnBox3D.Rendering
             {
                 GL.DeleteBuffer(_ebo);
                 _ebo = 0;
+            }
+
+            if (_uvBufferObject != 0) 
+            {
+                GL.DeleteBuffer(_uvBufferObject);
+                _uvBufferObject = 0; 
             }
 
             _disposed = true;
