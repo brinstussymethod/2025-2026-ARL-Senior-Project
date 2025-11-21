@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <!-- Design & startup defaults (Light) so the designer resolves keys. 
+       ThemeManager will append the active theme LAST at runtime and override these. -->
+  <SolidColorBrush x:Key="SurfaceBrush"     Color="#FFFFFFFF"/>
+  <SolidColorBrush x:Key="CardBrush"        Color="#FFF5F5F5"/>
+  <SolidColorBrush x:Key="CardHoverBrush"   Color="#FFEFEFEF"/>
+  <SolidColorBrush x:Key="CardPressedBrush" Color="#FFE6E6E6"/>
+  <SolidColorBrush x:Key="BorderBrushLight" Color="#FFDDDDDD"/>
+  <SolidColorBrush x:Key="BorderBrushHover" Color="#FFBFBFBF"/>
+  <SolidColorBrush x:Key="TextBrush"        Color="#FF1A1A1A"/>
+  <SolidColorBrush x:Key="AccentBrush"      Color="#FF666666"/>
+  <SolidColorBrush x:Key="AccentLightBrush" Color="#FF8C8C8C"/>
+</ResourceDictionary>

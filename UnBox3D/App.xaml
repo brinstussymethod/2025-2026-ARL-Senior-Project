@@ -1,8 +1,17 @@
-﻿<Application x:Class="UnBox3D.App"
+<?xml version="1.0" encoding="utf-8"?>
+<Application x:Class="UnBox3D.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:local="clr-namespace:UnBox3D">
-
-    <Application.Resources>
-    </Application.Resources>
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <Application.Resources>
+    <ResourceDictionary>
+      <ResourceDictionary.MergedDictionaries>
+        <!-- Design/startup fallback (light) so the designer resolves keys -->
+        <ResourceDictionary Source="Themes/Defaults.xaml"/>
+        <!-- Shared, app-wide resources -->
+        <ResourceDictionary Source="Themes/Colors.xaml"/>
+        <ResourceDictionary Source="Themes/Typography.xaml"/>
+        <ResourceDictionary Source="Themes/Controls.xaml"/>
+      </ResourceDictionary.MergedDictionaries>
+    </ResourceDictionary>
+  </Application.Resources>
 </Application>

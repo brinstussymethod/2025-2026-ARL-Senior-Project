@@ -1,0 +1,8 @@
+<Project>
+  <!-- Use Update instead of Include so we don't create duplicates with SDK default Page items -->
+  <ItemGroup>
+    <Page Update="Themes\Controls.xaml;Themes\Defaults.xaml;Themes\Typography.xaml;Views\LoadingWindow.xaml;Views\MainMenuWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+  </ItemGroup>
+</Project>
