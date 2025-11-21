@@ -1,4 +1,4 @@
-﻿using Assimp;
+using Assimp;
 using g3;
 using OpenTK.Mathematics;
 using UnBox3D.Rendering;
@@ -13,19 +13,23 @@ namespace UnBox3D.Commands
         private readonly IRayCaster _rayCaster;
         private readonly IGLControlHost _glControlHost;
         private readonly ICamera _camera;
+        private readonly string _shape;
 
 
         private readonly Stack<MeshReplaceMemento> replacedMeshes;
 
-        public ReplaceCommand(IGLControlHost glControlHost, ISceneManager sceneManager, IRayCaster rayCaster, ICamera camera)
+
+        public ReplaceCommand(IGLControlHost glControlHost, ISceneManager sceneManager, IRayCaster rayCaster, ICamera camera, string shape)
         {
             _glControlHost = glControlHost;
             _rayCaster = rayCaster;
             _camera = camera;
             _sceneManager = sceneManager;
+            _shape = shape;
 
             replacedMeshes = new Stack<MeshReplaceMemento>();
         }
+
 
         public static void AppendMeshFromTriangles(DMesh3 sourceMesh, DMesh3 targetMesh, IEnumerable<int> triangleIndices)
         {
@@ -67,77 +71,44 @@ namespace UnBox3D.Commands
             if (_rayCaster.RayIntersectsMesh(_sceneManager.GetMeshes(), rayOrigin, rayWorld, out float distance, out IAppMesh clickedMesh))
             {
                 // Get the index of the clicked mesh
-                //int meshIndex = scene.IndexOf(clickedMesh);
                 int meshIndex = _sceneManager.GetMeshes().IndexOf(clickedMesh);
                 if (meshIndex == -1) return; // Safety check
 
-                //MeshConnectedComponents c = new MeshConnectedComponents(clickedMesh);
-                // c.FindConnectedT();
-
-                /*
-                DMeshAABBTree3 spatial = new DMeshAABBTree3(clickedMesh);
-                spatial.Build();
-
-                // Convert your ray origin and direction from OpenTK to g3 types
-                g3.Vector3d origin = new g3.Vector3d(rayOrigin.X, rayOrigin.Y, rayOrigin.Z);
-                g3.Vector3d direction = new g3.Vector3d(rayWorld.X, rayWorld.Y, rayWorld.Z);
-                Ray3d ray = new Ray3d(origin, direction);
-
-                // Find intersected triangle
-                int triID = spatial.FindNearestHitTriangle(ray, float.MaxValue);
-                if (triID == DMesh3.InvalidID) return;
-                
-
-                Dictionary<int, int> triangleToGroupMap = new Dictionary<int, int>();
-
-                // Build map: triangle ID -> group index
-                for (int groupIndex = 0; groupIndex < c.Components.Count; groupIndex++)
-                {
-                    foreach (int triID in c.Components[groupIndex].Indices)
-                    {
-                        triangleToGroupMap[triID] = groupIndex;
-                    }
-                }
-
-                DMeshAABBTree3 spatial = new DMeshAABBTree3(clickedMesh);
-                spatial.Build(); 
-
-                g3.Vector3d origin = new g3.Vector3d(rayOrigin.X, rayOrigin.Y, rayOrigin.Z);
-                g3.Vector3d direction = new g3.Vector3d(rayWorld.X, rayWorld.Y, rayWorld.Z);
-                Ray3d ray = new Ray3d(origin, direction);
-
-                int tri = spatial.FindNearestHitTriangle(ray, float.MaxValue);
-                if (tri == DMesh3.InvalidID) return;
-
-                int clickedGroup = triangleToGroupMap[tri];
-                var group = c.Components[clickedGroup];
-
-                // Now extract that submesh
-                DMesh3 newMesh = new DMesh3();
-                MeshEditor editor = new MeshEditor(newMesh);
-
-                */
-
-                // Create replacement cylinder
-
+                // Gets the center of the mesh, its dimensions, and sets the color for the replacement mesh
                 Vector3 meshCenter = _sceneManager.GetMeshCenter(clickedMesh.GetG4Mesh());
                 Vector3 meshDimensions = _sceneManager.GetMeshDimensions(clickedMesh.GetG4Mesh());
-
-                bool isXAligned = (meshDimensions.X < meshDimensions.Z);
-
-                float radius = Math.Max(Math.Min(meshDimensions.X, meshDimensions.Z), meshDimensions.Y) / 2;
-                float height = isXAligned ? meshDimensions.X : meshDimensions.Z;
-                AppMesh replacementMesh = GeometryGenerator.CreateRotatedCylinder(meshCenter, radius, height, 32, Vector3.UnitY);
-
-                
                 Vector3 color = new Vector3(1.0f, 0.0f, 0.0f); // red color
 
-                MeshReplaceMemento replaceMesh = new MeshReplaceMemento(clickedMesh, replacementMesh, color);
-                replacedMeshes.Push(replaceMesh);
+                AppMesh replacementMesh;
 
+                // When you want to replace with a cube (or rectangular prism)
+                if (_shape == "cube")
+                {
+                    // Use existing dimensions of the clicked mesh as box extents
+                    replacementMesh = GeometryGenerator.CreateBox(
+                        meshCenter,
+                        meshDimensions.X,
+                        meshDimensions.Y,
+                        meshDimensions.Z
+                    );
+                }
+                else // or replace with cylinder
+                {
+                    bool isXAligned = (meshDimensions.X < meshDimensions.Z);
+                    float radius = Math.Max(Math.Min(meshDimensions.X, meshDimensions.Z), meshDimensions.Y) / 2;
+                    float height = isXAligned ? meshDimensions.X : meshDimensions.Z;
+                    replacementMesh = GeometryGenerator.CreateRotatedCylinder(
+                        meshCenter, radius, height, 32, Vector3.UnitY
+                    );
+                }
+
+                // Whatever shape was picked to replace will then be that shape to replace with
+                var replaceMesh = new MeshReplaceMemento(clickedMesh, replacementMesh, color);
+                replacedMeshes.Push(replaceMesh);
                 replacementMesh.SetColor(color);
                 _sceneManager.ReplaceMesh(clickedMesh, replacementMesh);
-                Console.WriteLine($"Replacement Complete!");
+                Console.WriteLine("Replacement Complete!");
+
             }
         }
 
