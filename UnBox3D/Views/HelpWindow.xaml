@@ -12,66 +12,144 @@
         ResizeMode="CanResize"
         Background="{DynamicResource SurfaceBrush}">
 
-    <!-- ScrollViewer allows the help content to scroll if it's longer than the window -->
+    <!-- ScrollViewer allows the help content to scroll if it's longer than the window/adjust to window screen -->
     <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="20">
         <StackPanel>
+			
 
-            <!-- Title -->
+            <!-- title -->
             <TextBlock Text="UnBox3D — Help"
                        FontSize="24"
                        FontWeight="Bold"
                        Margin="0 0 0 20"/>
 
-            <!-- Program Description -->
-            <TextBlock Text="UnBox3D is a 3D visualization and modeling tool that allows users to load, view, and interact with 3D objects in real time. You can navigate the 3D scene, adjust settings, and customize your workspace using both the mouse and keyboard shortcuts."
+            <!-- brief summary of the program -->
+            <TextBlock Text="UnBox3D is an application that converts complex 3D geometries into simplified 2D unfolded representations for precise laser-cutting. It allows you to explore and manipulate 3D objects using mouse and keyboard controls, making it easy to create ready-to-use 2D unfolded representations for assembling the physical model."
                        TextWrapping="Wrap"
                        FontSize="14"
                        Margin="0 0 0 20"/>
 
-            <!-- Keybinds Section -->
-            <TextBlock Text="Keyboard Shortcuts" 
+            <!-- keyboard shortcuts and control functions -->
+            <TextBlock Text="Keyboard Shortcuts &amp; Controls" 
                        FontSize="18" 
                        FontWeight="SemiBold" 
                        Margin="0 0 0 10"/>
 
             <Grid>
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="200"/>
+                    <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
 
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                </Grid.RowDefinitions>
+                <!-- left column: rows 0-4 -->
+                <Grid Grid.Column="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="120"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
 
-                <TextBlock Text="Enter" Grid.Row="0" Grid.Column="0" Margin="0 5"/>
-                <TextBlock Text="Start rendering / begin session" Grid.Row="0" Grid.Column="1" Margin="0 5"/>
+                    <TextBlock Text="Enter" Grid.Row="0" Grid.Column="0" Margin="0,2"/>
+                    <TextBlock Text="Start rendering / begin session" Grid.Row="0" Grid.Column="1" Margin="5,2"/>
 
-                <TextBlock Text="Alt + O" Grid.Row="1" Grid.Column="0" Margin="0 5"/>
-                <TextBlock Text="Open project file" Grid.Row="1" Grid.Column="1" Margin="0 5"/>
+                    <TextBlock Text="Alt + O" Grid.Row="1" Grid.Column="0" Margin="0,2"/>
+                    <TextBlock Text="Open project file" Grid.Row="1" Grid.Column="1" Margin="5,2"/>
 
-                <TextBlock Text="Alt + S" Grid.Row="2" Grid.Column="0" Margin="0 5"/>
-                <TextBlock Text="Open settings window" Grid.Row="2" Grid.Column="1" Margin="0 5"/>
+                    <TextBlock Text="Alt + S" Grid.Row="2" Grid.Column="0" Margin="0,2"/>
+                    <TextBlock Text="Open settings window" Grid.Row="2" Grid.Column="1" Margin="5,2"/>
 
-                <TextBlock Text="Esc" Grid.Row="3" Grid.Column="0" Margin="0 5"/>
-                <TextBlock Text="Exit current view or close dialog" Grid.Row="3" Grid.Column="1" Margin="0 5"/>
+                    <TextBlock Text="Esc" Grid.Row="3" Grid.Column="0" Margin="0,2"/>
+                    <TextBlock Text="Exit current view or close dialog" Grid.Row="3" Grid.Column="1" Margin="5,2"/>
 
-                <TextBlock Text="Alt + F4" Grid.Row="4" Grid.Column="0" Margin="0 5"/>
-                <TextBlock Text="Close the application" Grid.Row="4" Grid.Column="1" Margin="0 5"/>
+                    <TextBlock Text="Alt + F4" Grid.Row="4" Grid.Column="0" Margin="0,2"/>
+                    <TextBlock Text="Close the application" Grid.Row="4" Grid.Column="1" Margin="5,2"/>
+                </Grid>
+
+                <!-- right column: rows 5-10 -->
+                <Grid Grid.Column="1">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="120"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Text="A / D" Grid.Row="0" Grid.Column="0" Margin="0,2"/>
+                    <TextBlock Text="Move camera left / right" Grid.Row="0" Grid.Column="1" Margin="5,2"/>
+
+                    <TextBlock Text="Space" Grid.Row="1" Grid.Column="0" Margin="0,2"/>
+                    <TextBlock Text="Move camera up" Grid.Row="1" Grid.Column="1" Margin="5,2"/>
+
+                    <TextBlock Text="Left Shift" Grid.Row="2" Grid.Column="0" Margin="0,2"/>
+                    <TextBlock Text="Move camera down" Grid.Row="2" Grid.Column="1" Margin="5,2"/>
+
+                    <TextBlock Text="W / S" Grid.Row="3" Grid.Column="0" Margin="0,2"/>
+                    <TextBlock Text="Zoom camera in / out" Grid.Row="3" Grid.Column="1" Margin="5,2"/>
+
+                    <TextBlock Text="Q / E" Grid.Row="4" Grid.Column="0" Margin="0,2"/>
+                    <TextBlock Text="Rolls camera left / right" Grid.Row="4" Grid.Column="1" Margin="5,2"/>
+                </Grid>
             </Grid>
 
+			<!-- mouse control function -->
+            <TextBlock Text="Mouse Controls" 
+                       FontSize="18" 
+                       FontWeight="SemiBold" 
+                       Margin="0 20 0 10"/>
 
-            <!-- Tips -->
-            <TextBlock Text="Tip: Use mouse drag and scroll wheel to navigate the 3D scene." 
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- left column: rows 0-4 -->
+                <Grid Grid.Column="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="120"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Text="Left Button" Grid.Row="0" Grid.Column="0" Margin="0,2"/>
+                    <TextBlock Text="Select objects in hierarchy" Grid.Row="0" Grid.Column="1" Margin="5,2"/>
+
+                    <TextBlock Text="Right Button" Grid.Row="1" Grid.Column="0" Margin="0,2"/>
+                    <TextBlock Text="Press + hold - rotates the camera" Grid.Row="1" Grid.Column="1" Margin="5,2"/>
+
+                    <TextBlock Text="Scroll Wheel" Grid.Row="2" Grid.Column="0" Margin="0,2"/>
+                    <TextBlock Text="Zooms in / out" Grid.Row="2" Grid.Column="1" Margin="5,2"/>
+
+                    <TextBlock Text="Scroll Wheel" Grid.Row="3" Grid.Column="0" Margin="0,2"/>
+                    <TextBlock Text="Press + hold - pan camera (moves the camera left/right/up/down without rotating)" Grid.Row="3" Grid.Column="1" Margin="5,2" TextWrapping="Wrap"/>
+                </Grid>
+            </Grid>
+            
+            <!-- any tips -->
+            <TextBlock Text="Tip: Press and hold the scroll wheel to rotate the camera while using A/D/Space/Left Shift to move it, allowing you to view objects from any angle." 
+                       TextWrapping="Wrap" 
                        FontSize="13" 
                        Opacity="0.7" 
                        Margin="0 20 0 0"/>
 
-            <!-- Button row -->
+            <!-- button functions -->
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0 20 0 0">
                 <Button Content="Back to Main Menu" Width="160" Margin="0 0 10 0" Click="Back_Click"/>
                 <Button Content="Close" Width="100" Click="Close_Click"/>
