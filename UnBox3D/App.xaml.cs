@@ -72,7 +72,7 @@ namespace UnBox3D
                 var renderer = provider.GetRequiredService<IRenderer>();
                 var settings = provider.GetRequiredService<ISettingsManager>();
                 var camera   = provider.GetRequiredService<ICamera>();
-                return new GLControlHost(scene, renderer, settings); // adjusted to match 3‑arg constructornified pipeline
+                return new GLControlHost(scene, renderer, settings, camera); // adjusted to match 3‑arg constructornified pipeline
             });
             services.AddSingleton<IGLControlHost>(sp => sp.GetRequiredService<GLControlHost>());
 

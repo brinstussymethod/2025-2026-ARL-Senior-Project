@@ -401,3 +401,65 @@ namespace UnBox3D.Views
         }
     }
 }
+
+
+namespace UnBox3D.Views
+{
+    public partial class MainWindow
+    {
+        private void EnsureTopLevelMainMenu()
+        {
+            try
+            {
+                var rootMenu = VisualChildrenFirstOrDefault<System.Windows.Controls.Menu>(this);
+                if (rootMenu == null) return;
+
+                bool exists = rootMenu.Items.OfType<System.Windows.Controls.MenuItem>()
+                    .Any(mi => string.Equals((mi.Header as string)?.Replace("_", "").Trim() ?? mi.Header?.ToString() ?? "",
+                                              "Main Menu", StringComparison.OrdinalIgnoreCase));
+
+                if (!exists)
+                {
+                    var item = new System.Windows.Controls.MenuItem { Header = "_Main Menu" };
+                    item.Click += BackToMainMenu_Click;
+                    rootMenu.Items.Add(item);
+                }
+            }
+            catch
+            {
+            }
+        }
+
+        private MainMenuWindow CreateMainMenuWindow()
+        {
+            try
+            {
+                var servicesProp = typeof(App).GetProperty("Services", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+                var services = servicesProp?.GetValue(null) as System.IServiceProvider;
+
+                var ctor = typeof(MainMenuWindow).GetConstructor(new System.Type[] { typeof(System.IServiceProvider) });
+                if (ctor != null && services != null)
+                    return (MainMenuWindow)ctor.Invoke(new object[] { services });
+
+                return new MainMenuWindow(App.Services);
+            }
+            catch
+            {
+                return new MainMenuWindow(App.Services);
+            }
+        }
+
+        private static T? VisualChildrenFirstOrDefault<T>(System.Windows.DependencyObject? parent) where T : System.Windows.DependencyObject
+        {
+            if (parent == null) return default;
+            for (int i = 0; i < System.Windows.Media.VisualTreeHelper.GetChildrenCount(parent); i++)
+            {
+                var child = System.Windows.Media.VisualTreeHelper.GetChild(parent, i);
+                if (child is T tChild) return tChild;
+                var hit = VisualChildrenFirstOrDefault<T>(child);
+                if (hit != null) return hit;
+            }
+            return default;
+        }
+    }
+}
