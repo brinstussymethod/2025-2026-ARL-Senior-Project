@@ -57,9 +57,9 @@ namespace UnBox3D.Rendering
         #endregion
 
         #region Constructor
-        public AppMesh(DMesh3 g4mesh, Assimp.Mesh assimpMesh)
+        public AppMesh(DMesh3WithTextures g4mesh, Assimp.Mesh assimpMesh)
         {
-            _g4Mesh = (DMesh3WithTextures)g4mesh;
+            _g4Mesh = g4mesh;
             _assimpMesh = assimpMesh;
             _name = assimpMesh.Name;
             _edges = new List<Vector3>();
@@ -297,8 +297,8 @@ namespace UnBox3D.Rendering
 
         public void SimplifyAdaptiveDecimation()
         {
-            // Create a new DMesh3 instance from your current mesh 
-            DMesh3 newMesh = new DMesh3(_g4Mesh);
+            // Create a new DMesh3WithTextures instance from your current mesh 
+            DMesh3WithTextures newMesh = new DMesh3WithTextures(_g4Mesh);
 
             // Create a Remesher instance using the new mesh
             Remesher remesh = new Remesher(newMesh);
@@ -321,7 +321,7 @@ namespace UnBox3D.Rendering
                 remesh.BasicRemeshPass();
 
             // Assign the new (remeshed) DMesh3 back to your app's internal mesh
-            _g4Mesh = (DMesh3WithTextures)newMesh;
+            _g4Mesh = newMesh;
             RefreshAssimpMesh();
             SetupMesh();
         }
@@ -410,7 +410,7 @@ namespace UnBox3D.Rendering
 
     public class MyReducer : Reducer
     {
-        public MyReducer(DMesh3 m) : base(m)
+        public MyReducer(DMesh3WithTextures m) : base(m)
         {
             PreserveBoundaryShape = false;
             ProjectionMode = TargetProjectionMode.NoProjection;
