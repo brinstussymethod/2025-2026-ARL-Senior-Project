@@ -697,7 +697,20 @@ namespace UnBox3D.ViewModels
             float radius = Math.Max(Math.Min(meshDimensions.X, meshDimensions.Z), meshDimensions.Y) / 2;
             float height = isXAligned ? meshDimensions.X : meshDimensions.Z;
 
-            AppMesh cylinder = GeometryGenerator.CreateRotatedCylinder(center, radius, height, 32, Vector3.UnitX);
+            // the name displayed in the hierarchy is subject to change depending on what kind of mesh it is
+            string name;
+            // if the name already has '(Simplified)' attached to it, then it has been replaced before and this new replacement shouldn't affect its name (because it's been simplified either way)
+            if (mesh.Name.Contains("(Simplified)"))
+            {
+                name = mesh.Name;
+            }
+            // if it does not, then it must be the first time it is being simplified, therefore, the keyword 'simplified' needs to be added to show in the hiearchy that this mesh is unique
+            else
+            {
+                name = mesh.Name + " (Simplified)";
+            }
+
+            AppMesh cylinder = GeometryGenerator.CreateRotatedCylinder(center, radius, height, 32, Vector3.UnitX, name);
 
             var summaryToRemove = Meshes.FirstOrDefault(ms => ms.SourceMesh == mesh);
             if (summaryToRemove != null)
@@ -708,8 +721,6 @@ namespace UnBox3D.ViewModels
             _sceneManager.ReplaceMesh(mesh, cylinder);
 
             Meshes.Add(new MeshSummary(cylinder));
-
-            //await ShowWpfMessageBoxAsync("Replaced Mesh!", "Replace", MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
         // If you want to implement replace with cylinder by clicking
@@ -728,14 +739,40 @@ var command = new SetReplaceStateCommand(_glControlHost, _mouseController, _scen
         private async void ReplaceWithCubeOption(IAppMesh mesh)
         {
             Vector3 center = _sceneManager.GetMeshCenter(mesh.GetG4Mesh());
-            Vector3 dims   = _sceneManager.GetMeshDimensions(mesh.GetG4Mesh());
 
-            AppMesh cube = GeometryGenerator.CreateBox(center, dims.X, dims.Y, dims.Z);
+            // instead of using GetMeshDimensions(), which gets the largest dimensions of the mesh, GetSmallestMeshDimesions is utilized to get the smallest dimensions
+            // this is done to limit the size of the replacement cube, which before made it too big
+            Vector3 meshDimensions = _sceneManager.GetSmallestMeshDimensions(mesh.GetG4Mesh());
 
-            var toRemove = Meshes.FirstOrDefault(ms => ms.SourceMesh == mesh);
-            if (toRemove != null) Meshes.Remove(toRemove);
+            // the name displayed in the hierarchy is subject to change depending on what kind of mesh it is
+            string name;
+            // if the name already has '(Simplified)' attached to it, then it has been replaced before and this new replacement shouldn't affect its name (because it's been simplified either way)
+            if (mesh.Name.Contains("(Simplified)"))
+            {
+                name = mesh.Name;
+            }
+            // if it does not, then it must be the first time it is being simplified, therefore, the keyword 'simplified' needs to be added to show in the hiearchy that this mesh is unique
+            else
+            {
+                name = mesh.Name + " (Simplified)";
+            }
+
+            AppMesh cube = GeometryGenerator.CreateBox(
+                            center,
+                            meshDimensions.X,
+                            meshDimensions.Y,
+                            meshDimensions.Z,
+                            name
+                        );
+
+            var summaryToRemove = Meshes.FirstOrDefault(ms => ms.SourceMesh == mesh);
+            if (summaryToRemove != null)
+            {
+                Meshes.Remove(summaryToRemove);
+            }
 
             _sceneManager.ReplaceMesh(mesh, cube);
+
             Meshes.Add(new MeshSummary(cube));
         }
 

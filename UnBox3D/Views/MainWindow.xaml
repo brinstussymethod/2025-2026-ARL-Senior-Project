@@ -59,7 +59,8 @@
             <!-- Left Panel: TreeView (Hierarchical Mesh View) -->
             <StackPanel Grid.Column="0" Orientation="Vertical">
                 <TextBlock Text="Meshes" FontSize="16" FontWeight="SemiBold" Margin="10,10,0,5"/>
-                <TreeView Grid.Column="0"
+                <TreeView x:Name="MeshesTreeView"
+                          Grid.Column="0"
                           Padding="10"
                           ItemsSource="{Binding Meshes}"
                           VirtualizingStackPanel.IsVirtualizing="True"
@@ -120,8 +121,14 @@
                 <!-- Replacement Tools -->
                 <TextBlock Text="Replacement Tools" FontWeight="SemiBold" Margin="0,10,0,4"/>
                 <StackPanel Orientation="Horizontal">
-                    <Button Content="Replace Click → Cylinder" Command="{Binding ReplaceWithCylinderClickCommand}" Margin="0,0,8,0"/>
-                    <Button Content="Replace Click → Cube" Command="{Binding ReplaceWithCubeClickCommand}" />
+                    <Button Content="Replace Click → Cylinder"
+                            Margin="0,0,8,0"
+                            Command="{Binding ReplaceWithCylinderOptionCommand}"
+                            CommandParameter="{Binding ElementName=MeshesTreeView, Path=SelectedItem.SourceMesh}" />
+
+                    <Button Content="Replace Click → Cube"
+                            Command="{Binding ReplaceWithCubeOptionCommand}"
+                            CommandParameter="{Binding ElementName=MeshesTreeView, Path=SelectedItem.SourceMesh}" />
                 </StackPanel>
 
                 <!-- Scene Tools -->
