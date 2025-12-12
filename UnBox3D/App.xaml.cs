@@ -1,4 +1,3 @@
-// App.xaml.cs — MERGED
 using Microsoft.Extensions.DependencyInjection;
 using OpenTK.Mathematics;
 using System.IO;
