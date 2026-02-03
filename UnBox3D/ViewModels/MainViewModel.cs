@@ -712,13 +712,15 @@ namespace UnBox3D.ViewModels
 
             AppMesh cylinder = GeometryGenerator.CreateRotatedCylinder(center, radius, height, 32, Vector3.UnitX, name);
 
-            var summaryToRemove = Meshes.FirstOrDefault(ms => ms.SourceMesh == mesh);
-            if (summaryToRemove != null)
-            {
-                Meshes.Remove(summaryToRemove);
-            }
+            //var summaryToRemove = Meshes.FirstOrDefault(ms => ms.SourceMesh == mesh);
+            //if (summaryToRemove != null)
+            //{
+            //    Meshes.Remove(summaryToRemove);
+            //}
 
             _sceneManager.ReplaceMesh(mesh, cylinder);
+
+            DeleteMesh(mesh);
 
             Meshes.Add(new MeshSummary(cylinder));
         }
@@ -726,7 +728,7 @@ namespace UnBox3D.ViewModels
         // If you want to implement replace with cylinder by clicking
         [RelayCommand]
         private async void ReplaceWithCylinderClick(){
-var command = new SetReplaceStateCommand(_glControlHost, _mouseController, _sceneManager, new RayCaster(_glControlHost, _camera), _camera, _commandHistory, "Cylinder");
+            var command = new SetReplaceStateCommand(_glControlHost, _mouseController, _sceneManager, new RayCaster(_glControlHost, _camera), _camera, _commandHistory, "Cylinder");
             command.Execute();
             await ShowWpfMessageBoxAsync("Replaced!", "Replace", MessageBoxButton.OK, MessageBoxImage.Information);
         
@@ -765,11 +767,13 @@ var command = new SetReplaceStateCommand(_glControlHost, _mouseController, _scen
                             name
                         );
 
-            var summaryToRemove = Meshes.FirstOrDefault(ms => ms.SourceMesh == mesh);
-            if (summaryToRemove != null)
-            {
-                Meshes.Remove(summaryToRemove);
-            }
+            //var summaryToRemove = Meshes.FirstOrDefault(ms => ms.SourceMesh == mesh);
+            //if (summaryToRemove != null)
+            //{
+            //    Meshes.Remove(summaryToRemove);
+            //}
+
+            DeleteMesh(mesh);
 
             _sceneManager.ReplaceMesh(mesh, cube);
 
