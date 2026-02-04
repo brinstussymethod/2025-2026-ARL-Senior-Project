@@ -19,7 +19,7 @@ namespace UnBox3D.Controls.States
         private readonly IRayCaster _rayCaster;
         private readonly ICommandHistory _commandHistory;
 
-        private IAppMesh _selectedMesh;
+        private IAppMesh? _selectedMesh;
         private bool _isRotating = false;
         private float _rotationSensitivity;
         private Quaternion _rotationAxis;
