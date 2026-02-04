@@ -8,7 +8,7 @@ namespace UnBox3D.Views
 {
     public partial class LoadingWindow : Window, INotifyPropertyChanged
     {
-        private string _statusHint;
+        private string _statusHint = string.Empty;
         private bool _isProgressIndeterminate;
         public bool IsProgressIndeterminate
         {

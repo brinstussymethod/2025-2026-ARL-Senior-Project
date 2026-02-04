@@ -5,7 +5,7 @@ namespace UnBox3D.Models
     public interface ICommandHistory
     {
         void PushCommand(ICommand command);
-        ICommand PopCommand();
+        ICommand? PopCommand();
     }
 
     public class CommandHistory : ICommandHistory
@@ -19,7 +19,7 @@ namespace UnBox3D.Models
         }
 
         // ...first out
-        public ICommand PopCommand()
+        public ICommand? PopCommand()
         {
             // If the list is not empty, get the most recent command from the history.
             return _history.Count > 0 ? _history.Pop() : null;

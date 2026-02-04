@@ -69,9 +69,9 @@ namespace UnBox3D.Utils
             if (!DoesFileExists(sourceFilePath))
                 throw new FileNotFoundException("Source file not found", sourceFilePath);
 
-            string destinationDirectory = Path.GetDirectoryName(destinationFilePath);
+            string? destinationDirectory = Path.GetDirectoryName(destinationFilePath) ?? null;
 
-            if (!DoesDirectoryExists(destinationDirectory))
+            if (destinationDirectory == null || !DoesDirectoryExists(destinationDirectory))
                 throw new DirectoryNotFoundException("Destination directory does not exist");
 
             File.Move(sourceFilePath, destinationFilePath);

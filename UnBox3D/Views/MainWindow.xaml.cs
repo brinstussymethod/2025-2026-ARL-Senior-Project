@@ -14,17 +14,20 @@ namespace UnBox3D.Views
     {
         #region Fields
         private IBlenderInstaller _blenderInstaller;
-        private IGLControlHost? _controlHost;
+        private IGLControlHost _controlHost;
         private ILogger? _logger;
         #endregion
 
         #region Constructor
-        public MainWindow()
+        public MainWindow(IBlenderInstaller blenderInstaller, IGLControlHost controlHost)
         {
             InitializeComponent();
 
             Loaded += MainWindow_Loaded;
             Closed += MainWindow_Closed;
+
+            _blenderInstaller = blenderInstaller;
+            _controlHost = controlHost;
         }
         #endregion
 
@@ -131,7 +134,7 @@ namespace UnBox3D.Views
 
         private void NumericTextBox_PreviewTextInput(object sender, TextCompositionEventArgs e)
         {
-            var textBox = sender as TextBox;
+            if (sender is not TextBox textBox) return;
 
             // Only allow digits and one decimal
             if (!char.IsDigit(e.Text[0]) && e.Text != ".")
@@ -149,6 +152,8 @@ namespace UnBox3D.Views
 
         private void NumericTextBox_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
         {
+            if (sender is not TextBox textBox) return;
+
             // Allow navigation, deletion and control keys
             if (e.Key == Key.Back || e.Key == Key.Delete || e.Key == Key.Left ||
                 e.Key == Key.Right || e.Key == Key.Tab)
@@ -159,8 +164,6 @@ namespace UnBox3D.Views
             // Handle clipboard operations
             if (Keyboard.Modifiers == ModifierKeys.Control && e.Key == Key.V)
             {
-                var textBox = sender as TextBox;
-
                 if (System.Windows.Clipboard.ContainsText())
                 {
                     string clipboardText = System.Windows.Clipboard.GetText();
@@ -210,7 +213,8 @@ namespace UnBox3D.Views
 
         private void NumericTextBox_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
         {
-            var textBox = sender as TextBox;
+            if (sender is not TextBox textBox) return;
+
             int cursorPosition = textBox.SelectionStart;
             string originalText = textBox.Text;
 
@@ -237,7 +241,7 @@ namespace UnBox3D.Views
 
         private void NumericTextBox_LostFocus(object sender, RoutedEventArgs e)
         {
-            var textBox = sender as TextBox;
+            if (sender is not TextBox textBox) return;
 
             if (string.IsNullOrWhiteSpace(textBox.Text) || textBox.Text == ".")
             {
