@@ -18,7 +18,7 @@ namespace UnBox3D.Utils
             var dispatcher = System.Windows.Application.Current.Dispatcher;
 
             // Schedule a low priority action that will complete the task
-            dispatcher.BeginInvoke(
+            await dispatcher.BeginInvoke(
                 DispatcherPriority.Background,
                 new Action(() => tcs.TrySetResult(true)));
 

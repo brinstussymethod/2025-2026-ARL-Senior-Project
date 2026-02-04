@@ -105,7 +105,6 @@ namespace UnBox3D.Rendering.OpenGL
         private RenderMode currentRenderMode;
         private ShadingModel currentShadingModel;
         private Vector4 backgroundColor;
-        private float angle = 0f;
 
         // The GLControlHost now receives the single DI-managed Camera instance.
         // It no longer constructs its own Camera/RayCaster/Mouse/Keyboard controllers.
@@ -144,11 +143,6 @@ namespace UnBox3D.Rendering.OpenGL
         public int GetWidth() => Width;
         public int GetHeight() => Height;
 
-        public void Invalidate()
-        {
-            base.Invalidate();
-        }
-
         public void Cleanup()
         {
             GL.BindBuffer(BufferTarget.ArrayBuffer, 0);
@@ -160,9 +154,9 @@ namespace UnBox3D.Rendering.OpenGL
         private void LoadSettingsFromJson()
         {
             // Get settings
-            string backgroundColorName = _settingsManager.GetSetting<string>(new RenderingSettings().GetKey(), RenderingSettings.BackgroundColor);
-            string renderMode = _settingsManager.GetSetting<string>(new RenderingSettings().GetKey(), RenderingSettings.RenderMode).ToLower();
-            string shadingModel = _settingsManager.GetSetting<string>(new RenderingSettings().GetKey(), RenderingSettings.ShadingModel).ToLower();
+            string backgroundColorName = _settingsManager.GetSetting<string>(new RenderingSettings().GetKey(), RenderingSettings.BackgroundColor) ?? throw new InvalidOperationException("BackgroundColor setting is missing.");
+            string renderMode = _settingsManager.GetSetting<string>(new RenderingSettings().GetKey(), RenderingSettings.RenderMode).ToLower() ?? throw new InvalidOperationException("Render mode setting is missing.");
+            string shadingModel = _settingsManager.GetSetting<string>(new RenderingSettings().GetKey(), RenderingSettings.ShadingModel).ToLower() ?? throw new InvalidOperationException("Shading model setting is missing.");
 
             // Apply settings
             switch (renderMode)
@@ -192,7 +186,7 @@ namespace UnBox3D.Rendering.OpenGL
         }
 
         // Event Handlers
-        private void GlControl_Load(object sender, EventArgs e)
+        private void GlControl_Load(object? sender, EventArgs e)
         {
             LoadSettingsFromJson();
             GL.ClearColor(backgroundColor.X,backgroundColor.Y, backgroundColor.Z,  1.0f);
@@ -240,7 +234,7 @@ namespace UnBox3D.Rendering.OpenGL
             _gridRenderer = new GridPlaneRenderer(_vertShader, _fragShader);
         }
 
-        private void GlControl_Paint(object sender, PaintEventArgs e)
+        private void GlControl_Paint(object? sender, PaintEventArgs e)
         {
             GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
 
@@ -266,7 +260,7 @@ namespace UnBox3D.Rendering.OpenGL
         }
 
 
-        private void GlControl_Resize(object sender, EventArgs e)
+        private void GlControl_Resize(object? sender, EventArgs e)
         {
             GL.Viewport(0, 0, Width, Height);
             if (_camera != null)

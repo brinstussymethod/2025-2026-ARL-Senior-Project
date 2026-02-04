@@ -2,8 +2,8 @@
 {
     public static class ShaderManager
     {
-        private static Shader _lightingShader;
-        private static Shader _lampShader;
+        private static Shader? _lightingShader;
+        private static Shader? _lampShader;
 
         public static Shader LightingShader
         {
