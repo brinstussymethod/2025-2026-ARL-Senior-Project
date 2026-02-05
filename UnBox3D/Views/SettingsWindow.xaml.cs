@@ -197,7 +197,8 @@ namespace UnBox3D.Views
 
         private void TextBox_InputChanged(object sender, RoutedEventArgs e)
         {
-            var textBox = sender as TextBox;
+            if (sender is not TextBox textBox) return;
+
             var textBoxName = textBox.Name;
             var textInput = textBox.Text;
 
@@ -226,7 +227,8 @@ namespace UnBox3D.Views
 
         private void TextBox_PathChanged(object sender, RoutedEventArgs e)
         {
-            var textBox = sender as TextBox;
+            if (sender is not TextBox textBox) return;
+
             var textBoxName = textBox.Name;
             var textInput = textBox.Text;
 
@@ -242,7 +244,8 @@ namespace UnBox3D.Views
 
         private void CheckBox_Toggled(object sender, RoutedEventArgs e)
         {
-            var checkBox = sender as CheckBox;
+            if (sender is not CheckBox checkBox) return;
+            
             var checkBoxName = checkBox.Name;
             var checkFlag = checkBox.IsChecked;
 
