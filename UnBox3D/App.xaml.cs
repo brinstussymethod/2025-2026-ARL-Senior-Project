@@ -94,6 +94,13 @@ namespace UnBox3D
                 return new MouseController(settings, camera, state, ray, host);
             });
 
+            // To make sure keyboard functionality is available for the main window
+            services.AddSingleton<KeyboardController>(provider =>
+            {
+                var camera = provider.GetRequiredService<ICamera>();
+                return new KeyboardController(camera);
+            });
+
             // Windows & VM (windows transient to avoid reuse of closed instances)
             services.AddTransient<SettingsWindow>();
             services.AddTransient<MainWindow>();

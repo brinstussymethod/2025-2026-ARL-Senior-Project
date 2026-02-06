@@ -7,6 +7,7 @@ using WpfMessageBox = System.Windows.MessageBox;
 using UnBox3D.Rendering.OpenGL;
 using UnBox3D.Utils;
 using UnBox3D.Theming;
+using UnBox3D.Controls;
 
 namespace UnBox3D.Views
 {
@@ -60,6 +61,7 @@ namespace UnBox3D.Views
             var glHost = _services.GetService<IGLControlHost>();
             var logger = _services.GetService<ILogger>();
             var blender = _services.GetService<IBlenderInstaller>();
+            
             if (glHost != null && logger != null && blender != null)
             {
                 main.Initialize(glHost, logger, blender);
@@ -67,6 +69,7 @@ namespace UnBox3D.Views
 
             Application.Current.MainWindow = main;
             main.Show();
+            _services.GetRequiredService<KeyboardController>(); // Ensure it's created and registered before MainWindow's Loaded event
             Close();
         }
 

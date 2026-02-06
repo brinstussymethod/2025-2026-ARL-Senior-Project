@@ -16,6 +16,7 @@ using TextBox = System.Windows.Controls.TextBox;
 using Application = System.Windows.Application;
 
 using UnBox3D.Rendering;
+using UnBox3D.Controls;
 namespace UnBox3D.Views
 {
     public partial class MainWindow : Window
@@ -40,7 +41,9 @@ namespace UnBox3D.Views
                 Loaded += (_, __) =>
                 {
                     if (DataContext == null)
+                    {
                         DataContext = App.Services.GetRequiredService<MainViewModel>();
+                    }
                 };
             }
 
@@ -399,14 +402,7 @@ namespace UnBox3D.Views
                 vm.SelectedMesh = null;
             }
         }
-    }
-}
 
-
-namespace UnBox3D.Views
-{
-    public partial class MainWindow
-    {
         private void EnsureTopLevelMainMenu()
         {
             try
@@ -463,3 +459,4 @@ namespace UnBox3D.Views
         }
     }
 }
+
