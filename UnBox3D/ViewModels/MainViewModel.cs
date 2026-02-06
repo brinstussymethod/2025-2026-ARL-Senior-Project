@@ -599,25 +599,20 @@ namespace UnBox3D.ViewModels
         [RelayCommand]
         private void DeleteMesh(IAppMesh mesh)
         {
-            if (mesh == null)
-                return;
+            if (mesh == null) return;
 
             _sceneManager.DeleteMesh(mesh);
 
-            // Dispose of the mesh's unmanaged resources
-            if (mesh is IDisposable disposableMesh)
-            {
-                disposableMesh.Dispose();
-            }
+            _latestImportedModel?.Remove(mesh);
 
-            // Remove the corresponding MeshSummary from the UI-bound collection.
-            // Assuming Meshes is an ObservableCollection<MeshSummary>
+            if (mesh is IDisposable disposableMesh)
+                disposableMesh.Dispose();
+
             var summaryToRemove = Meshes.FirstOrDefault(ms => ms.SourceMesh == mesh);
             if (summaryToRemove != null)
-            {
                 Meshes.Remove(summaryToRemove);
-            }
         }
+
 
         [RelayCommand]
         private async Task ExportModel()
