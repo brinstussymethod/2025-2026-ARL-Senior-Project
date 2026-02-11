@@ -238,6 +238,10 @@ namespace UnBox3D.Views
         private void Settings_Click(object sender, RoutedEventArgs e)
         {
             var settings = ActivatorUtilities.CreateInstance<SettingsWindow>(App.Services);
+            
+            var settingsManager = App.Services.GetRequiredService<ISettingsManager>();
+            settings.Initialize(_logger, settingsManager);
+
             settings.Owner = this;
             settings.ShowDialog();
         }
