@@ -137,6 +137,9 @@ namespace UnBox3D.Utils
                 _logger.Info($"Blender process exited with code: {exitCode}");
                 Debug.WriteLine($"Blender process exited with code: {exitCode}");
 
+                // Write diagnostic log to disk so teammates can share it when debugging
+                WriteDiagnosticLog(baseDirectory, blenderExePath, arguments, output, error, exitCode);
+
                 // Log all output for debugging
                 if (!string.IsNullOrWhiteSpace(output))
                 {
@@ -205,6 +208,45 @@ namespace UnBox3D.Utils
                 Debug.WriteLine($"Stack trace: {ex.StackTrace}");
                 ForceTerminateBlender();
                 return result;
+            }
+        }
+
+        private void WriteDiagnosticLog(string baseDirectory, string blenderExePath, string arguments,
+            string stdout, string stderr, int exitCode)
+        {
+            try
+            {
+                string logPath = Path.Combine(baseDirectory, "blender_diagnostic.log");
+                string addonPath = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                    "Blender Foundation", "Blender", "4.2", "extensions", "user_default", "export_paper_model");
+
+                string content =
+                    $"=== UnBox3D Blender Diagnostic Log ==={Environment.NewLine}" +
+                    $"Timestamp: {DateTime.Now:yyyy-MM-dd HH:mm:ss}{Environment.NewLine}" +
+                    $"Machine: {Environment.MachineName}{Environment.NewLine}" +
+                    $"OS: {Environment.OSVersion}{Environment.NewLine}" +
+                    $"Blender Path: {blenderExePath}{Environment.NewLine}" +
+                    $"Blender Exists: {File.Exists(blenderExePath)}{Environment.NewLine}" +
+                    $"Addon Folder Exists: {Directory.Exists(addonPath)}{Environment.NewLine}" +
+                    $"Addon Files: {(Directory.Exists(addonPath) ? string.Join(", ", Directory.GetFiles(addonPath).Select(Path.GetFileName)) : "N/A")}{Environment.NewLine}" +
+                    $"Script Path: {Path.Combine(baseDirectory, "Scripts", "unfolding_script.py")}{Environment.NewLine}" +
+                    $"Script Exists: {File.Exists(Path.Combine(baseDirectory, "Scripts", "unfolding_script.py"))}{Environment.NewLine}" +
+                    $"Exit Code: {exitCode}{Environment.NewLine}" +
+                    $"{Environment.NewLine}=== COMMAND ==={Environment.NewLine}" +
+                    $"{blenderExePath} {arguments}{Environment.NewLine}" +
+                    $"{Environment.NewLine}=== STDOUT ==={Environment.NewLine}" +
+                    $"{(string.IsNullOrWhiteSpace(stdout) ? "(empty)" : stdout)}{Environment.NewLine}" +
+                    $"{Environment.NewLine}=== STDERR ==={Environment.NewLine}" +
+                    $"{(string.IsNullOrWhiteSpace(stderr) ? "(empty)" : stderr)}{Environment.NewLine}";
+
+                File.WriteAllText(logPath, content);
+                _logger.Info($"Diagnostic log written to: {logPath}");
+                Debug.WriteLine($"Diagnostic log written to: {logPath}");
+            }
+            catch (Exception ex)
+            {
+                _logger.Error($"Failed to write diagnostic log: {ex.Message}");
             }
         }
 
