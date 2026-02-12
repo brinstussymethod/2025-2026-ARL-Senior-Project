@@ -154,18 +154,23 @@ def unfold(output_path: pathlib.Path):
     doc_height = val['dh']
     ext = val['ext']
 
-    bpy.ops.export_mesh.paper_model(
-        "EXEC_DEFAULT",
-        filepath=export_file,
-        page_size_preset='USER',
-        output_size_x=doc_width,
-        output_size_y=doc_height,
-        output_margin=0, # set to 0 since export team will handle the margins on the svg
-        do_create_stickers=False,
-        do_create_numbers=False,
-        file_format=ext,
-        scale=1
-    )
+    # Build export kwargs — some addon versions use different parameter names
+    export_kwargs = {
+        "filepath": export_file,
+        "page_size_preset": "USER",
+        "output_size_x": doc_width,
+        "output_size_y": doc_height,
+        "output_margin": 0,
+        "file_format": ext,
+        "scale": 1,
+    }
+
+    # Try with sticker/number params (user_default version), fall back without (blender_org version)
+    try:
+        bpy.ops.export_mesh.paper_model("EXEC_DEFAULT", do_create_stickers=False, do_create_numbers=False, **export_kwargs)
+    except TypeError as e:
+        print(f"Retrying export without sticker/number params: {e}")
+        bpy.ops.export_mesh.paper_model("EXEC_DEFAULT", **export_kwargs)
 
     print(f"Successfully exported unfolded model to: {export_file}")
     print(f"File format: {ext}")
