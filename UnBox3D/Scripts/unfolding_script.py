@@ -6,7 +6,8 @@ import os
 def get_command_line_args() -> dict:
     argv = sys.argv[sys.argv.index("--") + 1:]
 
-    print("Command-line arguements:", argv)
+    print("===== PYTHON SCRIPT STARTED =====")
+    print(f"Command-line arguments: {argv}")
 
     input_model = pathlib.Path(argv[argv.index("--input_model") + 1])
     output_model = pathlib.Path(argv[argv.index("--output_model") + 1])
@@ -15,8 +16,23 @@ def get_command_line_args() -> dict:
     doc_height = float(argv[argv.index("--dh") + 1])
     ext = argv[argv.index("--ext") + 1]
 
+    # Optional: inverse scale factor to restore real-world dimensions
+    inv_scale = 1.0
+    if "--scale" in argv:
+        inv_scale = float(argv[argv.index("--scale") + 1])
+
+    print(f"Parsed arguments:")
+    print(f"  Input model: {input_model}")
+    print(f"  Output model: {output_model}")
+    print(f"  Filename: {filename}")
+    print(f"  Doc width: {doc_width}")
+    print(f"  Doc height: {doc_height}")
+    print(f"  Extension: {ext}")
+    print(f"  Inverse scale: {inv_scale}")
+
     return {"input_model": input_model, "output_model": output_model,
-            "fn": filename, "dw": doc_width, "dh": doc_height, "ext": ext}
+            "fn": filename, "dw": doc_width, "dh": doc_height, "ext": ext,
+            "inv_scale": inv_scale}
 
 
 def clear_scene():
@@ -25,39 +41,70 @@ def clear_scene():
     
 
 def install_and_enable_addon(addon_name: str):
+    """
+    Enables the addon if it exists. 
+    NOTE: The addon must be manually installed in Blender beforehand.
+    Returns True if successful, False otherwise.
+    """
 
-    # If already enabled, do nothing
+    # Check if already enabled
     if addon_name in bpy.context.preferences.addons:
-        print(f"Addon '{addon_name}' already enabled.")
-        return
-    
-    # If addon not installed, install it
-    addon_path = os.path.join(bpy.utils.user_resource('SCRIPTS', "addons"), addon_name)
-    if not os.path.exists(addon_path):
-        print(f"Addon '{addon_name}' not installed. Installing...")
-        bpy.ops.extensions.package_install(repo_index=0, pkg_id=addon_name)
+        print(f"✓ Addon '{addon_name}' is already enabled.")
+        return True
 
-    # Enable the addon
+    # Try to enable the addon
+    print(f"Attempting to enable addon '{addon_name}'...")
     try:
         bpy.ops.preferences.addon_enable(module=addon_name)
-        print(f"Addon '{addon_name}' installed and enabled.")
+        print(f"✓ Addon '{addon_name}' enabled successfully.")
+        return True
     except Exception as e:
-        print(f"Failed to enable add-on '{addon_name}': {e}")
+        print(f"✗ Could not enable addon '{addon_name}': {e}")
+        return False
 
 
 def import_model(filepath: pathlib.Path):
+    print(f"Attempting to import model from: {filepath}")
     if filepath.exists():
+        print(f"File exists, importing...")
         bpy.ops.wm.obj_import(filepath=str(filepath))
 
-        print(f"Model loaded and transformed: {filepath}")
+        obj = bpy.context.object
+        if obj is None:
+            print("ERROR: No object was imported")
+            raise RuntimeError("No object was imported from the file")
+
+        # Ensure the object is the active selection
+        bpy.context.view_layer.objects.active = obj
+        obj.select_set(True)
+
+        # Triangulate the mesh to ensure all edges have proper angles
+        # This fixes the "NoneType > int" bug in the Paper Model addon
+        # which crashes on flat/simple geometry where edge.angle is None
+        print(f"Triangulating mesh to ensure edge angle compatibility...")
+        bpy.ops.object.mode_set(mode='EDIT')
+        bpy.ops.mesh.select_all(action='SELECT')
+        bpy.ops.mesh.quads_convert_to_tris()
+        bpy.ops.object.mode_set(mode='OBJECT')
+
+        print(f"Model loaded successfully: {filepath}")
     else:
-        print(f"Model file not found: {filepath}")
+        print(f"ERROR: Model file not found: {filepath}")
+        raise FileNotFoundError(f"Model file not found: {filepath}")
 
 
 def unfold(output_path: pathlib.Path):
     val = get_command_line_args()
-    obj = bpy.context.object #might delete 
+    obj = bpy.context.object
     obj.rotation_euler = (0, 0, 0)
+
+    # Apply inverse scale to restore real-world dimensions before unfolding
+    inv_scale = val.get('inv_scale', 1.0)
+    if inv_scale != 1.0:
+        print(f"Applying inverse scale factor: {inv_scale} to restore real-world dimensions")
+        obj.scale = (inv_scale, inv_scale, inv_scale)
+        bpy.ops.object.transform_apply(scale=True)
+        print(f"Model scaled to real-world size")
 
     '''
     Parameters
@@ -120,28 +167,51 @@ def unfold(output_path: pathlib.Path):
         scale=1
     )
 
-    print(f"Exporting unfolded model to: {export_file}")
+    print(f"Successfully exported unfolded model to: {export_file}")
+    print(f"File format: {ext}")
+    print("===== PYTHON SCRIPT COMPLETED SUCCESSFULLY =====")
     
 
 def main():
     paths = get_command_line_args()
-    
+
     clear_scene()
-    addon_name = "export_paper_model"
-    install_and_enable_addon(addon_name)
-    if addon_name in bpy.context.preferences.addons:
-        bpy.ops.preferences.addon_enable(module=addon_name)
-    else:
-        print(f"Failed to install or enable addon '{addon_name}'. Exiting.")
+
+    # Try multiple possible addon names (Blender 4.2 uses extensions system)
+    possible_addon_names = [
+        "bl_ext.user_default.export_paper_model",
+        "bl_ext.blender_org.export_paper_model",
+        "export_paper_model"
+    ]
+
+    addon_enabled = False
+    for addon_name in possible_addon_names:
+        result = install_and_enable_addon(addon_name)
+        if result:
+            addon_enabled = True
+            print(f"✓ Using addon: {addon_name}")
+            break
+
+    if not addon_enabled:
+        print("✗ ERROR: Could not enable Export Paper Model addon")
+        print("Please ensure the addon is installed in Blender:")
+        print("1. Open Blender 4.2")
+        print("2. Edit → Preferences → Add-ons")
+        print("3. Search for 'paper' and enable it")
         return
 
-    downloads_path = pathlib.Path.home() / "Downloads"
-    downloads_path.mkdir(parents=True, exist_ok=True)  # ensure it exists
-    
+    # Use the output path passed from C# instead of hardcoded Downloads folder
+    output_path = paths['output_model']
+
+    # Ensure output directory exists
+    output_path.mkdir(parents=True, exist_ok=True)
+
+    print(f"Output directory set to: {output_path}")
+
     import_model(paths['input_model'])
-    
-    # Pass Downloads folder as output_path (for now)
-    unfold(downloads_path)
+
+    # Pass the correct output path
+    unfold(output_path)
 
 
 if __name__ == "__main__":

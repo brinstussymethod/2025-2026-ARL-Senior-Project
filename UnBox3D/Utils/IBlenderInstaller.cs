@@ -58,15 +58,25 @@ namespace UnBox3D.Utils
 
                 if (blenderVersions.Length > 0)
                 {
-                    var latestVersion = blenderVersions // find last-modified version folder
-                        .OrderByDescending(d => d.LastWriteTime)
-                        .First();
+                    // PREFER Blender 4.2 for addon compatibility
+                    var blender42 = blenderVersions.FirstOrDefault(d => 
+                        d.Name.Contains("4.2") || d.Name.Contains("Blender 4.2"));
 
-                    // Construct the expected path to blender.exe    
-                    ProgramFilesBlenderExecutable = Path.Combine(
-                        latestVersion.FullName,
-                        "blender.exe"
-                        );
+                    if (blender42 != null)
+                    {
+                        Debug.WriteLine($"Found preferred Blender 4.2: {blender42.FullName}");
+                        ProgramFilesBlenderExecutable = Path.Combine(blender42.FullName, "blender.exe");
+                    }
+                    else
+                    {
+                        // Fall back to latest version
+                        var latestVersion = blenderVersions
+                            .OrderByDescending(d => d.LastWriteTime)
+                            .First();
+
+                        Debug.WriteLine($"Using latest Blender version: {latestVersion.FullName}");
+                        ProgramFilesBlenderExecutable = Path.Combine(latestVersion.FullName, "blender.exe");
+                    }
                 }
             }
             else return;

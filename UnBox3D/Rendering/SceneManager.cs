@@ -71,36 +71,45 @@ namespace UnBox3D.Rendering
 
         public void RemoveSmallMeshes(List<IAppMesh> originalMesh, float threshold)
         {
-            float largestDimension = 0;
+            if (originalMesh == null || originalMesh.Count == 0) return;
+
+            // Rank-based filtering: sort meshes by surface area, then the slider
+            // controls what percentage of meshes (by count) to remove from the bottom.
+            // Slider at 0% = all visible, slider at 50% = bottom half removed.
+            var meshAreas = new List<(IAppMesh mesh, double area)>();
+
             foreach (IAppMesh mesh in originalMesh)
             {
-                Vector3 meshDimensions = GetMeshDimensions(mesh.GetG4Mesh());
-                float localSmallestDimension = MathF.Min(meshDimensions.X, MathF.Min(meshDimensions.Y, meshDimensions.Z)); // We want to get the smallest dimension (X, Y, or Z) of each mesh to compare with the largest dimension
-                if (localSmallestDimension > largestDimension)
+                var dmesh = mesh.GetG4Mesh();
+                double area = 0;
+                foreach (int tid in dmesh.TriangleIndices())
                 {
-                    largestDimension = localSmallestDimension;
+                    area += dmesh.GetTriArea(tid);
                 }
+                meshAreas.Add((mesh, area));
             }
 
-            float percentageThreshold = (threshold / 100) * largestDimension;
-            foreach (IAppMesh mesh in originalMesh)
+            // Sort ascending by surface area (smallest first)
+            meshAreas.Sort((a, b) => a.area.CompareTo(b.area));
+
+            // How many meshes to remove from the bottom
+            int removeCount = (int)Math.Floor((threshold / 100.0) * meshAreas.Count);
+
+            for (int i = 0; i < meshAreas.Count; i++)
             {
-                Vector3 meshDimensions = GetMeshDimensions(mesh.GetG4Mesh());
-                if (meshDimensions.X >= percentageThreshold && meshDimensions.Y >= percentageThreshold && meshDimensions.Z >= percentageThreshold)
+                var mesh = meshAreas[i].mesh;
+
+                if (i < removeCount)
                 {
-                    // You went back on the threshold slider, so you add back meshes that are within the threshold
-                    if (!_sceneMeshes.Contains(mesh))
-                    {
-                        AddMesh(mesh);
-                    }
+                    // This mesh is in the bottom N% — remove it
+                    if (_sceneMeshes.Contains(mesh))
+                        DeleteMesh(mesh);
                 }
                 else
                 {
-                    // Since it doesn't meet the threshold, we can remove the mesh from scenemeshes
-                    if (_sceneMeshes.Contains(mesh))
-                    {
-                        DeleteMesh(mesh);
-                    }
+                    // This mesh is above the cutoff — keep it
+                    if (!_sceneMeshes.Contains(mesh))
+                        AddMesh(mesh);
                 }
             }
         }
@@ -133,32 +142,19 @@ namespace UnBox3D.Rendering
         {
             if (mesh.VertexCount > 0)
             {
-                float largestXDimension = 0.0f;
-                float largestYDimension = 0.0f;
-                float largestZDimension = 0.0f;
-
-                Vector3 meshCenter = GetMeshCenter(mesh);
+                Vector3 min = new Vector3(float.MaxValue, float.MaxValue, float.MaxValue);
+                Vector3 max = new Vector3(float.MinValue, float.MinValue, float.MinValue);
 
                 for (int i = 0; i < mesh.VertexCount; i++)
                 {
                     g4.Vector3d vertex = mesh.GetVertex(i);
                     Vector3 vertexVec = new Vector3((float)vertex.x, (float)vertex.y, (float)vertex.z);
 
-                    if (largestXDimension < (vertexVec.X - meshCenter.X))
-                    {
-                        largestXDimension = vertexVec.X - meshCenter.X;
-                    }
-                    if (largestYDimension < (vertexVec.Y - meshCenter.Y))
-                    {
-                        largestYDimension = vertexVec.Y - meshCenter.Y;
-                    }
-                    if (largestZDimension < (vertexVec.Z - meshCenter.Z))
-                    {
-                        largestZDimension = vertexVec.Z - meshCenter.Z;
-                    }
+                    min = Vector3.ComponentMin(min, vertexVec);
+                    max = Vector3.ComponentMax(max, vertexVec);
                 }
 
-                return new Vector3(largestXDimension * 2, largestYDimension * 2, largestZDimension * 2); // multiplying by 2 because thats the largest distance from the center
+                return max - min;
             }
 
             return Vector3.Zero;

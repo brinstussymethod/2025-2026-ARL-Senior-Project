@@ -17,7 +17,13 @@ namespace UnBox3D.Models
         private List<IAppMesh>? importedMeshes;
         private Scene? scene;
         private bool _wasScaled = false;
+        private double _scaleFactor = 1.0;
         public bool WasScaled => _wasScaled;
+        /// <summary>
+        /// The scale factor applied during import (e.g., 0.1429 means model was shrunk to ~14% of original).
+        /// To recover original dimensions, multiply by (1 / ScaleFactor).
+        /// </summary>
+        public double ScaleFactor => _scaleFactor;
 
 
         public ModelImporter(ISettingsManager settingsManager)
@@ -105,6 +111,7 @@ namespace UnBox3D.Models
             double maxDim = modelBounds.MaxDim;
             const double targetSize = 10.0; // Scale model to fit within this size
             double scaleFactor = (maxDim > targetSize) ? targetSize / maxDim : 1.0;
+            _scaleFactor = scaleFactor;
 
             if (scaleFactor != 1.0)
             {

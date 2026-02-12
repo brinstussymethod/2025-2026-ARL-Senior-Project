@@ -14,6 +14,7 @@ namespace UnBox3D.Views
     {
         #region Fields
         private IBlenderInstaller _blenderInstaller;
+        private BlenderAddonSetup _blenderAddonSetup;
         private IGLControlHost? _controlHost;
         private ILogger? _logger;
         #endregion
@@ -107,11 +108,12 @@ namespace UnBox3D.Views
 
         #region Initialization
         // Inject dependencies
-        public void Initialize(IGLControlHost controlHost, ILogger logger, IBlenderInstaller blenderInstaller)
+        public void Initialize(IGLControlHost controlHost, ILogger logger, IBlenderInstaller blenderInstaller, BlenderAddonSetup blenderAddonSetup)
         {
             _controlHost = controlHost ?? throw new ArgumentNullException(nameof(controlHost));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _blenderInstaller = blenderInstaller ?? throw new ArgumentNullException(nameof(blenderInstaller));
+            _blenderAddonSetup = blenderAddonSetup ?? throw new ArgumentNullException(nameof(blenderAddonSetup));
         }
         #endregion
 

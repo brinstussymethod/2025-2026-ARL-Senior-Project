@@ -34,7 +34,8 @@ namespace UnBox3D
             mainWindow.Initialize(
                 _serviceProvider.GetRequiredService<IGLControlHost>(),
                 _serviceProvider.GetRequiredService<ILogger>(),
-                _serviceProvider.GetRequiredService<IBlenderInstaller>()
+                _serviceProvider.GetRequiredService<IBlenderInstaller>(),
+                _serviceProvider.GetRequiredService<BlenderAddonSetup>()
             );
 
             mainWindow.Show();
@@ -143,7 +144,13 @@ namespace UnBox3D
                 return new KeyboardController(camera);
             });
 
-            services.AddSingleton<BlenderIntegration>();        // BlenderIntegration
+            services.AddSingleton<BlenderIntegration>(provider =>   // BlenderIntegration
+            {
+                var logger = provider.GetRequiredService<ILogger>();
+                var blenderInstaller = provider.GetRequiredService<IBlenderInstaller>();
+                return new BlenderIntegration(logger, blenderInstaller);
+            });
+            services.AddSingleton<BlenderAddonSetup>();                     // BlenderAddonSetup
             services.AddSingleton<SettingsWindow>();            // SettingsWindow
             services.AddSingleton<MainWindow>();                // MainWindow
 

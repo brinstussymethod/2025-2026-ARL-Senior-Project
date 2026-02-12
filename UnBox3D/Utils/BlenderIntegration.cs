@@ -2,58 +2,94 @@
 using System.Diagnostics;
 using System.IO;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 using UnBox3D.Utils;
 
 namespace UnBox3D.Utils
 {
+    public class BlenderScriptResult
+    {
+        public bool Success { get; set; }
+        public string ErrorMessage { get; set; } = string.Empty;
+    }
+
     public class BlenderIntegration
     {
         private readonly ILogger _logger;
+        private readonly IBlenderInstaller _blenderInstaller;
 
-        public BlenderIntegration(ILogger logger)
+        public BlenderIntegration(ILogger logger, IBlenderInstaller blenderInstaller)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _blenderInstaller = blenderInstaller ?? throw new ArgumentNullException(nameof(blenderInstaller));
         }
 
         public bool RunBlenderScript(string inputModelPath, string outputModelPath, string scriptPath, 
-            string filename, double doc_width, double doc_height, string ext, out string errorMessage)
+            string filename, double doc_width, double doc_height, string ext, out string errorMessage,
+            double inverseScale = 1.0)
         {
+            // Synchronous wrapper for backward compatibility
+            var result = RunBlenderScriptAsync(inputModelPath, outputModelPath, scriptPath, filename, doc_width, doc_height, ext, inverseScale).Result;
+            errorMessage = result.ErrorMessage;
+            return result.Success;
+        }
+
+        public async Task<BlenderScriptResult> RunBlenderScriptAsync(string inputModelPath, string outputModelPath, string scriptPath, 
+            string filename, double doc_width, double doc_height, string ext, double inverseScale = 1.0)
+        {
+            var result = new BlenderScriptResult();
             string baseDirectory = AppDomain.CurrentDomain.BaseDirectory;
             Debug.WriteLine("baseDirectory: " + baseDirectory);
 
-            // Fix Blender path construction for publishing
-            string blenderExePath = Path.Combine(baseDirectory, "Blender", "blender-4.2.0-windows-x64", "blender.exe");
+            // Get Blender path from BlenderInstaller (which checks Program Files)
+            string blenderExePath = _blenderInstaller.ExecutablePath;
             Debug.WriteLine("blenderExePath: " + blenderExePath);
 
             _logger.Info($"Base Directory: {baseDirectory}");
-            _logger.Info($"Blender Path: {blenderExePath}");
+            _logger.Info($"Blender Path from BlenderInstaller: {blenderExePath}");
 
-            if (!File.Exists(blenderExePath))
+            if (string.IsNullOrEmpty(blenderExePath) || !File.Exists(blenderExePath))
             {
-                errorMessage = $"Blender executable not found at path: {blenderExePath}";
-                _logger.Error(errorMessage);
-                return false;
+                result.ErrorMessage = $"Blender executable not found. Expected path: {blenderExePath ?? "(null)"}. Please ensure Blender is installed.";
+                _logger.Error(result.ErrorMessage);
+                Debug.WriteLine(result.ErrorMessage);
+                return result;
             }
 
             if (!File.Exists(scriptPath))
             {
-                _logger.Error($"Script file not found: {scriptPath}");
-                errorMessage = "The script file was not found.";
-                return false;
+                result.ErrorMessage = $"Script file not found: {scriptPath}";
+                _logger.Error(result.ErrorMessage);
+                Debug.WriteLine(result.ErrorMessage);
+                return result;
             }
+
+            if (!File.Exists(inputModelPath))
+            {
+                result.ErrorMessage = $"Input model file not found: {inputModelPath}";
+                _logger.Error(result.ErrorMessage);
+                Debug.WriteLine(result.ErrorMessage);
+                return result;
+            }
+
+            string arguments = $"-b -P \"{scriptPath}\"" +
+                                $" -- --input_model \"{inputModelPath}\"" +
+                                $" --output_model \"{outputModelPath}\"" +
+                                $" --fn \"{filename}\"" +
+                                $" --dw \"{doc_width}\"" +
+                                $" --dh \"{doc_height}\"" +
+                                $" --ext \"{ext}\"" +
+                                (inverseScale != 1.0 ? $" --scale \"{inverseScale}\"" : "");
+
+            _logger.Info($"Blender Command: {blenderExePath} {arguments}");
+            Debug.WriteLine($"Full Blender Command: {blenderExePath} {arguments}");
 
             Process process = new Process
             {
                 StartInfo = new ProcessStartInfo
                 {
                     FileName = blenderExePath,
-                    Arguments = $"-b -P \"{scriptPath}\"" +
-                                $" -- --input_model \"{inputModelPath}\"" +
-                                $" --output_model \"{outputModelPath}\"" +
-                                $" --fn \"{filename}\"" +
-                                $" --dw \"{doc_width}\"" +
-                                $" --dh \"{doc_height}\"" +
-                                $" --ext \"{ext}\"",
+                    Arguments = arguments,
                     UseShellExecute = false,
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
@@ -62,29 +98,83 @@ namespace UnBox3D.Utils
                 }
             };
 
-            errorMessage = string.Empty;
-
             try
             {
-                process.Start();
+                _logger.Info("Starting Blender process...");
+                Debug.WriteLine("Starting Blender process...");
 
-                // Set a timeout for waiting for Blender to finish
-                if (!process.WaitForExit(30000))
+                bool processStarted = process.Start();
+                if (!processStarted)
                 {
-                    errorMessage = "Process took too long to respond. Terminating...";
-                    _logger.Warn(errorMessage);
-                    ForceTerminateBlender();
-                    return false;
+                    result.ErrorMessage = "Failed to start Blender process.";
+                    _logger.Error(result.ErrorMessage);
+                    Debug.WriteLine(result.ErrorMessage);
+                    return result;
                 }
 
-                // Read Blender's output and error streams
-                string output = process.StandardOutput.ReadToEnd();
-                string error = process.StandardError.ReadToEnd();
+                _logger.Info($"Blender process started. PID: {process.Id}");
+                Debug.WriteLine($"Blender process started. PID: {process.Id}");
 
-                _logger.Info("Blender Output: " + output);
+                // Read output streams asynchronously to prevent deadlock
+                var outputTask = process.StandardOutput.ReadToEndAsync();
+                var errorTask = process.StandardError.ReadToEndAsync();
+
+                // Set a timeout for waiting for Blender to finish
+                if (!process.WaitForExit(120000))
+                {
+                    result.ErrorMessage = "Process took too long to respond (2 minute timeout). Terminating...";
+                    _logger.Warn(result.ErrorMessage);
+                    Debug.WriteLine(result.ErrorMessage);
+                    ForceTerminateBlender();
+                    return result;
+                }
+
+                // Wait for output streams to complete
+                string output = await outputTask;
+                string error = await errorTask;
+
+                int exitCode = process.ExitCode;
+                _logger.Info($"Blender process exited with code: {exitCode}");
+                Debug.WriteLine($"Blender process exited with code: {exitCode}");
+
+                // Log all output for debugging
+                if (!string.IsNullOrWhiteSpace(output))
+                {
+                    _logger.Info("=== BLENDER STDOUT START ===");
+                    _logger.Info(output);
+                    _logger.Info("=== BLENDER STDOUT END ===");
+                    Debug.WriteLine("=== BLENDER STDOUT START ===");
+                    Debug.WriteLine(output);
+                    Debug.WriteLine("=== BLENDER STDOUT END ===");
+                }
+                else
+                {
+                    _logger.Warn("Blender produced NO standard output.");
+                    Debug.WriteLine("Blender produced NO standard output.");
+                }
+
                 if (!string.IsNullOrWhiteSpace(error))
                 {
-                    _logger.Warn("Blender Errors: " + error);
+                    _logger.Warn("=== BLENDER STDERR START ===");
+                    _logger.Warn(error);
+                    _logger.Warn("=== BLENDER STDERR END ===");
+                    Debug.WriteLine("=== BLENDER STDERR START ===");
+                    Debug.WriteLine(error);
+                    Debug.WriteLine("=== BLENDER STDERR END ===");
+                }
+                else
+                {
+                    _logger.Info("No errors reported by Blender.");
+                    Debug.WriteLine("No errors reported by Blender.");
+                }
+
+                // Check exit code first
+                if (exitCode != 0)
+                {
+                    result.ErrorMessage = $"Blender exited with error code {exitCode}. Check logs for details.";
+                    _logger.Error(result.ErrorMessage);
+                    Debug.WriteLine(result.ErrorMessage);
+                    return result;
                 }
 
                 // Extract runtime error message if exists
@@ -93,22 +183,28 @@ namespace UnBox3D.Utils
                 if (string.IsNullOrEmpty(runtimeErrorMessage))
                 {
                     _logger.Info("Blender script executed successfully.");
-                    return true;
+                    Debug.WriteLine("Blender script executed successfully.");
+                    result.Success = true;
+                    return result;
                 }
                 else
                 {
-                    errorMessage = runtimeErrorMessage ?? "An unknown error occurred during processing.";
-                    _logger.Error($"Blender script failed. Exit code: {process.ExitCode}, Error: {errorMessage}");
+                    result.ErrorMessage = runtimeErrorMessage ?? "An unknown error occurred during processing.";
+                    _logger.Error($"Blender script failed with runtime error: {result.ErrorMessage}");
+                    Debug.WriteLine($"Blender script failed with runtime error: {result.ErrorMessage}");
                     ForceTerminateBlender();
-                    return false;
+                    return result;
                 }
             }
             catch (Exception ex)
             {
-                errorMessage = ex.Message;
-                _logger.Error("Error occurred while running Blender: " + errorMessage);
+                result.ErrorMessage = $"Exception while running Blender: {ex.GetType().Name} - {ex.Message}";
+                _logger.Error(result.ErrorMessage);
+                _logger.Error($"Stack trace: {ex.StackTrace}");
+                Debug.WriteLine(result.ErrorMessage);
+                Debug.WriteLine($"Stack trace: {ex.StackTrace}");
                 ForceTerminateBlender();
-                return false;
+                return result;
             }
         }
 
@@ -151,9 +247,10 @@ namespace UnBox3D.Utils
                 return "continue";
             }
 
-            if (error.Contains("RuntimeError: Error: Python: Traceback (most recent call last)"))
+            if (error.Contains("'>' not supported between instances of 'NoneType' and 'int'") ||
+                error.Contains("balance = sum"))
             {
-                return "Model was too complex to perform unfolding.";
+                return "The model's geometry caused an error in the Paper Model addon. Try simplifying the mesh before unfolding.";
             }
 
             string pattern = @"RuntimeError:\s*(.+?)(?:\n|$)";

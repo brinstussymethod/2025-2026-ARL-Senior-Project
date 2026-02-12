@@ -33,6 +33,7 @@ namespace UnBox3D.ViewModels
         private readonly ModelExporter _modelExporter;
         private readonly ICommandHistory _commandHistory;
         private string _importedFilePath; // Global filepath that should be referenced when simplifying
+        private double _importScaleFactor = 1.0; // Scale factor applied during import (to reverse for real-world unfolding)
         private List<IAppMesh> _latestImportedModel; // This is so we can keep track of the original model when playing around with small mesh thresholds.
         private IAppMesh _lastSelectedMesh; // Keep track of the previously selected mesh so we can remove its highlight
         private Vector3 _normalColor;    // Color used for unselected meshes
@@ -104,6 +105,7 @@ namespace UnBox3D.ViewModels
                 string filePath = openFileDialog.FileName;
                 _importedFilePath = EnsureImportDirectory(filePath);
                 List<IAppMesh> importedMeshes = _modelImporter.ImportModel(_importedFilePath);
+                _importScaleFactor = _modelImporter.ScaleFactor;
 
                 _latestImportedModel = importedMeshes; // Purpose: Remember the model that was imported so that the user can freely mess with something like size thresholds and go back.
 
@@ -158,6 +160,13 @@ namespace UnBox3D.ViewModels
         {
             Debug.WriteLine("Input model is coming from: " + inputModelPath);
 
+            if (string.IsNullOrWhiteSpace(inputModelPath) || !File.Exists(inputModelPath))
+            {
+                Debug.WriteLine($"ProcessUnfolding: inputModelPath missing or not found: '{inputModelPath}'");
+                await ShowWpfMessageBoxAsync("The input model file was not found. Ensure the file exists before unfolding.", "Input Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+
             var installWindow = new LoadingWindow
             {
                 StatusHint = "Installing Blender...",
@@ -182,7 +191,8 @@ namespace UnBox3D.ViewModels
                     "Missing Dependency", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
-            else
+
+            try
             {
                 var loadingWindow = new LoadingWindow
                 {
@@ -206,14 +216,15 @@ namespace UnBox3D.ViewModels
                     return;
                 }
 
-                using SaveFileDialog saveFileDialog = new()
+                var saveFileDialog = new Microsoft.Win32.SaveFileDialog
                 {
                     Title = "Save your unfolded file",
                     Filter = "SVG Files|*.svg|PDF Files|*.pdf",
                     FileName = "MyUnfoldedFile"
                 };
 
-                if (saveFileDialog.ShowDialog() != DialogResult.OK)
+                bool? dialogResult = saveFileDialog.ShowDialog();
+                if (dialogResult != true)
                 {
                     loadingWindow.Close();
                     return;
@@ -237,11 +248,24 @@ namespace UnBox3D.ViewModels
                 string outputDirectory = _fileSystem.CombinePaths(baseDir, "UnfoldedOutputs");
                 string scriptPath = _fileSystem.CombinePaths(baseDir, "Scripts", "unfolding_script.py");
 
-                if (!_fileSystem.DoesDirectoryExists(outputDirectory))
+                // immediate checks to help diagnose "no output" issues
+                Debug.WriteLine($"ProcessUnfolding: baseDirectory: {baseDir}");
+                Debug.WriteLine($"ProcessUnfolding: outputDirectory: {outputDirectory}");
+                Debug.WriteLine($"ProcessUnfolding: scriptPath: {scriptPath}");
+                Debug.WriteLine($"ProcessUnfolding: inputModelPath full: {Path.GetFullPath(inputModelPath)}");
+
+                if (!File.Exists(scriptPath))
                 {
-                    _fileSystem.CreateDirectory(outputDirectory);
+                    loadingWindow.Close();
+                    Debug.WriteLine("ProcessUnfolding: unfolding_script.py not found.");
+                    await ShowWpfMessageBoxAsync($"Unfolding script missing: {scriptPath}", "Script Missing", MessageBoxButton.OK, MessageBoxImage.Error);
+                    return;
                 }
 
+                if (!_fileSystem.DoesDirectoryExists(outputDirectory))
+                    _fileSystem.CreateDirectory(outputDirectory);
+
+                // clear previous outputs
                 CleanupUnfoldedFolder(outputDirectory);
 
                 double incrementWidth = PageWidth;
@@ -256,17 +280,51 @@ namespace UnBox3D.ViewModels
                 while (!success)
                 {
                     iteration++;
+
+                    const int maxRetries = 20;
+                    if (iteration > maxRetries)
+                    {
+                        loadingWindow.Close();
+                        await ShowWpfMessageBoxAsync(
+                            $"Failed after {maxRetries} attempts. The model could not be unfolded.",
+                            "Unfolding Failed", MessageBoxButton.OK, MessageBoxImage.Error);
+                        return;
+                    }
+
                     loadingWindow.UpdateStatus($"Processing with Blender (Attempt {iteration})...");
-                    loadingWindow.UpdateProgress((double)iteration / 100 * 50);
+                    loadingWindow.UpdateProgress((double)iteration / maxRetries * 50);
                     await DispatcherHelper.DoEvents();
 
-                    success = await Task.Run(() => _blenderIntegration.RunBlenderScript(
-                        inputModelPath, outputDirectory, scriptPath,
-                        newFileName, incrementWidth, incrementHeight, "SVG", out errorMessage));
+                    // Calculate inverse scale to restore real-world dimensions
+                    double inverseScale = (_importScaleFactor != 0 && _importScaleFactor != 1.0) 
+                        ? 1.0 / _importScaleFactor 
+                        : 1.0;
+
+                    // run the script and capture returned errorMessage
+                    success = await Task.Run(() =>
+                        _blenderIntegration.RunBlenderScript(
+                            inputModelPath, outputDirectory, scriptPath,
+                            newFileName, incrementWidth, incrementHeight, "SVG", out errorMessage,
+                            inverseScale));
+
+                    Debug.WriteLine($"RunBlenderScript returned success={success}; errorMessage='{errorMessage}'");
+                    // list output directory immediately after call to see what was produced
+                    try
+                    {
+                        var produced = Directory.Exists(outputDirectory)
+                            ? Directory.GetFiles(outputDirectory).Select(Path.GetFileName).ToArray()
+                            : Array.Empty<string>();
+                        Debug.WriteLine("Files in outputDirectory after RunBlenderScript:");
+                        foreach (var f in produced) Debug.WriteLine(f);
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"Failed listing outputDirectory: {ex}");
+                    }
 
                     if (!success)
                     {
-                        if (errorMessage.Contains("continue"))
+                        if (!string.IsNullOrEmpty(errorMessage) && errorMessage.Contains("continue"))
                         {
                             incrementWidth++;
                             incrementHeight++;
@@ -276,19 +334,17 @@ namespace UnBox3D.ViewModels
                         else
                         {
                             loadingWindow.Close();
-
                             await loadingWindow.Dispatcher.InvokeAsync(() =>
                             {
                                 System.Windows.Application.Current.MainWindow?.Activate();
                                 System.Windows.MessageBox.Show(
-                                    errorMessage,
+                                    errorMessage ?? "Unknown error running Blender/unfolding script.",
                                     "Error Processing File",
                                     MessageBoxButton.OK,
                                     MessageBoxImage.Error,
                                     MessageBoxResult.OK,
                                     System.Windows.MessageBoxOptions.DefaultDesktopOnly);
                             });
-
                             return;
                         }
                     }
@@ -297,9 +353,32 @@ namespace UnBox3D.ViewModels
                 loadingWindow.UpdateStatus("Processing unfolded panels...");
                 await DispatcherHelper.DoEvents();
 
-                string[] svgPanelFiles = Directory.GetFiles(outputDirectory, "*.svg");
-                int totalPanels = svgPanelFiles.Length;
+                // capture files produced by blender
+                string[] svgPanelFiles = Array.Empty<string>();
+                try
+                {
+                    svgPanelFiles = Directory.GetFiles(outputDirectory, "*.svg");
+                    Debug.WriteLine($"Found {svgPanelFiles.Length} svg files in '{outputDirectory}'");
+                    foreach (var f in svgPanelFiles) Debug.WriteLine($"  -> {f}");
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Error getting svg files: {ex}");
+                }
 
+                if (svgPanelFiles.Length == 0)
+                {
+                    loadingWindow.Close();
+                    Debug.WriteLine($"No SVG files found in output directory '{outputDirectory}'. errorMessage: {errorMessage}");
+                    await ShowWpfMessageBoxAsync(
+                        $"Blender completed but did not produce SVG output in:\n{outputDirectory}\n\nBlender message: {errorMessage}",
+                        "Unfold Error",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Error);
+                    return;
+                }
+
+                int totalPanels = svgPanelFiles.Length;
                 for (int i = 0; i < totalPanels; i++)
                 {
                     string svgFile = svgPanelFiles[i];
@@ -311,14 +390,24 @@ namespace UnBox3D.ViewModels
                         PageWidth * 1000f, PageHeight * 1000f));
                 }
 
+                // ... rest of method follows unchanged (exporting files, cleanup, notifications) ...
                 loadingWindow.UpdateStatus("Exporting final files...");
                 loadingWindow.UpdateProgress(80);
                 await DispatcherHelper.DoEvents();
+
+                bool anyFilesMoved = false;
 
                 if (format == "SVG")
                 {
                     string[] svgFiles = Directory.GetFiles(outputDirectory, $"{newFileName}*.svg");
                     int fileCount = svgFiles.Length;
+
+                    if (fileCount == 0)
+                    {
+                        loadingWindow.Close();
+                        await ShowWpfMessageBoxAsync("No SVG files were produced to export.", "Export Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                        return;
+                    }
 
                     for (int i = 0; i < fileCount; i++)
                     {
@@ -330,7 +419,35 @@ namespace UnBox3D.ViewModels
                         loadingWindow.UpdateProgress(80 + ((double)i / fileCount * 20));
                         await DispatcherHelper.DoEvents();
 
-                        File.Move(source, destination, overwrite: true); // Optionally wrap in _fileSystem
+                        try
+                        {
+                            // Skip if source and destination are the same file
+                            if (string.Equals(Path.GetFullPath(source), Path.GetFullPath(destination), StringComparison.OrdinalIgnoreCase))
+                            {
+                                Debug.WriteLine($"Source and destination are the same file, skipping copy: {source}");
+                                anyFilesMoved = true;
+                                continue;
+                            }
+
+                            // Small delay to let SVG editor release the file handle
+                            await Task.Delay(100);
+
+                            File.Copy(source, destination, overwrite: true);
+                            File.Delete(source);
+                            anyFilesMoved = true;
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine($"Failed moving SVG file '{source}' -> '{destination}': {ex}");
+                        }
+                    }
+
+                    var exportedInDest = Directory.GetFiles(userSelectedPath, $"{newFileName}*.svg");
+                    if (!exportedInDest.Any())
+                    {
+                        loadingWindow.Close();
+                        await ShowWpfMessageBoxAsync("Export reported success but no SVG files were found in the destination folder.", "Export Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                        return;
                     }
                 }
                 else if (format == "PDF")
@@ -360,9 +477,18 @@ namespace UnBox3D.ViewModels
 
                     if (allSuccessful)
                     {
-                        pdf.Save(pdfFile);
-                        string destination = Path.Combine(userSelectedPath, $"{newFileName}.pdf");
-                        File.Move(pdfFile, destination, overwrite: true);
+                        try
+                        {
+                            pdf.Save(pdfFile);
+                            string destination = Path.Combine(userSelectedPath, $"{newFileName}.pdf");
+                            File.Copy(pdfFile, destination, overwrite: true);
+                            File.Delete(pdfFile);
+                            anyFilesMoved = true;
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine($"Failed to save/move PDF: {ex}");
+                        }
                     }
                     else
                     {
@@ -374,22 +500,51 @@ namespace UnBox3D.ViewModels
                             inputModelPath, outputDirectory, scriptPath,
                             newFileName, incrementWidth, incrementHeight, "PDF", out errorMessage));
 
-                        string destination = Path.Combine(userSelectedPath, $"{newFileName}.pdf");
-                        File.Move(pdfFile, destination, overwrite: true);
+                        if (File.Exists(pdfFile))
+                        {
+                            string destination = Path.Combine(userSelectedPath, $"{newFileName}.pdf");
+                            try
+                            {
+                                File.Copy(pdfFile, destination, overwrite: true);
+                                File.Delete(pdfFile);
+                                anyFilesMoved = true;
+                            }
+                            catch (Exception ex)
+                            {
+                                Debug.WriteLine($"Failed to move fallback PDF: {ex}");
+                            }
+                        }
+                    }
+
+                    if (!anyFilesMoved)
+                    {
+                        loadingWindow.Close();
+                        await ShowWpfMessageBoxAsync("Export reported success but no PDF file could be saved to the destination folder.", "Export Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                        return;
                     }
                 }
+
                 loadingWindow.UpdateStatus("Cleaning up temporary files...");
                 loadingWindow.UpdateProgress(100);
                 await DispatcherHelper.DoEvents();
-                CleanupUnfoldedFolder(outputDirectory);
+
+                // Only clean up if the user chose a different destination folder
+                if (!string.Equals(Path.GetFullPath(outputDirectory), Path.GetFullPath(userSelectedPath), StringComparison.OrdinalIgnoreCase))
+                {
+                    CleanupUnfoldedFolder(outputDirectory);
+                }
 
                 loadingWindow.Close();
 
                 await ShowWpfMessageBoxAsync($"{format} file has been exported successfully!",
                     "Export Complete", MessageBoxButton.OK, MessageBoxImage.Information);
             }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"ProcessUnfolding exception: {ex}");
+                await ShowWpfMessageBoxAsync($"Unexpected error: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
-
         [RelayCommand]
         private async Task UnfoldMesh(IAppMesh mesh)
         {
@@ -398,17 +553,63 @@ namespace UnBox3D.ViewModels
 
             // 1. Export the single mesh to a temporary .obj file
             string fileName = $"unfold_temp_{Guid.NewGuid()}.obj";
-            string? exportedPath = _modelExporter.ExportToObj(new List<IAppMesh> { mesh }, fileName);
+            string? exportedPath = null;
 
-            if (string.IsNullOrWhiteSpace(exportedPath))
+            try
             {
-                await ShowWpfMessageBoxAsync("Failed to export mesh for unfolding.", "Export Error",
+                exportedPath = _modelExporter.ExportToObj(new List<IAppMesh> { mesh }, fileName);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"UnfoldMesh: ExportToObj threw: {ex}");
+                await ShowWpfMessageBoxAsync($"Failed to export mesh for unfolding: {ex.Message}", "Export Error",
                                              MessageBoxButton.OK, MessageBoxImage.Error);
                 return;
             }
 
+            // Validate the returned path and attempt a few reasonable fallbacks if necessary.
+            bool PathIsValid(string? p) => !string.IsNullOrWhiteSpace(p) && File.Exists(p) && Path.GetExtension(p).Equals(".obj", StringComparison.OrdinalIgnoreCase);
+
+            if (!PathIsValid(exportedPath))
+            {
+                // try a few likely locations if the exporter returned a relative filename or null
+                var candidates = new[]
+                {
+            exportedPath ?? string.Empty,
+            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, fileName),
+            Path.Combine(Path.GetTempPath(), fileName)
+        }.Where(p => !string.IsNullOrWhiteSpace(p)).ToArray();
+
+                string? found = candidates.FirstOrDefault(PathIsValid);
+
+                if (found != null)
+                {
+                    exportedPath = found;
+                }
+                else
+                {
+                    string tried = string.Join(Environment.NewLine, candidates);
+                    Debug.WriteLine($"UnfoldMesh: ExportToObj returned invalid path. Tried:{Environment.NewLine}{tried}");
+                    await ShowWpfMessageBoxAsync(
+                        "Failed to export mesh for unfolding. The exporter did not produce a valid .obj file.\n" +
+                        "If this persists, verify that ModelExporter.ExportToObj writes an absolute path and that the file exists.",
+                        "Export Error",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Error);
+                    return;
+                }
+            }
+
             // 2. Unfold just this mesh using the same logic you already have
-            await ProcessUnfolding(exportedPath);
+            try
+            {
+                await ProcessUnfolding(exportedPath);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"UnfoldMesh: ProcessUnfolding threw: {ex}");
+                await ShowWpfMessageBoxAsync($"Unfolding failed: {ex.Message}", "Unfold Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
 
@@ -666,10 +867,34 @@ namespace UnBox3D.ViewModels
          private async void ReplaceWithCubeClick()
          {
              var command = new SetReplaceStateCommand(_glControlHost, _mouseController, _sceneManager, new RayCaster(_glControlHost, _camera), _camera, _commandHistory, "cube");
-             
+
              command.Execute();
              await ShowWpfMessageBoxAsync("Replaced!", "Replace", MessageBoxButton.OK, MessageBoxImage.Information);
          }
+
+        [RelayCommand]
+        private void ReplaceWithWedgeOption(IAppMesh mesh)
+        {
+            Vector3 center = _sceneManager.GetMeshCenter(mesh.GetG4Mesh());
+            Vector3 meshDimensions = _sceneManager.GetMeshDimensions(mesh.GetG4Mesh());
+
+            AppMesh wedge = GeometryGenerator.CreateWedge(
+                center,
+                meshDimensions.X,
+                meshDimensions.Y,
+                meshDimensions.Z
+            );
+
+            var summaryToRemove = Meshes.FirstOrDefault(ms => ms.SourceMesh == mesh);
+            if (summaryToRemove != null)
+            {
+                Meshes.Remove(summaryToRemove);
+            }
+
+            _sceneManager.ReplaceMesh(mesh, wedge);
+
+            Meshes.Add(new MeshSummary(wedge));
+        }
 
 
         [RelayCommand]
