@@ -53,6 +53,16 @@ namespace UnBox3D.Views
 
                 await _blenderInstaller.CheckAndInstallBlender(progress);
 
+                // Automatically install, enable, and patch the Export Paper Model addon
+                loadingWindow.UpdateStatus("Setting up Blender addon...");
+                loadingWindow.UpdateProgress(90);
+
+                var (addonSuccess, addonMessage) = await _blenderAddonSetup.EnsureAddonIsEnabled();
+                if (!addonSuccess)
+                {
+                    _logger?.Warn($"Addon auto-setup issue: {addonMessage}");
+                }
+
                 loadingWindow.Close();
 
                 // Attach GLControlHost to WindowsFormsHost
