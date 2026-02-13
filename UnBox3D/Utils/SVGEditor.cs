@@ -3,9 +3,12 @@ using PdfSharpCore.Pdf;
 using Svg;
 using Svg.Transforms;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Drawing;
 using System.Drawing.Imaging;    // For ImageFormat
+using System.Text.RegularExpressions;
+using System.Xml.Linq;
 /* Values are in pixels
 // SOMEONE GET ON THIS
 // Margins don't work? It seems to crop out rather than provide that 2in buffer
@@ -167,69 +170,73 @@ namespace UnBox3D.Utils
 
         /// <summary>
         /// Crops the SVG viewBox and dimensions to tightly fit the actual drawn content,
-        /// removing empty whitespace. Adds a small padding margin around the content.
-        /// Uses SvgVisualElement.Bounds which properly accounts for group transforms.
-        /// Skips the cardboard grid overlay so we crop to just the model geometry.
+        /// removing empty whitespace. Parses path coordinates directly from the SVG XML
+        /// to compute bounds — does not rely on the SVG library's Bounds property.
         /// </summary>
         public static void CropToContent(string svgFilePath, float paddingMm = 10f)
         {
-            SvgDocument svgDoc = SvgDocument.Open(svgFilePath);
+            // Parse as raw XML — much more reliable than the SVG library for bounds detection
+            XNamespace ns = "http://www.w3.org/2000/svg";
+            XDocument xdoc = XDocument.Load(svgFilePath);
+            XElement root = xdoc.Root!;
 
-            float docW = svgDoc.Width.Value;
-            float docH = svgDoc.Height.Value;
+            // Read current document dimensions from the root <svg> element
+            string? widthAttr = root.Attribute("width")?.Value;
+            string? heightAttr = root.Attribute("height")?.Value;
+            if (widthAttr == null || heightAttr == null) return;
 
-            Debug.WriteLine($"CropToContent: original document size = {docW}x{docH}");
+            // Strip "mm" suffix to get numeric values
+            float docW = float.Parse(widthAttr.Replace("mm", ""), CultureInfo.InvariantCulture);
+            float docH = float.Parse(heightAttr.Replace("mm", ""), CultureInfo.InvariantCulture);
 
-            // Walk all visual elements and collect their bounds.
-            // SvgVisualElement.Bounds accounts for parent group transforms,
-            // which is critical because Blender nests paths inside <g> groups.
+            Debug.WriteLine($"CropToContent: original SVG = {docW}x{docH}mm");
+
+            // Extract all numeric coordinates from <path d="..."> attributes.
+            // The d attribute contains commands like "M0 38113 L50000 38113 Z"
+            // We just need to find the min/max of all numbers to get the bounding box.
             float minX = float.MaxValue, minY = float.MaxValue;
             float maxX = float.MinValue, maxY = float.MinValue;
             bool foundContent = false;
 
-            foreach (var element in svgDoc.Descendants())
+            // Regex to extract number pairs from SVG path d attributes
+            // Matches patterns like: M100.5 200.3, L300 400, etc.
+            var numberRegex = new Regex(@"-?\d+\.?\d*", RegexOptions.Compiled);
+
+            foreach (var pathEl in xdoc.Descendants(ns + "path"))
             {
-                // Skip our cardboard grid overlay — crop to model content only
-                if (element is SvgGroup grp && grp.ID == "cardboard-grid")
-                    continue;
+                string? d = pathEl.Attribute("d")?.Value;
+                if (string.IsNullOrEmpty(d)) continue;
 
-                // Only process visual elements that have geometry (paths, lines, polygons, etc.)
-                if (element is not SvgVisualElement visual)
-                    continue;
+                // Skip sticker/tab paths (they extend beyond the actual model outline)
+                string? cls = pathEl.Attribute("class")?.Value;
+                if (cls == "sticker") continue;
 
-                // Skip groups themselves — we want leaf elements with actual geometry
-                if (element is SvgGroup)
-                    continue;
+                var matches = numberRegex.Matches(d);
 
-                try
+                // Path coordinates come in X,Y pairs after move/line commands
+                for (int i = 0; i < matches.Count - 1; i += 2)
                 {
-                    var bounds = visual.Bounds;
-
-                    // Skip degenerate or empty bounds
-                    if (bounds.IsEmpty || (bounds.Width <= 0 && bounds.Height <= 0))
-                        continue;
-
-                    foundContent = true;
-                    if (bounds.Left < minX) minX = bounds.Left;
-                    if (bounds.Top < minY) minY = bounds.Top;
-                    if (bounds.Right > maxX) maxX = bounds.Right;
-                    if (bounds.Bottom > maxY) maxY = bounds.Bottom;
-                }
-                catch
-                {
-                    // Some elements may not support Bounds — skip them
+                    if (float.TryParse(matches[i].Value, CultureInfo.InvariantCulture, out float x) &&
+                        float.TryParse(matches[i + 1].Value, CultureInfo.InvariantCulture, out float y))
+                    {
+                        foundContent = true;
+                        if (x < minX) minX = x;
+                        if (y < minY) minY = y;
+                        if (x > maxX) maxX = x;
+                        if (y > maxY) maxY = y;
+                    }
                 }
             }
 
             if (!foundContent)
             {
-                Debug.WriteLine("CropToContent: No drawable content found, skipping crop");
+                Debug.WriteLine("CropToContent: No path content found, skipping crop");
                 return;
             }
 
-            Debug.WriteLine($"CropToContent: raw content bounds = ({minX:F1},{minY:F1})-({maxX:F1},{maxY:F1})");
+            Debug.WriteLine($"CropToContent: content bounds = ({minX:F1},{minY:F1})-({maxX:F1},{maxY:F1})");
 
-            // Add padding around the content
+            // Add padding
             minX = Math.Max(0, minX - paddingMm);
             minY = Math.Max(0, minY - paddingMm);
             maxX = maxX + paddingMm;
@@ -238,21 +245,21 @@ namespace UnBox3D.Utils
             float cropW = maxX - minX;
             float cropH = maxY - minY;
 
-            // Only crop if it actually reduces the size meaningfully
+            // Only crop if it reduces size by at least 5%
             if (cropW >= docW * 0.95f && cropH >= docH * 0.95f)
             {
-                Debug.WriteLine($"CropToContent: content fills most of page, skipping crop");
+                Debug.WriteLine("CropToContent: content fills most of page, skipping crop");
                 return;
             }
 
-            Debug.WriteLine($"CropToContent: cropping from {docW:F0}x{docH:F0} to {cropW:F0}x{cropH:F0} (viewBox origin: {minX:F1},{minY:F1})");
+            Debug.WriteLine($"CropToContent: cropping {docW:F0}x{docH:F0} → {cropW:F0}x{cropH:F0}mm");
 
-            // Set viewBox to the content area and resize the document
-            svgDoc.ViewBox = new SvgViewBox(minX, minY, cropW, cropH);
-            svgDoc.Width = new SvgUnit(SvgUnitType.Millimeter, cropW);
-            svgDoc.Height = new SvgUnit(SvgUnitType.Millimeter, cropH);
+            // Rewrite the SVG root attributes directly in XML
+            root.SetAttributeValue("width", $"{cropW:F2}mm");
+            root.SetAttributeValue("height", $"{cropH:F2}mm");
+            root.SetAttributeValue("viewBox", $"{minX:F2} {minY:F2} {cropW:F2} {cropH:F2}");
 
-            svgDoc.Write(svgFilePath);
+            xdoc.Save(svgFilePath);
             Debug.WriteLine($"CropToContent: saved cropped SVG ({cropW:F0}x{cropH:F0}mm)");
         }
 
