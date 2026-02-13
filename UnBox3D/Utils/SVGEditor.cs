@@ -169,13 +169,14 @@ namespace UnBox3D.Utils
         }
 
         /// <summary>
-        /// Crops the SVG viewBox and dimensions to tightly fit the actual drawn content,
-        /// removing empty whitespace. Parses path coordinates directly from the SVG XML
-        /// to compute bounds — does not rely on the SVG library's Bounds property.
+        /// Crops the SVG viewBox and dimensions to tightly fit the actual drawn content.
+        /// The viewBox controls what you see (browser/Inkscape scales to fit the window).
+        /// The width/height in mm preserve the real-world dimensions for printing at 1:1.
+        /// Parses path coordinates directly from the SVG XML for reliable bounds detection.
         /// </summary>
-        public static void CropToContent(string svgFilePath, float paddingMm = 10f)
+        public static void CropToContent(string svgFilePath)
         {
-            // Parse as raw XML — much more reliable than the SVG library for bounds detection
+            // Parse as raw XML — more reliable than the SVG library for bounds detection
             XNamespace ns = "http://www.w3.org/2000/svg";
             XDocument xdoc = XDocument.Load(svgFilePath);
             XElement root = xdoc.Root!;
@@ -193,13 +194,12 @@ namespace UnBox3D.Utils
 
             // Extract all numeric coordinates from <path d="..."> attributes.
             // The d attribute contains commands like "M0 38113 L50000 38113 Z"
-            // We just need to find the min/max of all numbers to get the bounding box.
+            // We find min/max of all X,Y pairs to compute the bounding box.
             float minX = float.MaxValue, minY = float.MaxValue;
             float maxX = float.MinValue, maxY = float.MinValue;
             bool foundContent = false;
 
-            // Regex to extract number pairs from SVG path d attributes
-            // Matches patterns like: M100.5 200.3, L300 400, etc.
+            // Regex to extract numbers from SVG path data
             var numberRegex = new Regex(@"-?\d+\.?\d*", RegexOptions.Compiled);
 
             foreach (var pathEl in xdoc.Descendants(ns + "path"))
@@ -207,13 +207,13 @@ namespace UnBox3D.Utils
                 string? d = pathEl.Attribute("d")?.Value;
                 if (string.IsNullOrEmpty(d)) continue;
 
-                // Skip sticker/tab paths (they extend beyond the actual model outline)
+                // Skip sticker/tab paths (glue tabs extend beyond the model outline)
                 string? cls = pathEl.Attribute("class")?.Value;
                 if (cls == "sticker") continue;
 
                 var matches = numberRegex.Matches(d);
 
-                // Path coordinates come in X,Y pairs after move/line commands
+                // Path coordinates come in X,Y pairs after M/L commands
                 for (int i = 0; i < matches.Count - 1; i += 2)
                 {
                     if (float.TryParse(matches[i].Value, CultureInfo.InvariantCulture, out float x) &&
@@ -234,33 +234,40 @@ namespace UnBox3D.Utils
                 return;
             }
 
-            Debug.WriteLine($"CropToContent: content bounds = ({minX:F1},{minY:F1})-({maxX:F1},{maxY:F1})");
+            float contentW = maxX - minX;
+            float contentH = maxY - minY;
+            Debug.WriteLine($"CropToContent: content = ({minX:F1},{minY:F1})-({maxX:F1},{maxY:F1}), size={contentW:F0}x{contentH:F0}mm");
 
-            // Add padding
-            minX = Math.Max(0, minX - paddingMm);
-            minY = Math.Max(0, minY - paddingMm);
-            maxX = maxX + paddingMm;
-            maxY = maxY + paddingMm;
+            // Add proportional padding (5% of content size, minimum 100mm ≈ 4 inches)
+            // This gives enough breathing room to clearly see the full outline shape
+            float padX = Math.Max(100f, contentW * 0.05f);
+            float padY = Math.Max(100f, contentH * 0.05f);
+
+            minX = Math.Max(0, minX - padX);
+            minY = Math.Max(0, minY - padY);
+            maxX = maxX + padX;
+            maxY = maxY + padY;
 
             float cropW = maxX - minX;
             float cropH = maxY - minY;
 
-            // Only crop if it reduces size by at least 5%
-            if (cropW >= docW * 0.95f && cropH >= docH * 0.95f)
+            // Only crop if it actually reduces the size meaningfully (>10% reduction)
+            if (cropW >= docW * 0.9f && cropH >= docH * 0.9f)
             {
                 Debug.WriteLine("CropToContent: content fills most of page, skipping crop");
                 return;
             }
 
-            Debug.WriteLine($"CropToContent: cropping {docW:F0}x{docH:F0} → {cropW:F0}x{cropH:F0}mm");
+            Debug.WriteLine($"CropToContent: cropping {docW:F0}x{docH:F0} → {cropW:F0}x{cropH:F0}mm (padding {padX:F0}x{padY:F0})");
 
-            // Rewrite the SVG root attributes directly in XML
+            // viewBox = what coordinates are visible (browser scales this to fit the window)
+            // width/height in mm = real-world print size (for 1:1 printing on a plotter)
             root.SetAttributeValue("width", $"{cropW:F2}mm");
             root.SetAttributeValue("height", $"{cropH:F2}mm");
             root.SetAttributeValue("viewBox", $"{minX:F2} {minY:F2} {cropW:F2} {cropH:F2}");
 
             xdoc.Save(svgFilePath);
-            Debug.WriteLine($"CropToContent: saved cropped SVG ({cropW:F0}x{cropH:F0}mm)");
+            Debug.WriteLine($"CropToContent: saved ({cropW:F0}x{cropH:F0}mm) — open in browser to see full shape, print at 100% for real size");
         }
 
         public static bool ExportToPdf(string svgFile, PdfDocument pdf)
