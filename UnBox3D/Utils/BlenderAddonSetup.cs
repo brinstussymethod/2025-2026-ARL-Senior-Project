@@ -261,47 +261,69 @@ namespace UnBox3D.Utils
         }
 
         /// <summary>
-        /// Patches the Export Paper Model addon's unfolder.py to fix the flat-geometry crash.
+        /// Patches the Export Paper Model addon's files to fix the flat-geometry crash.
         /// The addon crashes with "TypeError: '>' not supported between instances of 'NoneType' and 'int'"
         /// when edge.angle is None on flat/coplanar faces.
+        /// Patches ALL addon locations (user_default has unfolder.py, blender_org has __init__.py).
         /// </summary>
         private void PatchAddonBug()
         {
-            string? addonPath = GetAddonPath();
-            if (addonPath == null || !Directory.Exists(addonPath)) return;
+            string appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
 
-            string unfolderPath = Path.Combine(addonPath, "unfolder.py");
-            if (!File.Exists(unfolderPath))
+            // All possible addon locations and the files that contain the buggy line
+            var filesToPatch = new[]
             {
-                _logger.Warn($"unfolder.py not found at: {unfolderPath}");
-                return;
-            }
+                Path.Combine(appData, "Blender Foundation", "Blender", "4.2", "extensions", "user_default", "export_paper_model", "unfolder.py"),
+                Path.Combine(appData, "Blender Foundation", "Blender", "4.2", "extensions", "blender_org", "export_paper_model", "__init__.py"),
+                Path.Combine(appData, "Blender Foundation", "Blender", "4.2", "extensions", "blender_org", "export_paper_model", "unfolder.py"),
+                Path.Combine(appData, "Blender Foundation", "Blender", "4.2", "scripts", "addons", "export_paper_model", "__init__.py"),
+            };
 
-            try
+            // The blender_org version has a slightly different line (includes "if not edge.is_cut")
+            string[] buggyPatterns =
+            [
+                "balance = sum((+1 if edge.angle > 0 else -1) for edge in island_edges)",
+                "balance = sum((+1 if edge.angle > 0 else -1) for edge in island_edges if not edge.is_cut(uvedge.uvface.face))",
+            ];
+
+            string[] fixedPatterns =
+            [
+                "balance = sum((+1 if (edge.angle or 0) > 0 else -1) for edge in island_edges)",
+                "balance = sum((+1 if (edge.angle or 0) > 0 else -1) for edge in island_edges if not edge.is_cut(uvedge.uvface.face))",
+            ];
+
+            foreach (var filePath in filesToPatch)
             {
-                string content = File.ReadAllText(unfolderPath);
+                if (!File.Exists(filePath)) continue;
 
-                const string buggyLine = "balance = sum((+1 if edge.angle > 0 else -1) for edge in island_edges)";
-                const string fixedLine = "balance = sum((+1 if (edge.angle or 0) > 0 else -1) for edge in island_edges)";
+                try
+                {
+                    string content = File.ReadAllText(filePath);
+                    bool patched = false;
 
-                if (content.Contains(buggyLine))
-                {
-                    content = content.Replace(buggyLine, fixedLine);
-                    File.WriteAllText(unfolderPath, content);
-                    _logger.Info("Patched unfolder.py — fixed flat-geometry NoneType bug.");
+                    for (int i = 0; i < buggyPatterns.Length; i++)
+                    {
+                        if (content.Contains(buggyPatterns[i]))
+                        {
+                            content = content.Replace(buggyPatterns[i], fixedPatterns[i]);
+                            patched = true;
+                        }
+                    }
+
+                    if (patched)
+                    {
+                        File.WriteAllText(filePath, content);
+                        _logger.Info($"Patched: {filePath}");
+                    }
+                    else
+                    {
+                        _logger.Info($"Already patched or different version: {filePath}");
+                    }
                 }
-                else if (content.Contains(fixedLine))
+                catch (Exception ex)
                 {
-                    _logger.Info("unfolder.py is already patched.");
+                    _logger.Error($"Failed to patch {filePath}: {ex.Message}");
                 }
-                else
-                {
-                    _logger.Warn("unfolder.py does not contain the expected line. Addon version may differ.");
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.Error($"Failed to patch unfolder.py: {ex.Message}");
             }
         }
     }
