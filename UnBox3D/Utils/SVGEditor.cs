@@ -168,7 +168,8 @@ namespace UnBox3D.Utils
         /// <summary>
         /// Crops the SVG viewBox and dimensions to tightly fit the actual drawn content,
         /// removing empty whitespace. Adds a small padding margin around the content.
-        /// This dramatically reduces the apparent size when opening in Inkscape or a browser.
+        /// Uses SvgVisualElement.Bounds which properly accounts for group transforms.
+        /// Skips the cardboard grid overlay so we crop to just the model geometry.
         /// </summary>
         public static void CropToContent(string svgFilePath, float paddingMm = 10f)
         {
@@ -177,45 +178,47 @@ namespace UnBox3D.Utils
             float docW = svgDoc.Width.Value;
             float docH = svgDoc.Height.Value;
 
-            // Walk all path/line/polygon/rect elements to find the actual content bounds
+            Debug.WriteLine($"CropToContent: original document size = {docW}x{docH}");
+
+            // Walk all visual elements and collect their bounds.
+            // SvgVisualElement.Bounds accounts for parent group transforms,
+            // which is critical because Blender nests paths inside <g> groups.
             float minX = float.MaxValue, minY = float.MaxValue;
             float maxX = float.MinValue, maxY = float.MinValue;
             bool foundContent = false;
 
             foreach (var element in svgDoc.Descendants())
             {
-                RectangleF bounds = RectangleF.Empty;
+                // Skip our cardboard grid overlay — crop to model content only
+                if (element is SvgGroup grp && grp.ID == "cardboard-grid")
+                    continue;
 
-                if (element is SvgPath path)
-                    bounds = path.Bounds;
-                else if (element is SvgLine line)
+                // Only process visual elements that have geometry (paths, lines, polygons, etc.)
+                if (element is not SvgVisualElement visual)
+                    continue;
+
+                // Skip groups themselves — we want leaf elements with actual geometry
+                if (element is SvgGroup)
+                    continue;
+
+                try
                 {
-                    float x1 = line.StartX.Value, y1 = line.StartY.Value;
-                    float x2 = line.EndX.Value, y2 = line.EndY.Value;
-                    bounds = new RectangleF(Math.Min(x1, x2), Math.Min(y1, y2),
-                        Math.Abs(x2 - x1), Math.Abs(y2 - y1));
+                    var bounds = visual.Bounds;
+
+                    // Skip degenerate or empty bounds
+                    if (bounds.IsEmpty || (bounds.Width <= 0 && bounds.Height <= 0))
+                        continue;
+
+                    foundContent = true;
+                    if (bounds.Left < minX) minX = bounds.Left;
+                    if (bounds.Top < minY) minY = bounds.Top;
+                    if (bounds.Right > maxX) maxX = bounds.Right;
+                    if (bounds.Bottom > maxY) maxY = bounds.Bottom;
                 }
-                else if (element is SvgPolygon polygon)
-                    bounds = polygon.Bounds;
-                else if (element is SvgPolyline polyline)
-                    bounds = polyline.Bounds;
-                else if (element is SvgRectangle rect)
-                    bounds = rect.Bounds;
-                else if (element is SvgCircle circle)
-                    bounds = circle.Bounds;
-                else if (element is SvgEllipse ellipse)
-                    bounds = ellipse.Bounds;
-                else
-                    continue;
-
-                if (bounds.Width <= 0 && bounds.Height <= 0)
-                    continue;
-
-                foundContent = true;
-                if (bounds.Left < minX) minX = bounds.Left;
-                if (bounds.Top < minY) minY = bounds.Top;
-                if (bounds.Right > maxX) maxX = bounds.Right;
-                if (bounds.Bottom > maxY) maxY = bounds.Bottom;
+                catch
+                {
+                    // Some elements may not support Bounds — skip them
+                }
             }
 
             if (!foundContent)
@@ -224,16 +227,25 @@ namespace UnBox3D.Utils
                 return;
             }
 
-            // Add padding
+            Debug.WriteLine($"CropToContent: raw content bounds = ({minX:F1},{minY:F1})-({maxX:F1},{maxY:F1})");
+
+            // Add padding around the content
             minX = Math.Max(0, minX - paddingMm);
             minY = Math.Max(0, minY - paddingMm);
-            maxX = Math.Min(docW, maxX + paddingMm);
-            maxY = Math.Min(docH, maxY + paddingMm);
+            maxX = maxX + paddingMm;
+            maxY = maxY + paddingMm;
 
             float cropW = maxX - minX;
             float cropH = maxY - minY;
 
-            Debug.WriteLine($"CropToContent: original={docW}x{docH}mm, content bounds=({minX},{minY})-({maxX},{maxY}), cropped={cropW}x{cropH}mm");
+            // Only crop if it actually reduces the size meaningfully
+            if (cropW >= docW * 0.95f && cropH >= docH * 0.95f)
+            {
+                Debug.WriteLine($"CropToContent: content fills most of page, skipping crop");
+                return;
+            }
+
+            Debug.WriteLine($"CropToContent: cropping from {docW:F0}x{docH:F0} to {cropW:F0}x{cropH:F0} (viewBox origin: {minX:F1},{minY:F1})");
 
             // Set viewBox to the content area and resize the document
             svgDoc.ViewBox = new SvgViewBox(minX, minY, cropW, cropH);
