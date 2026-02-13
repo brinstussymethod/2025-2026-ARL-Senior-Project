@@ -395,6 +395,9 @@ namespace UnBox3D.ViewModels
                     // Add cardboard sheet grid overlay showing where to cut
                     await Task.Run(() => SVGEditor.AddCardboardGrid(svgFile, CardboardSheetWidth, CardboardSheetHeight));
 
+                    // Crop the SVG to just the content area (removes empty whitespace)
+                    await Task.Run(() => SVGEditor.CropToContent(svgFile));
+
                     // Rename to final output name (skip panel splitting — one file with grid overlay)
                     string destName = totalPanels == 1
                         ? $"{newFileName}.svg"

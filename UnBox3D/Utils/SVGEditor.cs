@@ -165,6 +165,85 @@ namespace UnBox3D.Utils
             Debug.WriteLine($"AddCardboardGrid: {numSheetsX}x{numSheetsY} = {totalSheets} sheets needed");
         }
 
+        /// <summary>
+        /// Crops the SVG viewBox and dimensions to tightly fit the actual drawn content,
+        /// removing empty whitespace. Adds a small padding margin around the content.
+        /// This dramatically reduces the apparent size when opening in Inkscape or a browser.
+        /// </summary>
+        public static void CropToContent(string svgFilePath, float paddingMm = 10f)
+        {
+            SvgDocument svgDoc = SvgDocument.Open(svgFilePath);
+
+            float docW = svgDoc.Width.Value;
+            float docH = svgDoc.Height.Value;
+
+            // Walk all path/line/polygon/rect elements to find the actual content bounds
+            float minX = float.MaxValue, minY = float.MaxValue;
+            float maxX = float.MinValue, maxY = float.MinValue;
+            bool foundContent = false;
+
+            foreach (var element in svgDoc.Descendants())
+            {
+                RectangleF bounds = RectangleF.Empty;
+
+                if (element is SvgPath path)
+                    bounds = path.Bounds;
+                else if (element is SvgLine line)
+                {
+                    float x1 = line.StartX.Value, y1 = line.StartY.Value;
+                    float x2 = line.EndX.Value, y2 = line.EndY.Value;
+                    bounds = new RectangleF(Math.Min(x1, x2), Math.Min(y1, y2),
+                        Math.Abs(x2 - x1), Math.Abs(y2 - y1));
+                }
+                else if (element is SvgPolygon polygon)
+                    bounds = polygon.Bounds;
+                else if (element is SvgPolyline polyline)
+                    bounds = polyline.Bounds;
+                else if (element is SvgRectangle rect)
+                    bounds = rect.Bounds;
+                else if (element is SvgCircle circle)
+                    bounds = circle.Bounds;
+                else if (element is SvgEllipse ellipse)
+                    bounds = ellipse.Bounds;
+                else
+                    continue;
+
+                if (bounds.Width <= 0 && bounds.Height <= 0)
+                    continue;
+
+                foundContent = true;
+                if (bounds.Left < minX) minX = bounds.Left;
+                if (bounds.Top < minY) minY = bounds.Top;
+                if (bounds.Right > maxX) maxX = bounds.Right;
+                if (bounds.Bottom > maxY) maxY = bounds.Bottom;
+            }
+
+            if (!foundContent)
+            {
+                Debug.WriteLine("CropToContent: No drawable content found, skipping crop");
+                return;
+            }
+
+            // Add padding
+            minX = Math.Max(0, minX - paddingMm);
+            minY = Math.Max(0, minY - paddingMm);
+            maxX = Math.Min(docW, maxX + paddingMm);
+            maxY = Math.Min(docH, maxY + paddingMm);
+
+            float cropW = maxX - minX;
+            float cropH = maxY - minY;
+
+            Debug.WriteLine($"CropToContent: original={docW}x{docH}mm, content bounds=({minX},{minY})-({maxX},{maxY}), cropped={cropW}x{cropH}mm");
+
+            // Set viewBox to the content area and resize the document
+            svgDoc.ViewBox = new SvgViewBox(minX, minY, cropW, cropH);
+            svgDoc.Width = new SvgUnit(SvgUnitType.Millimeter, cropW);
+            svgDoc.Height = new SvgUnit(SvgUnitType.Millimeter, cropH);
+
+            svgDoc.Write(svgFilePath);
+            Debug.WriteLine($"CropToContent: saved cropped SVG ({cropW:F0}x{cropH:F0}mm)");
+        }
+
         public static bool ExportToPdf(string svgFile, PdfDocument pdf)
         {
             Debug.WriteLine($"Combining SVG: {svgFile}");
