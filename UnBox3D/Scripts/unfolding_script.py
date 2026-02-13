@@ -254,9 +254,16 @@ def unfold(output_path: pathlib.Path):
 
     # Run the export operator with retry logic for oversized islands.
     # If an unfolded island is too large for the page, double the page size and retry.
+    # IMPORTANT: We must also update pm.output_size_x/y so Blender re-layouts
+    # the islands at the new size. Otherwise auto_scale uses the old small canvas
+    # and the exported SVG has a huge page but tiny content in one corner.
     max_retries = 5                                    # Maximum number of retry attempts
     for attempt in range(max_retries + 1):
         try:
+            # Sync the layout canvas to match the export page size
+            pm.output_size_x = export_kwargs["output_size_x"]
+            pm.output_size_y = export_kwargs["output_size_y"]
+
             bpy.ops.export_mesh.paper_model("EXEC_DEFAULT", **export_kwargs)  # Execute the export
             break                                      # Success — exit the retry loop
         except RuntimeError as e:
