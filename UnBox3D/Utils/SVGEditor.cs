@@ -4,6 +4,7 @@ using Svg;
 using Svg.Transforms;
 using System.Diagnostics;
 using System.IO;
+using System.Drawing;
 using System.Drawing.Imaging;    // For ImageFormat
 /* Values are in pixels
 // SOMEONE GET ON THIS
@@ -78,6 +79,90 @@ namespace UnBox3D.Utils
                     Debug.WriteLine($"Exported panel to {outputFilePath} with x-offset: {xOffset}, y-offset: {yOffset}");
                 }
             }
+        }
+
+        /// <summary>
+        /// Overlays a dashed grid onto an SVG file showing corrugated cardboard sheet boundaries.
+        /// The grid lines help plan cuts and reduce waste on the rotary cutter.
+        /// </summary>
+        public static void AddCardboardGrid(string svgFilePath, float sheetWidthMm, float sheetHeightMm)
+        {
+            if (sheetWidthMm <= 0 || sheetHeightMm <= 0)
+                return;
+
+            SvgDocument svgDoc = SvgDocument.Open(svgFilePath);
+
+            // SVG document dimensions are in mm (as exported by Blender paper model addon)
+            float docWidthMm = svgDoc.Width.Value;
+            float docHeightMm = svgDoc.Height.Value;
+
+            Debug.WriteLine($"AddCardboardGrid: doc={docWidthMm}x{docHeightMm}mm, sheet={sheetWidthMm}x{sheetHeightMm}mm");
+
+            var gridGroup = new SvgGroup();
+            gridGroup.ID = "cardboard-grid";
+
+            // Vertical dashed lines at each sheet boundary
+            int numSheetsX = (int)Math.Ceiling(docWidthMm / sheetWidthMm);
+            for (int i = 1; i < numSheetsX; i++)
+            {
+                float xMm = i * sheetWidthMm;
+                var line = new SvgLine
+                {
+                    StartX = new SvgUnit(SvgUnitType.Millimeter, xMm),
+                    StartY = new SvgUnit(SvgUnitType.Millimeter, 0),
+                    EndX = new SvgUnit(SvgUnitType.Millimeter, xMm),
+                    EndY = new SvgUnit(SvgUnitType.Millimeter, docHeightMm),
+                    Stroke = new SvgColourServer(Color.Blue),
+                    StrokeWidth = new SvgUnit(SvgUnitType.Millimeter, 0.5f),
+                    StrokeDashArray = new SvgUnitCollection { new SvgUnit(SvgUnitType.Millimeter, 5), new SvgUnit(SvgUnitType.Millimeter, 3) },
+                    Opacity = 0.6f
+                };
+                gridGroup.Children.Add(line);
+            }
+
+            // Horizontal dashed lines at each sheet boundary
+            int numSheetsY = (int)Math.Ceiling(docHeightMm / sheetHeightMm);
+            for (int j = 1; j < numSheetsY; j++)
+            {
+                float yMm = j * sheetHeightMm;
+                var line = new SvgLine
+                {
+                    StartX = new SvgUnit(SvgUnitType.Millimeter, 0),
+                    StartY = new SvgUnit(SvgUnitType.Millimeter, yMm),
+                    EndX = new SvgUnit(SvgUnitType.Millimeter, docWidthMm),
+                    EndY = new SvgUnit(SvgUnitType.Millimeter, yMm),
+                    Stroke = new SvgColourServer(Color.Blue),
+                    StrokeWidth = new SvgUnit(SvgUnitType.Millimeter, 0.5f),
+                    StrokeDashArray = new SvgUnitCollection { new SvgUnit(SvgUnitType.Millimeter, 5), new SvgUnit(SvgUnitType.Millimeter, 3) },
+                    Opacity = 0.6f
+                };
+                gridGroup.Children.Add(line);
+            }
+
+            // Add sheet count labels in the corner of each sheet cell
+            for (int ix = 0; ix < numSheetsX; ix++)
+            {
+                for (int iy = 0; iy < numSheetsY; iy++)
+                {
+                    float labelX = ix * sheetWidthMm + 2;
+                    float labelY = iy * sheetHeightMm + 6;
+                    var label = new SvgText($"Sheet {ix + 1},{iy + 1}")
+                    {
+                        X = new SvgUnitCollection { new SvgUnit(SvgUnitType.Millimeter, labelX) },
+                        Y = new SvgUnitCollection { new SvgUnit(SvgUnitType.Millimeter, labelY) },
+                        FontSize = new SvgUnit(SvgUnitType.Millimeter, 4),
+                        Fill = new SvgColourServer(Color.Blue),
+                        Opacity = 0.5f
+                    };
+                    gridGroup.Children.Add(label);
+                }
+            }
+
+            svgDoc.Children.Add(gridGroup);
+            svgDoc.Write(svgFilePath);
+
+            int totalSheets = numSheetsX * numSheetsY;
+            Debug.WriteLine($"AddCardboardGrid: {numSheetsX}x{numSheetsY} = {totalSheets} sheets needed");
         }
 
         public static bool ExportToPdf(string svgFile, PdfDocument pdf)

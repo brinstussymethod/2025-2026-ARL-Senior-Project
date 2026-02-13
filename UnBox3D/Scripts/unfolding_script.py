@@ -139,19 +139,78 @@ def unfold(output_path: pathlib.Path):
     '''Context of Blender'''
     pm = bpy.context.scene.paper_model
 
-    pm.output_size_x=1
-    pm.output_size_y=1
-    pm.use_auto_scale = False
-    pm.limit_by_page = False
+    doc_width = val['dw']
+    doc_height = val['dh']
+
+    # Set the Blender-side page to match export size so all islands
+    # are laid out on a single sheet instead of being split across pages
+    pm.output_size_x = doc_width
+    pm.output_size_y = doc_height
+    pm.use_auto_scale = True
+    pm.limit_by_page = True
     pm.scale = 1
+
+    # Line styles to distinguish cut-through vs bevel-fold lines on the rotary cutter:
+    #   outer  = SOLID  (thick black)  -> cut all the way through
+    #   convex = DASH   (red dashed)   -> bevel 45° cut, mountain fold
+    #   concave = DASHDOT (blue dash-dot) -> bevel 45° cut, valley fold
+    # Different addon versions store the style in different places
+    style = None
+
+    # Try scene property group first (user_default version)
+    if hasattr(pm, 'style'):
+        style = pm.style
+
+    # Try the operator's last-used settings (blender_org version)
+    if style is None:
+        try:
+            op_class = bpy.ops.export_mesh.paper_model.get_rna_type()
+            if hasattr(op_class, 'style'):
+                style = op_class.style
+        except Exception:
+            pass
+
+    if style is not None:
+        try:
+            style.line_width = 0.0002
+            # Outer edges: solid black = cut through
+            style.outer_color = (0, 0, 0, 1)
+            style.outer_style = 'SOLID'
+            style.outer_width = 3
+            style.use_outbg = True
+            style.outbg_color = (1, 1, 1, 1)
+            style.outbg_width = 5
+            # Convex edges: red dashed = mountain fold (bevel cut)
+            style.convex_color = (0.8, 0, 0, 1)
+            style.convex_style = 'DASH'
+            style.convex_width = 2
+            # Concave edges: blue dash-dot = valley fold (bevel cut)
+            style.concave_color = (0, 0, 0.8, 1)
+            style.concave_style = 'DASHDOT'
+            style.concave_width = 2
+            # Freestyle edges: solid gray
+            style.freestyle_color = (0.5, 0.5, 0.5, 1)
+            style.freestyle_style = 'SOLID'
+            style.freestyle_width = 2
+            # Background / inner
+            style.use_inbg = True
+            style.inbg_color = (1, 1, 1, 1)
+            style.inbg_width = 2
+            # Stickers / text
+            style.sticker_color = (0.9, 0.9, 0.9, 1)
+            style.text_color = (0, 0, 0, 1)
+            print("Style configured: SOLID=cut-through, DASH(red)=mountain fold, DASHDOT(blue)=valley fold")
+        except Exception as e:
+            print(f"Warning: Could not set all style properties: {e}")
+            print("Exporting with default line styles")
+    else:
+        print("Note: Style property not found on this addon version, using default line styles")
 
     '''Export'''
 
     filename = val['fn']
     export_file = str(output_path / filename)
 
-    doc_width = val['dw']
-    doc_height = val['dh']
     ext = val['ext']
 
     # Build export kwargs — some addon versions use different parameter names
@@ -165,12 +224,28 @@ def unfold(output_path: pathlib.Path):
         "scale": 1,
     }
 
-    # Try with sticker/number params (user_default version), fall back without (blender_org version)
-    try:
-        bpy.ops.export_mesh.paper_model("EXEC_DEFAULT", do_create_stickers=False, do_create_numbers=False, **export_kwargs)
-    except TypeError as e:
-        print(f"Retrying export without sticker/number params: {e}")
-        bpy.ops.export_mesh.paper_model("EXEC_DEFAULT", **export_kwargs)
+    # Detect supported operator properties to handle different addon versions
+    op_props = bpy.ops.export_mesh.paper_model.get_rna_type().properties.keys()
+    if 'do_create_stickers' in op_props:
+        export_kwargs['do_create_stickers'] = False
+    if 'do_create_numbers' in op_props:
+        export_kwargs['do_create_numbers'] = False
+
+    # Attempt export, retrying with larger page sizes if an island doesn't fit
+    max_retries = 5
+    for attempt in range(max_retries + 1):
+        try:
+            bpy.ops.export_mesh.paper_model("EXEC_DEFAULT", **export_kwargs)
+            break
+        except RuntimeError as e:
+            if "island is too big" in str(e) and attempt < max_retries:
+                export_kwargs["output_size_x"] *= 2
+                export_kwargs["output_size_y"] *= 2
+                print(f"Island too big for page, retrying with "
+                      f"{export_kwargs['output_size_x']}x{export_kwargs['output_size_y']} "
+                      f"(attempt {attempt + 2}/{max_retries + 1})")
+            else:
+                raise
 
     print(f"Successfully exported unfolded model to: {export_file}")
     print(f"File format: {ext}")

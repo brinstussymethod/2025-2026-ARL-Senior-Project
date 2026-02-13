@@ -133,6 +133,38 @@
                             </TextBox>
                         </Grid>
                     </GroupBox>
+
+                    <GroupBox Header="Cardboard Sheet Size" Margin="0,5,0,0">
+                        <StackPanel Margin="5">
+                            <TextBlock Text="Width (ft):" Margin="0,2,0,0"/>
+                            <StackPanel Orientation="Horizontal">
+                                <Slider x:Name="CardboardWidthSlider"
+                                        Width="150"
+                                        Minimum="1" Maximum="12"
+                                        Value="6"
+                                        TickFrequency="0.5"
+                                        IsSnapToTickEnabled="True"
+                                        TickPlacement="BottomRight"
+                                        ValueChanged="CardboardSlider_ValueChanged"/>
+                                <TextBlock Text="{Binding ElementName=CardboardWidthSlider, Path=Value, StringFormat=' {0:F1} ft'}"
+                                           VerticalAlignment="Center" Margin="5,0,0,0"/>
+                            </StackPanel>
+
+                            <TextBlock Text="Height (ft):" Margin="0,5,0,0"/>
+                            <StackPanel Orientation="Horizontal">
+                                <Slider x:Name="CardboardHeightSlider"
+                                        Width="150"
+                                        Minimum="1" Maximum="12"
+                                        Value="5"
+                                        TickFrequency="0.5"
+                                        IsSnapToTickEnabled="True"
+                                        TickPlacement="BottomRight"
+                                        ValueChanged="CardboardSlider_ValueChanged"/>
+                                <TextBlock Text="{Binding ElementName=CardboardHeightSlider, Path=Value, StringFormat=' {0:F1} ft'}"
+                                           VerticalAlignment="Center" Margin="5,0,0,0"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </GroupBox>
                 </StackPanel>
 
                 <MenuItem Header="Export Model" Command="{Binding ExportUnfoldModelCommand}" />

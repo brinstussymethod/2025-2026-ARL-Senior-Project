@@ -278,6 +278,18 @@ namespace UnBox3D.Views
             }
         }
 
+        private void CardboardSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (DataContext is MainViewModel vm)
+            {
+                const float ftToMm = 304.8f;
+                if (CardboardWidthSlider != null)
+                    vm.CardboardSheetWidth = (float)CardboardWidthSlider.Value * ftToMm;
+                if (CardboardHeightSlider != null)
+                    vm.CardboardSheetHeight = (float)CardboardHeightSlider.Value * ftToMm;
+            }
+        }
+
         // Runs whenever the user left-clicks a different item in the TreeView.
         // e.NewValue is a MeshSummary, not the raw mesh object, so we pull the underlying SourceMesh.
         private void TreeView_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)

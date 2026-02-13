@@ -54,6 +54,12 @@ namespace UnBox3D.ViewModels
         private float pageHeight = 25.0f;
 
         [ObservableProperty]
+        private float cardboardSheetWidth = 1828.8f; // mm (default 6ft)
+
+        [ObservableProperty]
+        private float cardboardSheetHeight = 1524.0f; // mm (default 5ft)
+
+        [ObservableProperty]
         private float simplificationRatio = 50f; // represents percentage (10–100)
 
         [ObservableProperty]
@@ -386,8 +392,18 @@ namespace UnBox3D.ViewModels
                     loadingWindow.UpdateProgress(50 + ((double)i / totalPanels * 30));
                     await DispatcherHelper.DoEvents();
 
-                    await Task.Run(() => SVGEditor.ExportSvgPanels(svgFile, outputDirectory, newFileName, i,
-                        PageWidth * 1000f, PageHeight * 1000f));
+                    // Add cardboard sheet grid overlay showing where to cut
+                    await Task.Run(() => SVGEditor.AddCardboardGrid(svgFile, CardboardSheetWidth, CardboardSheetHeight));
+
+                    // Rename to final output name (skip panel splitting — one file with grid overlay)
+                    string destName = totalPanels == 1
+                        ? $"{newFileName}.svg"
+                        : $"{newFileName}_page{i + 1}.svg";
+                    string destPath = Path.Combine(outputDirectory, destName);
+                    if (!string.Equals(Path.GetFullPath(svgFile), Path.GetFullPath(destPath), StringComparison.OrdinalIgnoreCase))
+                    {
+                        File.Move(svgFile, destPath, overwrite: true);
+                    }
                 }
 
                 // ... rest of method follows unchanged (exporting files, cleanup, notifications) ...
