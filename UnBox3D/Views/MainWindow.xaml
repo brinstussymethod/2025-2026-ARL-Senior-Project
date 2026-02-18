@@ -245,7 +245,7 @@
                           ShowsPreview="True"/>
 
             <!-- OpenGL Rendering Host -->
-            <WindowsFormsHost Grid.Column="2" Name="openGLHost" />
+            <WindowsFormsHost Grid.Column="2" Name="openGLHost"/>
         </Grid>
     </DockPanel>
 </Window>

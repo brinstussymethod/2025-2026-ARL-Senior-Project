@@ -1,104 +1,228 @@
 ﻿using OpenTK.Mathematics;
-using OpenTK.Graphics.OpenGL;
+using OpenTK.Graphics.OpenGL4;
 using UnBox3D.Utils;
 using System;
+using System.Collections.Generic;
+using Assimp;
+using System.Diagnostics;
+using UnBox3D.Rendering.OpenGL;
 
 namespace UnBox3D.Rendering
 {
     public class Gizmo
     {
-        private Vector3 center = new Vector3();
-        private readonly float radius;
-        private readonly int numSegments;
-        private bool isVisible { get; set; }
+        private int _vao;
+        private int _vbo;
+        private int _ebo;
+        private int _vertexCount;
+        private Shader _shader;
+        private bool _isInitialized = false;
 
-        public Gizmo(float radius, int numSegments)
+        public void Initialize(string modelPath)
         {
-            this.radius = radius;
-            this.numSegments = numSegments;
-        }
+            if (_isInitialized)
+                return;
 
-        public Vector3 GetCenter() { return center; }
+            // Load the FBX model using Assimp
+            List<float> vertices = new List<float>();
+            List<uint> indices = new List<uint>();
 
-        public void SetCenter(Vector3 center) 
-        {
-            this.center.X = center.X;
-            this.center.Y = center.Z;
-            this.center.Z = center.Y;
-        }
-
-        private void RenderCircle(Vector3 axis, float lineWidth)
-        {
-            // Set the line width to make the gizmos thicker
-            GL.LineWidth(lineWidth);
-
-            GL.Begin(PrimitiveType.LineLoop);
-            for (int i = 0; i < numSegments; i++)
+            try
             {
-                float angle = 2.0f * (float)Math.PI * i / numSegments;
-                float x = radius * (float)Math.Cos(angle);
-                float y = radius * (float)Math.Sin(angle);
+                using (var importer = new AssimpContext())
+                {
+                    var scene = importer.ImportFile(modelPath,
+                        PostProcessSteps.Triangulate |
+                        PostProcessSteps.GenerateNormals);
 
-                // Rotate the circle based on the axis (X, Y, or Z)
-                if (axis == Vector3.UnitX)
-                {
-                    GL.Vertex3(center.X, center.Y + x, center.Z + y); // YZ plane
+                    if (scene == null || scene.MeshCount == 0)
+                    {
+                        Debug.WriteLine("Failed to load gizmo model");
+                        return;
+                    }
+
+                    uint indexOffset = 0;
+                    foreach (var mesh in scene.Meshes)
+                    {
+                        // Add vertices (position + normal)
+                        for (int i = 0; i < mesh.VertexCount; i++)
+                        {
+                            var pos = mesh.Vertices[i];
+                            var norm = mesh.HasNormals ? mesh.Normals[i] : new Vector3D(0, 1, 0);
+
+                            vertices.Add(pos.X);
+                            vertices.Add(pos.Y);
+                            vertices.Add(pos.Z);
+                            vertices.Add(norm.X);
+                            vertices.Add(norm.Y);
+                            vertices.Add(norm.Z);
+                        }
+
+                        // Add indices
+                        foreach (var face in mesh.Faces)
+                        {
+                            if (face.IndexCount == 3)
+                            {
+                                indices.Add((uint)(face.Indices[0] + indexOffset));
+                                indices.Add((uint)(face.Indices[1] + indexOffset));
+                                indices.Add((uint)(face.Indices[2] + indexOffset));
+                            }
+                        }
+
+                        indexOffset += (uint)mesh.VertexCount;
+                    }
                 }
-                else if (axis == Vector3.UnitY)
-                {
-                    GL.Vertex3(center.X + x, center.Y, center.Z + y); // XZ plane
-                }
-                else if (axis == Vector3.UnitZ)
-                {
-                    GL.Vertex3(center.X + x, center.Y + y, center.Z); // XY plane
-                }
+
+                _vertexCount = indices.Count;
+
+                // Create OpenGL buffers
+                _vao = GL.GenVertexArray();
+                _vbo = GL.GenBuffer();
+                _ebo = GL.GenBuffer();
+
+                GL.BindVertexArray(_vao);
+
+                GL.BindBuffer(BufferTarget.ArrayBuffer, _vbo);
+                GL.BufferData(BufferTarget.ArrayBuffer, vertices.Count * sizeof(float),
+                    vertices.ToArray(), BufferUsageHint.StaticDraw);
+
+                GL.BindBuffer(BufferTarget.ElementArrayBuffer, _ebo);
+                GL.BufferData(BufferTarget.ElementArrayBuffer, indices.Count * sizeof(uint),
+                    indices.ToArray(), BufferUsageHint.StaticDraw);
+
+                // Position attribute
+                GL.VertexAttribPointer(0, 3, VertexAttribPointerType.Float, false, 6 * sizeof(float), 0);
+                GL.EnableVertexAttribArray(0);
+
+                // Normal attribute
+                GL.VertexAttribPointer(1, 3, VertexAttribPointerType.Float, false, 6 * sizeof(float), 3 * sizeof(float));
+                GL.EnableVertexAttribArray(1);
+
+                GL.BindVertexArray(0);
+
+                // Use lighting shader for the gizmo
+                _shader = ShaderManager.LightingShader;
+
+                _isInitialized = true;
+                Debug.WriteLine("Gizmo initialized successfully");
             }
-            GL.End();
-            // Set the line width back to its default
-            GL.LineWidth(1.0f);
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error loading gizmo model: {ex.Message}");
+            }
         }
 
-
-        public bool RayIntersectsGizmoCircle(Vector3 rayOrigin, Vector3 rayDirection, Vector3 axis)
+        public void Render(ICamera camera, int screenWidth, int screenHeight)
         {
-            // Find the plane that the gizmo circle lies in
-            Vector3 gizmoCenter = center;
+            if (!_isInitialized)
+                return;
 
-            // Compute the normal to the plane (same as the axis for the circle)
-            Vector3 planeNormal = axis;
+            // Save current viewport
+            int[] viewport = new int[4];
+            GL.GetInteger(GetPName.Viewport, viewport);
 
-            // Calculate intersection point between ray and plane of the gizmo's circle
-            float d = Vector3.Dot(gizmoCenter - rayOrigin, planeNormal) / Vector3.Dot(rayDirection, planeNormal);
+            // Define gizmo viewport (top right corner, 180x180 pixels for more space)
+            int gizmoSize = 180;
+            int gizmoPosX = screenWidth - gizmoSize - 10;
+            int gizmoPosY = screenHeight - gizmoSize - 10;
+            GL.Viewport(gizmoPosX, gizmoPosY, gizmoSize, gizmoSize);
 
-            // If d < 0, no intersection (ray points away from the plane)
-            if (d < 0) return false;
+            // Clear depth buffer for gizmo rendering
+            GL.Clear(ClearBufferMask.DepthBufferBit);
 
-            // Compute the intersection point on the plane
-            Vector3 intersectionPoint = rayOrigin + rayDirection * d;
+            // Create rotation matrix from camera orientation (without translation)
+            Matrix4 gizmoRotation = CreateRotationFromCamera(camera);
 
-            // Calculate the distance from the intersection point to the gizmo's center
-            float distanceToCenter = (intersectionPoint - gizmoCenter).Length;
+            // Apply correction: rotate to match initial camera orientation and flip upside down
+            // Z forward, Y up, X right when camera starts at default position
+            Matrix4 correctionRotation = Matrix4.CreateRotationX(MathHelper.DegreesToRadians(-90));
 
-            // If distance to center is less than the radius of the gizmo's circle, ray intersects
-            return distanceToCenter <= radius;
+            // Scale to a balanced size - big enough to see clearly but not too big
+            Matrix4 gizmoModel = Matrix4.CreateScale(0.55f) * correctionRotation * gizmoRotation;
+
+            // Create a simple view matrix (camera looking at origin from close distance)
+            Matrix4 gizmoView = Matrix4.LookAt(new Vector3(0, 0, 3), Vector3.Zero, Vector3.UnitY);
+
+            // Create orthographic projection with larger bounds to prevent cropping
+            Matrix4 gizmoProjection = Matrix4.CreateOrthographic(3.5f, 3.5f, 0.1f, 100.0f);
+
+            // Render the gizmo
+            _shader.Use();
+            _shader.SetMatrix4("model", gizmoModel);
+            _shader.SetMatrix4("view", gizmoView);
+            _shader.SetMatrix4("projection", gizmoProjection);
+            _shader.SetVector3("objectColor", new Vector3(0.8f, 0.8f, 0.8f));
+            _shader.SetVector3("lightColor", new Vector3(1.0f, 1.0f, 1.0f));
+            _shader.SetVector3("lightPos", new Vector3(5.0f, 5.0f, 5.0f));
+            _shader.SetVector3("viewPos", new Vector3(0, 0, 3));
+
+            GL.BindVertexArray(_vao);
+            GL.DrawElements(BeginMode.Triangles, _vertexCount, DrawElementsType.UnsignedInt, 0);
+            GL.BindVertexArray(0);
+
+            // Restore original viewport
+            GL.Viewport(viewport[0], viewport[1], viewport[2], viewport[3]);
         }
 
-
-        // Method to draw all the circles (X, Y, Z)
-        public void RenderGizmos()
+        public string GetCurrentLabel(ICamera camera)
         {
-            // X-axis (red circle)
-            GL.Color3(Colors.Red);
-            RenderCircle(Vector3.UnitX, 3.0f);
+            // Determine which direction is most prominently visible based on camera orientation
+            Vector3 forward = -camera.Front;
 
-            // Y-axis (green circle)
-            GL.Color3(Colors.Green);
-            RenderCircle(Vector3.UnitY, 3.0f);
+            string label = "";
 
-            // Z-axis (blue circle)
-            GL.Color3(Colors.Blue);
-            RenderCircle(Vector3.UnitZ, 3.0f);
+            // Front/Back (Z-axis) - highest priority
+            if (Math.Abs(forward.Z) > 0.5f)
+            {
+                if (forward.Z > 0)
+                    label = "FRONT";
+                else
+                    label = "BACK";
+            }
+            // Top/Bottom (Y-axis)
+            else if (Math.Abs(forward.Y) > 0.5f)
+            {
+                if (forward.Y > 0)
+                    label = "TOP";
+                else
+                    label = "BOTTOM";
+            }
+            // Left/Right (X-axis)
+            else if (Math.Abs(forward.X) > 0.5f)
+            {
+                if (forward.X > 0)
+                    label = "RIGHT";
+                else
+                    label = "LEFT";
+            }
+
+            return label;
         }
 
+        private Matrix4 CreateRotationFromCamera(ICamera camera)
+        {
+            // Create rotation matrix matching camera's pitch, yaw, and roll
+            // using the camera's Right, Up, and Front vectors
+            Matrix4 rotation = new Matrix4(
+                new Vector4(camera.Right, 0),
+                new Vector4(camera.Up, 0),
+                new Vector4(-camera.Front, 0),  // Negate front to match camera direction
+                new Vector4(0, 0, 0, 1)
+            );
+
+            return rotation;
+        }
+
+        public void Dispose()
+        {
+            if (_isInitialized)
+            {
+                GL.DeleteVertexArray(_vao);
+                GL.DeleteBuffer(_vbo);
+                GL.DeleteBuffer(_ebo);
+
+                _isInitialized = false;
+            }
+        }
     }
 }

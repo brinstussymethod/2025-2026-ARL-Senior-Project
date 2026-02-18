@@ -99,6 +99,9 @@ namespace UnBox3D.Rendering.OpenGL
         private  GridPlaneRenderer _gridRenderer;
         private readonly string _vertShader = "Rendering/OpenGL/Shaders/shader.vert";
         private readonly string _fragShader = "Rendering/OpenGL/Shaders/lighting.frag";
+        
+        // Added for testing 2/10/26
+        private Gizmo _gizmo;
 
         private ICamera _camera;
 
@@ -238,6 +241,9 @@ namespace UnBox3D.Rendering.OpenGL
             GL.Disable(EnableCap.CullFace);
 
             _gridRenderer = new GridPlaneRenderer(_vertShader, _fragShader);
+            _gizmo = new Gizmo();
+            _gizmo.Initialize("Assets/3DObjects/Gizmo.fbx"); 
+
         }
 
         private void GlControl_Paint(object sender, PaintEventArgs e)
@@ -247,7 +253,6 @@ namespace UnBox3D.Rendering.OpenGL
             _sceneRenderer.RenderScene(_camera, _lightingShader);
 
             _gridRenderer.DrawGrid(_camera.GetViewMatrix(), _camera.GetProjectionMatrix());
-
 
             GL.BindVertexArray(_vaoLamp);
 
@@ -262,7 +267,33 @@ namespace UnBox3D.Rendering.OpenGL
 
             GL.DrawArrays(PrimitiveType.Triangles, 0, 36);
 
+            // Render gizmo last (in top right corner, synced with camera rotation)
+            _gizmo.Render(_camera, Width, Height);
+
             SwapBuffers();
+
+            // Draw text label on top of OpenGL content using GDI+
+            string label = _gizmo.GetCurrentLabel(_camera);
+            if (!string.IsNullOrEmpty(label))
+            {
+                using (var graphics = e.Graphics)
+                {
+                    using (var font = new Font("Arial", 10, FontStyle.Bold))
+                    using (var shadowBrush = new SolidBrush(Color.FromArgb(180, Color.Black)))
+                    using (var textBrush = new SolidBrush(Color.White))
+                    {
+                        // Position text below the gizmo
+                        int gizmoSize = 180;
+                        int textX = Width - gizmoSize / 2 - 25;
+                        int textY = Height - 35;
+
+                        // Draw shadow
+                        graphics.DrawString(label, font, shadowBrush, textX + 1, textY + 1);
+                        // Draw text
+                        graphics.DrawString(label, font, textBrush, textX, textY);
+                    }
+                }
+            }
         }
 
 
