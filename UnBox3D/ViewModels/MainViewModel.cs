@@ -722,13 +722,19 @@ namespace UnBox3D.ViewModels
 
         // If you want to implement replace with cylinder by clicking
         [RelayCommand]
-        private async void ReplaceWithCylinderClick(){
-            var command = new SetReplaceStateCommand(_glControlHost, _mouseController, _sceneManager, new RayCaster(_glControlHost, _camera), _camera, _commandHistory, "Cylinder");
-            command.Execute();
-            await ShowWpfMessageBoxAsync("Replaced!", "Replace", MessageBoxButton.OK, MessageBoxImage.Information);
-        
-}
+        private async void ReplaceWithCylinderClick()
+        {
+            if (SelectedMesh != null)
+            {
+                ReplaceWithCylinderOption(SelectedMesh);
+                //await ShowWpfMessageBoxAsync("Replaced!", "Replace", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            else
+            {
+                await ShowWpfMessageBoxAsync("Select a mesh first.", "Replace", MessageBoxButton.OK, MessageBoxImage.Information);
 
+            }
+        }
 
         
 
@@ -781,7 +787,7 @@ private async void ReplaceWithCubeClick()
     if (SelectedMesh != null)
     {
         ReplaceWithCubeOption(SelectedMesh);
-        await ShowWpfMessageBoxAsync("Replaced!", "Replace", MessageBoxButton.OK, MessageBoxImage.Information);
+        //await ShowWpfMessageBoxAsync("Replaced!", "Replace", MessageBoxButton.OK, MessageBoxImage.Information);
     }
     else
     {

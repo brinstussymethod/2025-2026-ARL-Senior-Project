@@ -125,11 +125,11 @@
                 <StackPanel Orientation="Horizontal">
                     <Button Content="Replace Click → Cylinder"
                             Margin="0,0,8,0"
-                            Command="{Binding ReplaceWithCylinderOptionCommand}"
+                            Command="{Binding ReplaceWithCylinderClickCommand}"
                             CommandParameter="{Binding ElementName=MeshesTreeView, Path=SelectedItem.SourceMesh}" />
 
                     <Button Content="Replace Click → Cube"
-                            Command="{Binding ReplaceWithCubeOptionCommand}"
+                            Command="{Binding ReplaceWithCubeClickCommand}"
                             CommandParameter="{Binding ElementName=MeshesTreeView, Path=SelectedItem.SourceMesh}" />
                 </StackPanel>
 
