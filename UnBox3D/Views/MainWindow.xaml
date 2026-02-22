@@ -57,30 +57,54 @@
             </Grid.ColumnDefinitions>
 
             <!-- Left Panel: TreeView (Hierarchical Mesh View) -->
-            <StackPanel Grid.Column="0" Orientation="Vertical">
-                <TextBlock Text="Meshes" FontSize="16" FontWeight="SemiBold" Margin="10,10,0,5"/>
+            <Grid Grid.Column="0">
+                <Grid.RowDefinitions>
+                    <!-- Header -->
+                    <RowDefinition Height="Auto"/>
+                    <!-- TreeView fills remaining space -->
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <TextBlock Text="Meshes"
+               FontSize="16"
+               FontWeight="SemiBold"
+               Margin="10,10,0,5"
+               Grid.Row="0"/>
+
                 <TreeView x:Name="MeshesTreeView"
-                          Grid.Column="0"
-                          Padding="10"
-                          ItemsSource="{Binding Meshes}"
-                          SelectedItemChanged="TreeView_SelectedItemChanged"
-                          VirtualizingStackPanel.IsVirtualizing="True"
-                          VirtualizingStackPanel.VirtualizationMode="Recycling"
-                          ScrollViewer.CanContentScroll="True">
+              Grid.Row="1"
+              Padding="10"
+              ItemsSource="{Binding Meshes}"
+              SelectedItemChanged="TreeView_SelectedItemChanged"
+              VirtualizingStackPanel.IsVirtualizing="True"
+              VirtualizingStackPanel.VirtualizationMode="Recycling"
+              ScrollViewer.CanContentScroll="True">
+
                     <TreeView.ItemTemplate>
                         <DataTemplate>
-                            <TextBlock Tag="{Binding DataContext, RelativeSource={RelativeSource AncestorType=Window}}">
-                                <Run Text="{Binding Name}" FontWeight="Bold" />
-                                <Run Text=" (" Foreground="Gray" />
-                                <Run Text="{Binding VertexCount}" Foreground="Gray" />
-                                <Run Text=" vertices)" Foreground="Gray" />
-                                <Button Content="Export" Margin="5,0,0,0" Command="{Binding DataContext.ExportMeshCommand, RelativeSource={RelativeSource AncestorType=TreeView}}" CommandParameter="{Binding SourceMesh}" />
-                                <Button Content="Delete" Margin="5,0,0,0" Command="{Binding DataContext.DeleteMeshCommand, RelativeSource={RelativeSource AncestorType=TreeView}}" CommandParameter="{Binding SourceMesh}" />
-                            </TextBlock>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock>
+                        <Run Text="{Binding Name}" FontWeight="Bold"/>
+                        <Run Text=" (" Foreground="Gray"/>
+                        <Run Text="{Binding VertexCount}" Foreground="Gray"/>
+                        <Run Text=" vertices)" Foreground="Gray"/>
+                                </TextBlock>
+
+                                <Button Content="Export"
+                            Margin="10,0,0,0"
+                            Command="{Binding DataContext.ExportMeshCommand, RelativeSource={RelativeSource AncestorType=TreeView}}"
+                            CommandParameter="{Binding SourceMesh}"/>
+
+                                <Button Content="Delete"
+                            Margin="5,0,0,0"
+                            Command="{Binding DataContext.DeleteMeshCommand, RelativeSource={RelativeSource AncestorType=TreeView}}"
+                            CommandParameter="{Binding SourceMesh}"/>
+                            </StackPanel>
                         </DataTemplate>
                     </TreeView.ItemTemplate>
+
                 </TreeView>
-            </StackPanel>
+            </Grid>
 
             <!-- Splitter between TreeView and OpenGL rendering host -->
             <GridSplitter Grid.Column="1"
