@@ -172,21 +172,25 @@ namespace UnBox3D.Rendering
 
             foreach (IAppMesh mesh in originalMeshes)
             {
-                if (mesh.Name != "GeneratedCylinder")
+                
+                // if the mesh is a prism, then it already is a box mesh, so we can just add it to the list of box meshes without creating a new one
+                // we also want to leave cylinders as they are, so they can also be added to the list of box meshes without creating a new one
+                if (mesh.Name.Contains("(Prims)") || mesh.Name.Contains("(Cylinder)"))
+                {
+                    boxMeshes.Add((AppMesh)mesh);
+                }
+                // if the mesh has not been simplified, then we want to replace it with a box mesh of the same dimensions
+                else
                 {
                     DMesh3 geomMesh = mesh.GetG4Mesh();
                     Vector3 meshCenter = GetMeshCenter(geomMesh);
-                    Vector3 meshDimensions = GetMeshDimensions(geomMesh);
+                    Vector3 meshDimensions = GetSmallestMeshDimensions(geomMesh);
 
                     AppMesh boxMesh = GeometryGenerator.CreateBox(meshCenter, meshDimensions.X, meshDimensions.Y, meshDimensions.Z, mesh.Name);
                     boxMeshes.Add(boxMesh);
 
                     _sceneMeshes.Add(boxMesh);
                     _sceneMeshes.Remove(mesh);
-                }
-                else if (mesh.Name == "GeneratedCylinder")
-                {
-                    boxMeshes.Add((AppMesh)mesh);
                 }
             }
 

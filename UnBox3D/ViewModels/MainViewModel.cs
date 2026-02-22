@@ -695,14 +695,18 @@ namespace UnBox3D.ViewModels
             // the name displayed in the hierarchy is subject to change depending on what kind of mesh it is
             string name;
             // if the name already has '(Simplified)' attached to it, then it has been replaced before and this new replacement shouldn't affect its name (because it's been simplified either way)
-            if (mesh.Name.Contains("(Simplified)"))
+            if (mesh.Name.Contains("(Cylinder)"))
             {
                 name = mesh.Name;
+            }
+            else if (mesh.Name.Contains("(Prism)"))
+            {
+                name = mesh.Name.Replace("(Prism)", "(Cylinder)");
             }
             // if it does not, then it must be the first time it is being simplified, therefore, the keyword 'simplified' needs to be added to show in the hiearchy that this mesh is unique
             else
             {
-                name = mesh.Name + " (Simplified)";
+                name = mesh.Name + " (Cylinder)";
             }
 
             AppMesh cylinder = GeometryGenerator.CreateRotatedCylinder(center, radius, height, 32, Vector3.UnitX, name);
@@ -750,14 +754,18 @@ namespace UnBox3D.ViewModels
             // the name displayed in the hierarchy is subject to change depending on what kind of mesh it is
             string name;
             // if the name already has '(Simplified)' attached to it, then it has been replaced before and this new replacement shouldn't affect its name (because it's been simplified either way)
-            if (mesh.Name.Contains("(Simplified)"))
+            if (mesh.Name.Contains("(Prism)"))
             {
                 name = mesh.Name;
+            }
+            else if (mesh.Name.Contains("(Cylinder)"))
+            {
+                name = mesh.Name.Replace("(Cylinder)", "(Prism)");
             }
             // if it does not, then it must be the first time it is being simplified, therefore, the keyword 'simplified' needs to be added to show in the hiearchy that this mesh is unique
             else
             {
-                name = mesh.Name + " (Simplified)";
+                name = mesh.Name + " (Prism)";
             }
 
             AppMesh cube = GeometryGenerator.CreateBox(

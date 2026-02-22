@@ -57,6 +57,7 @@
             </Grid.ColumnDefinitions>
 
             <!-- Left Panel: TreeView (Hierarchical Mesh View) -->
+            <!-- Replaced StackPanel with Grid to enable scrolling -->
             <Grid Grid.Column="0">
                 <Grid.RowDefinitions>
                     <!-- Header -->
