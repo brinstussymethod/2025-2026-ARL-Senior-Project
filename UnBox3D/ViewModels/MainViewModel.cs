@@ -694,28 +694,27 @@ namespace UnBox3D.ViewModels
 
             // the name displayed in the hierarchy is subject to change depending on what kind of mesh it is
             string name;
-            // if the name already has '(Simplified)' attached to it, then it has been replaced before and this new replacement shouldn't affect its name (because it's been simplified either way)
+            // if the name already has '(Cylinder)' attached to it, then it has been replaced before and this new replacement shouldn't affect its name
             if (mesh.Name.Contains("(Cylinder)"))
             {
                 name = mesh.Name;
             }
+            // if it ends with anything beside '(Cylinder)', then it has been replaced before and this new replacement should just replace the end of the name to show what kind of simplification it is now
             else if (mesh.Name.Contains("(Prism)"))
             {
                 name = mesh.Name.Replace("(Prism)", "(Cylinder)");
             }
-            // if it does not, then it must be the first time it is being simplified, therefore, the keyword 'simplified' needs to be added to show in the hiearchy that this mesh is unique
+            else if (mesh.Name.Contains("(Wedge)"))
+            {
+                name = mesh.Name.Replace("(Wedge)", "(Cylinder)");
+            }
+            // if it does not, then it must be the first time it is being simplified, therefore, the keyword '(Cylinder)' needs to be added to show in the hiearchy that this mesh is unique
             else
             {
                 name = mesh.Name + " (Cylinder)";
             }
 
             AppMesh cylinder = GeometryGenerator.CreateRotatedCylinder(center, radius, height, 32, Vector3.UnitX, name);
-
-            //var summaryToRemove = Meshes.FirstOrDefault(ms => ms.SourceMesh == mesh);
-            //if (summaryToRemove != null)
-            //{
-            //    Meshes.Remove(summaryToRemove);
-            //}
 
             _sceneManager.ReplaceMesh(mesh, cylinder);
 
@@ -731,7 +730,6 @@ namespace UnBox3D.ViewModels
             if (SelectedMesh != null)
             {
                 ReplaceWithCylinderOption(SelectedMesh);
-                //await ShowWpfMessageBoxAsync("Replaced!", "Replace", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             else
             {
@@ -753,7 +751,7 @@ namespace UnBox3D.ViewModels
 
             // the name displayed in the hierarchy is subject to change depending on what kind of mesh it is
             string name;
-            // if the name already has '(Simplified)' attached to it, then it has been replaced before and this new replacement shouldn't affect its name (because it's been simplified either way)
+            // if the name already has '(Prism)' attached to it, then it has been replaced before and this new replacement shouldn't affect its name
             if (mesh.Name.Contains("(Prism)"))
             {
                 name = mesh.Name;
@@ -761,6 +759,10 @@ namespace UnBox3D.ViewModels
             else if (mesh.Name.Contains("(Cylinder)"))
             {
                 name = mesh.Name.Replace("(Cylinder)", "(Prism)");
+            }
+            else if (mesh.Name.Contains("(Wedge)"))
+            {
+                name = mesh.Name.Replace("(Wedge)", "(Prism)");
             }
             // if it does not, then it must be the first time it is being simplified, therefore, the keyword 'simplified' needs to be added to show in the hiearchy that this mesh is unique
             else
@@ -776,12 +778,6 @@ namespace UnBox3D.ViewModels
                             name
                         );
 
-            //var summaryToRemove = Meshes.FirstOrDefault(ms => ms.SourceMesh == mesh);
-            //if (summaryToRemove != null)
-            //{
-            //    Meshes.Remove(summaryToRemove);
-            //}
-
             DeleteMesh(mesh);
 
             _sceneManager.ReplaceMesh(mesh, cube);
@@ -790,20 +786,60 @@ namespace UnBox3D.ViewModels
         }
 
         [RelayCommand]
-private async void ReplaceWithCubeClick()
-{
-    if (SelectedMesh != null)
-    {
-        ReplaceWithCubeOption(SelectedMesh);
-        //await ShowWpfMessageBoxAsync("Replaced!", "Replace", MessageBoxButton.OK, MessageBoxImage.Information);
-    }
-    else
-    {
-        await ShowWpfMessageBoxAsync("Select a mesh first.", "Replace", MessageBoxButton.OK, MessageBoxImage.Information);
-    }
-}
-    
-[RelayCommand]
+        private async void ReplaceWithCubeClick()
+        {
+            if (SelectedMesh != null)
+            {
+                ReplaceWithCubeOption(SelectedMesh);
+            }
+            else
+            {
+                await ShowWpfMessageBoxAsync("Select a mesh first.", "Replace", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+        }
+
+        [RelayCommand]
+        private async void ReplaceWithWedgeOption(IAppMesh mesh)
+        {
+            Vector3 center = _sceneManager.GetMeshCenter(mesh.GetG4Mesh());
+            Vector3 meshDimensions = _sceneManager.GetSmallestMeshDimensions(mesh.GetG4Mesh());
+            string name;
+            if (mesh.Name.Contains("(Wedge)"))
+            {
+                name = mesh.Name;
+            }
+            else if (mesh.Name.Contains("(Cylinder)"))
+            {
+                name = mesh.Name.Replace("(Cylinder)", "(Wedge)");
+            }
+            else if (mesh.Name.Contains("(Prism)"))
+            {
+                name = mesh.Name.Replace("(Prism)", "(Wedge)");
+            }
+            else
+            {
+                name = mesh.Name + " (Wedge)";
+            }
+            AppMesh wedge = GeometryGenerator.CreateWedge(center, meshDimensions.X, meshDimensions.Y, meshDimensions.Z, name);
+            DeleteMesh(mesh);
+            _sceneManager.ReplaceMesh(mesh, wedge);
+            Meshes.Add(new MeshSummary(wedge));
+        }
+
+        [RelayCommand]
+        private async void ReplaceWithWedgeClick()
+        {
+            if (SelectedMesh != null)
+            {
+                ReplaceWithWedgeOption(SelectedMesh);
+            }
+            else
+            {
+                await ShowWpfMessageBoxAsync("Select a mesh first.", "Replace", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+        }
+
+        [RelayCommand]
         private async Task SimplifyQEC(IAppMesh mesh)
         {
             await RunPythonSimplificationSingle(mesh, "quadric_edge_collapse");

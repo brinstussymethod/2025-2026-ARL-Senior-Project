@@ -278,5 +278,82 @@ namespace UnBox3D.Rendering
 
             return appMesh;
         }
+
+        /// <summary>
+        /// Creates a triangular prism (wedge) shape. The cross-section is a right triangle
+        /// with the right angle at the bottom-front. Useful for windshield-like shapes.
+        /// The wedge extends along the Z axis (depth).
+        /// </summary>
+        /// <param name="center">Center position of the wedge</param>
+        /// <param name="width">Width along X axis (base of triangle)</param>
+        /// <param name="height">Height along Y axis (vertical edge of triangle)</param>
+        /// <param name="depth">Depth along Z axis (extrusion length)</param>
+        /// <param name="name">Optional mesh name</param>
+        public static AppMesh CreateWedge(Vector3 center, float width, float height, float depth, string name = "Wedge")
+        {
+            Mesh assimpMesh = new Mesh(name, PrimitiveType.Triangle);
+            DMesh3 g4Mesh = new DMesh3();
+
+            float hw = width / 2, hh = height / 2, hd = depth / 2;
+
+            // Cross-section is a right triangle:
+            //   bottom-left (0), bottom-right (1), top-left (2)
+            // Front face (Z = -hd)
+            // Back face  (Z = +hd)
+            Vector3[] vertices =
+            [
+                new Vector3(center.X - hw, center.Y - hh, center.Z - hd), // 0 front bottom-left
+                new Vector3(center.X + hw, center.Y - hh, center.Z - hd), // 1 front bottom-right
+                new Vector3(center.X - hw, center.Y + hh, center.Z - hd), // 2 front top-left
+
+                new Vector3(center.X - hw, center.Y - hh, center.Z + hd), // 3 back bottom-left
+                new Vector3(center.X + hw, center.Y - hh, center.Z + hd), // 4 back bottom-right
+                new Vector3(center.X - hw, center.Y + hh, center.Z + hd), // 5 back top-left
+            ];
+
+            foreach (var v in vertices)
+            {
+                assimpMesh.Vertices.Add(new Assimp.Vector3D(v.X, v.Y, v.Z));
+                g4Mesh.AppendVertex(new g4.Vector3d(v.X, v.Y, v.Z));
+            }
+
+            // Faces (two triangles per quad face, one triangle for each end cap)
+            int[][] faces =
+            [
+                [0, 1, 2],       // Front triangle
+                [3, 5, 4],       // Back triangle
+                [0, 3, 4], [0, 4, 1], // Bottom quad
+                [0, 2, 5], [0, 5, 3], // Left quad
+                [1, 4, 5], [1, 5, 2], // Hypotenuse (slope) quad
+            ];
+
+            Vector3[] vertexNormals = new Vector3[vertices.Length];
+
+            foreach (var face in faces)
+            {
+                Vector3 v0 = vertices[face[0]];
+                Vector3 v1 = vertices[face[1]];
+                Vector3 v2 = vertices[face[2]];
+
+                Vector3 faceNormal = Vector3.Cross(v1 - v0, v2 - v0).Normalized();
+
+                vertexNormals[face[0]] += faceNormal;
+                vertexNormals[face[1]] += faceNormal;
+                vertexNormals[face[2]] += faceNormal;
+
+                assimpMesh.Faces.Add(new Face(face));
+                g4Mesh.AppendTriangle(face[0], face[1], face[2]);
+            }
+
+            foreach (var normal in vertexNormals)
+            {
+                var n = normal.Normalized();
+                assimpMesh.Normals.Add(new Assimp.Vector3D(n.X, n.Y, n.Z));
+            }
+
+            AppMesh appMesh = new AppMesh(g4Mesh, assimpMesh);
+            appMesh.SetColor(Colors.Red);
+            return appMesh;
+        }
     }
 }

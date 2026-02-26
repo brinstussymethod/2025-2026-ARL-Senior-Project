@@ -172,10 +172,10 @@ namespace UnBox3D.Rendering
 
             foreach (IAppMesh mesh in originalMeshes)
             {
-                
+
                 // if the mesh is a prism, then it already is a box mesh, so we can just add it to the list of box meshes without creating a new one
-                // we also want to leave cylinders as they are, so they can also be added to the list of box meshes without creating a new one
-                if (mesh.Name.Contains("(Prims)") || mesh.Name.Contains("(Cylinder)"))
+                // we also want to leave cylinders as they are, so they can also be added to the list of box meshes without creating a new one, as well as wedges
+                if (mesh.Name.Contains("(Prims)") || mesh.Name.Contains("(Cylinder)") || mesh.Name.Contains("(Wedge)"))
                 {
                     boxMeshes.Add((AppMesh)mesh);
                 }
