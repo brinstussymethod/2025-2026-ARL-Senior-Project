@@ -41,7 +41,7 @@ namespace UnBox3D.ViewModels
         private IAppMesh _lastSelectedMesh;
         private Vector3 _normalColor;
         private Vector3 _highlightColor;
-// This is so we can keep track of the original model when playing around with small mesh thresholds.
+        // This is so we can keep track of the original model when playing around with small mesh thresholds.
 
         [ObservableProperty]
         private IAppMesh selectedMesh;
@@ -63,7 +63,38 @@ namespace UnBox3D.ViewModels
 
         public ObservableCollection<MeshSummary> Meshes { get; } = new();
 
+        public ICamera Camera => _camera;
 
+        public ObservableCollection<IAppMesh> SceneMeshes => _sceneManager.GetMeshes();
+
+        private MeshSummary? _selectedMeshSummary;
+        public MeshSummary? SelectedMeshSummary
+        {
+            get => _selectedMeshSummary;
+            set
+            {
+                if (_selectedMeshSummary == value) return;
+
+                // unselect old
+                if (_selectedMeshSummary != null)
+                    _selectedMeshSummary.IsSelected = false;
+
+                _selectedMeshSummary = value;
+
+                // select new
+                if (_selectedMeshSummary != null)
+                {
+                    _selectedMeshSummary.IsSelected = true;
+                    SelectedMesh = _selectedMeshSummary.SourceMesh; // keep your existing property updated
+                }
+                else
+                {
+                    SelectedMesh = null;
+                }
+
+                OnPropertyChanged(nameof(SelectedMeshSummary));
+            }
+        }
         #endregion
 
         #region Constructor

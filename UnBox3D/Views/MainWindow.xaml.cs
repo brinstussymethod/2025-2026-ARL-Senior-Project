@@ -1,22 +1,23 @@
 // MainWindow.xaml.cs — MERGED
 using Microsoft.Extensions.DependencyInjection;
+using OpenTK.Mathematics;
 using System;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
-using System.IO;
-using Control = System.Windows.Forms.Control;
+using UnBox3D.Controls;
+using UnBox3D.Models; // added for MeshSummary/IAppMesh
+using UnBox3D.Rendering;
 using UnBox3D.Rendering.OpenGL;
 using UnBox3D.Utils;
 using UnBox3D.ViewModels;
-using UnBox3D.Models; // added for MeshSummary/IAppMesh
-using TextBox = System.Windows.Controls.TextBox;
 using Application = System.Windows.Application;
-
-using UnBox3D.Rendering;
-using UnBox3D.Controls;
+using Control = System.Windows.Forms.Control;
+using TextBox = System.Windows.Controls.TextBox;
 namespace UnBox3D.Views
 {
     public partial class MainWindow : Window
@@ -100,6 +101,8 @@ namespace UnBox3D.Views
                 if (_controlHost is not null)
                 {
                     openGLHost.Child = (Control)_controlHost;
+                    var gl = openGLHost.Child;
+                    gl.MouseDown += OpenGL_MouseDown;
                     _logger?.Info("GLControlHost successfully attached to WindowsFormsHost.");
                     StartUpdateLoop();
                 }
@@ -393,18 +396,7 @@ namespace UnBox3D.Views
         {
             if (DataContext is not MainViewModel vm) return;
 
-            if (e.NewValue is MeshSummary summary && summary.SourceMesh != null)
-            {
-                vm.SelectedMesh = summary.SourceMesh;
-            }
-            else if (e.NewValue is IAppMesh mesh)
-            {
-                vm.SelectedMesh = mesh;
-            }
-            else
-            {
-                vm.SelectedMesh = null;
-            }
+            vm.SelectedMeshSummary = e.NewValue as MeshSummary;
         }
 
         private void EnsureTopLevelMainMenu()
@@ -460,6 +452,35 @@ namespace UnBox3D.Views
                 if (hit != null) return hit;
             }
             return default;
+        }
+
+        private void OpenGL_MouseDown(object? sender, System.Windows.Forms.MouseEventArgs e)
+        {
+            if (e.Button != System.Windows.Forms.MouseButtons.Left) return;
+
+            // 1) Build ray in world space
+            RayCaster rayCaster = new RayCaster(_controlHost, VM.Camera);
+
+            // 2) Find hit mesh
+            Vector2 mousePosition = rayCaster.GetMousePosition();
+            Vector3 rayDirection = rayCaster.ConvertToNDC(mousePosition);
+            Vector3 rayOrigin = rayCaster.GetRay();
+            var hit = rayCaster.GetClickedMesh(VM.SceneMeshes, rayOrigin, rayDirection);
+            
+            // 3) Update selection
+            if (DataContext is MainViewModel vm)
+            {
+                vm.SelectedMesh = hit;
+                var hitSummary = vm.Meshes.FirstOrDefault(ms => ReferenceEquals(ms.SourceMesh, hit));
+                vm.SelectedMeshSummary = hitSummary;
+                
+                MeshesTreeView.Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    MeshesTreeView.UpdateLayout();
+                    var container = (TreeViewItem)MeshesTreeView.ItemContainerGenerator.ContainerFromItem(vm.SelectedMeshSummary);
+                    container?.BringIntoView();
+                }), System.Windows.Threading.DispatcherPriority.Background);
+            }
         }
     }
 }

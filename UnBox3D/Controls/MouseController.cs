@@ -51,6 +51,7 @@ namespace UnBox3D.Controls
 
         public void SetState(IState newState) => _currentState = newState;
         public IState GetState() => _currentState;
+        public RayCaster GetRayCaster() => (RayCaster)_rayCaster;
 
         public void OnMouseDown(object sender, MouseEventArgs e)
         {

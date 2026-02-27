@@ -39,7 +39,7 @@ namespace UnBox3D.Rendering
 
         // Step 0:
         // Get the current mouse position in window coordinates; top-left is (0, 0)
-        private Vector2 GetMousePosition()
+        public Vector2 GetMousePosition()
         {
             // Get the screen coordinates of the mouse
             var mousePosition = Control.MousePosition;
@@ -50,7 +50,7 @@ namespace UnBox3D.Rendering
 
         // Step 1:
         // Convert mouse position to Normalized Device Coordinates (NDC)
-        private Vector3 ConvertToNDC(Vector2 mousePosition)
+        public Vector3 ConvertToNDC(Vector2 mousePosition)
         {
             float x = (2.0f * mousePosition.X) / _glControlHost.GetWidth() - 1.0f;
             float y = 1.0f - (2.0f * mousePosition.Y) / _glControlHost.GetHeight();
@@ -124,6 +124,15 @@ namespace UnBox3D.Rendering
                 }
             }
             return hasIntersection;
+        }
+
+        public IAppMesh GetClickedMesh(ObservableCollection<IAppMesh> scene, Vector3 rayOrigin, Vector3 rayDirection)
+        {
+            if (RayIntersectsMesh(scene, rayOrigin, rayDirection, out float distance, out IAppMesh clickedMesh))
+            {
+                return clickedMesh;
+            }
+            return null;
         }
 
         public bool RayIntersectsTriangle(Vector3 rayOrigin, Vector3 rayDirection, Vector3 v0, Vector3 v1, Vector3 v2, out float distance)
