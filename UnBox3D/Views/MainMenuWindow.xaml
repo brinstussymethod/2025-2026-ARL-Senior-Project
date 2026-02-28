@@ -1,0 +1,83 @@
+<Window x:Class="UnBox3D.Views.MainMenuWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="UnBox3D — Main Menu"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="CanResize"
+        MinWidth="760" MinHeight="500"
+        Height="600" Width="900"
+        TextOptions.TextFormattingMode="Ideal"
+        TextOptions.TextRenderingMode="ClearType"
+        Icon="pack://application:,,,/Assets/Icons/logo.ico">
+
+    <Grid Background="{DynamicResource SurfaceBrush}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Border Grid.Row="0" Padding="12" BorderBrush="{DynamicResource BorderBrushLight}" BorderThickness="0,0,0,1" Background="{DynamicResource SurfaceBrush}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="UnBox3D — Main Menu" Style="{DynamicResource HeaderText}" VerticalAlignment="Center"/>
+                <TextBlock Grid.Column="1" Text="Dark mode" Margin="8,0" VerticalAlignment="Center"/>
+                <ToggleButton Grid.Column="2"
+                              x:Name="DarkModeToggle"
+                              Style="{StaticResource SwitchStyle}"
+                              Focusable="False"
+                              IsTabStop="False"
+                              ToolTip="Toggle dark mode"
+                              Click="ToggleTheme_Click"/>
+            </Grid>
+        </Border>
+
+        <!-- Content -->
+        <Grid Grid.Row="1">
+            <Viewbox Stretch="Uniform">
+                <Grid Width="720">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <StackPanel Grid.Row="1" Margin="48,8" Orientation="Vertical">
+                        <Button x:Name="BtnStart"
+                                IsDefault="True"
+                                Height="52" Margin="0,12,0,0" Click="Start_Click"
+                                Style="{StaticResource MenuButtonStyle}">
+                            <AccessText Text="_Start new session    [Enter]" />
+                        </Button>
+                        <Button x:Name="BtnOpen" Height="52" Margin="0,12,0,0" Click="Open_Click" Style="{StaticResource MenuButtonStyle}">
+                            <AccessText Text="_Open existing...    [Alt+O]" />
+                        </Button>
+                        <Button x:Name="BtnSettings" Height="52" Margin="0,12,0,0" Click="Settings_Click" Style="{StaticResource MenuButtonStyle}">
+                            <AccessText Text="_Settings    [Alt+S]" />
+                        </Button>
+                        <Button x:Name="BtnHelp" Height="52" Margin="0,12,0,0" Click="Help_Click" Style="{StaticResource MenuButtonStyle}">
+                            <AccessText Text="_Help    [Alt+H]" />
+                        </Button>
+                        <Button x:Name="BtnExit" Height="52" Margin="0,12,0,0" Click="Exit_Click" Style="{StaticResource MenuButtonStyle}">
+                            <AccessText Text="E_xit    [Esc]" />
+                        </Button>
+                    </StackPanel>
+                </Grid>
+            </Viewbox>
+        </Grid>
+
+        <StatusBar Grid.Row="2" Background="{DynamicResource SurfaceBrush}" Foreground="{DynamicResource TextBrush}">
+            <StatusBarItem>
+                <TextBlock Text="Status: Press Enter to start, Alt+O to open a model."/>
+            </StatusBarItem>
+        </StatusBar>
+    </Grid>
+</Window>

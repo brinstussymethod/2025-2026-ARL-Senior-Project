@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <!-- Global Light palette (grayscale) -->
+  <ResourceDictionary x:Key="Theme.Light">
+    <SolidColorBrush x:Key="SurfaceBrush"        Color="#FFFFFFFF"/>
+    <SolidColorBrush x:Key="CardBrush"           Color="#FFF5F5F5"/>
+    <SolidColorBrush x:Key="CardHoverBrush"      Color="#FFEFEFEF"/>
+    <SolidColorBrush x:Key="CardPressedBrush"    Color="#FFE6E6E6"/>
+    <SolidColorBrush x:Key="BorderBrushLight"    Color="#FFDDDDDD"/>
+    <SolidColorBrush x:Key="BorderBrushHover"    Color="#FFBFBFBF"/>
+    <SolidColorBrush x:Key="TextBrush"           Color="#FF1A1A1A"/>
+    <SolidColorBrush x:Key="AccentBrush"         Color="#FF666666"/>
+    <SolidColorBrush x:Key="AccentLightBrush"    Color="#FF8C8C8C"/>
+  </ResourceDictionary>
+
+  <!-- Global Dark palette (grayscale) -->
+  <ResourceDictionary x:Key="Theme.Dark">
+    <SolidColorBrush x:Key="SurfaceBrush"        Color="#FF0F0F10"/>
+    <SolidColorBrush x:Key="CardBrush"           Color="#FF171718"/>
+    <SolidColorBrush x:Key="CardHoverBrush"      Color="#FF1F1F21"/>
+    <SolidColorBrush x:Key="CardPressedBrush"    Color="#FF2A2A2D"/>
+    <SolidColorBrush x:Key="BorderBrushLight"    Color="#FF2E2E31"/>
+    <SolidColorBrush x:Key="BorderBrushHover"    Color="#FF3B3B3F"/>
+    <SolidColorBrush x:Key="TextBrush"           Color="#FFEAEAEA"/>
+    <SolidColorBrush x:Key="AccentBrush"         Color="#FF9A9A9A"/>
+    <SolidColorBrush x:Key="AccentLightBrush"    Color="#FFBEBEBE"/>
+  </ResourceDictionary>
+
+</ResourceDictionary>

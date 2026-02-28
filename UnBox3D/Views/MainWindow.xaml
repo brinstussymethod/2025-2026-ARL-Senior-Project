@@ -14,228 +14,185 @@
         <!-- Menu Bar -->
         <Menu DockPanel.Dock="Top">
             <MenuItem Header="File">
-                <MenuItem Header="Import Model" Command="{Binding ImportObjModelCommand}" />
-
-                <MenuItem Header="Export Model" Command="{Binding ExportModelCommand}" />
-                <MenuItem Header="Exit" Command="{Binding ExitCommand}" />
+                <MenuItem Header="Import OBJ..." Click="ImportModel_Click"/>
+                <MenuItem Header="Export Scene as OBJ..." Click="ExportModel_Click"/>
+                <Separator/>
+                <MenuItem Header="Exit" Click="Exit_Click"/>
             </MenuItem>
 
-            <MenuItem Header="Edit">
-                <MenuItem StaysOpenOnClick="True" Header="Replace All Meshes with Bounding Boxes">
-                    <StackPanel Orientation="Vertical" Margin="10,0,10,5">
-                        <TextBlock Text="Remove Small Meshes Below Threshold (%)" FontWeight="Bold" Margin="0,0,0,5"/>
-                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                            <Slider x:Name="thresholdSlider"
-                                        Width="120"
-                                        Minimum="0" Maximum="100"
-                                        ValueChanged="MeshThreshold_ValueChanged"
-                                        TickFrequency="1"
-                                        IsSnapToTickEnabled="True"
-                                        ToolTip="Meshes smaller than this threshold will be removed." />
-                            <TextBlock Text="{Binding ElementName=thresholdSlider, Path=Value, StringFormat=' {0:F0}%'}"
-                                           Margin="5,0,0,0" VerticalAlignment="Center" HorizontalAlignment="Center" />
-                        </StackPanel>
-
-                        <Separator Margin="0,10,0,5"/>
-                        <Button Content="Replace with Bounding Boxes"
-                                    Command="{Binding ReplaceSceneWithBoundingBoxesCommand}"
-                                    HorizontalAlignment="Stretch"
-                                    Padding="5"
-                                    Margin="0,0,0,0" 
-                                    ToolTip="Replaces all meshes with their bounding box representations. Meshes smaller than the threshold will be removed."/>
-                    </StackPanel>
-                </MenuItem>
-                <Separator />
-                <MenuItem Header="Reduce All Meshes Complexity" StaysOpenOnClick="True">
-                    <StackPanel Orientation="Vertical" Margin="10">
-                        <TextBlock Text="Reduce Mesh Complexity (%)" FontWeight="Bold" />
-                        <TextBlock Text="Drag right to simplify more, left to keep more detail." 
-                                   FontSize="11" Foreground="Gray" HorizontalAlignment="Center"/>
-                        <Slider Minimum="10" Maximum="100"
-                                Value="{Binding SimplificationRatio, Mode=TwoWay}"
-                                                Width="120"
-                                                TickFrequency="10"
-                                                IsSnapToTickEnabled="True"
-                                                TickPlacement="BottomRight"
-                                                HorizontalAlignment="Center"/>
-                        <TextBlock Text="{Binding SimplificationRatio, StringFormat='Reducing by {0:F0}%'}" 
-                                   FontSize="12" Foreground="Gray" HorizontalAlignment="Center"/>
-                        <Separator />
-
-                        <Button Content="High Quality (Slowest)"
-                    Command="{Binding SimplifyAllQECCommand}"
-                    ToolTip="Quadric Edge Collapse powered by Open3D"
-                    HorizontalAlignment="Stretch"
-                    Padding="5" />
-
-                        <Button Content="Moderate Quality (Fast)"
-                    Command="{Binding SimplifyAllFQDCommand}"
-                    ToolTip="Fast Quadric Decimation powered by PyVista"
-                    HorizontalAlignment="Stretch"
-                    Padding="5" />
-
-                        <Button Content="Lower Quality (Fastest)"
-                    Command="{Binding SimplifyAllVCCommand}"
-                    ToolTip="Vertex Clustering Simplification powered by Open3D"
-                    HorizontalAlignment="Stretch"
-                    Padding="5" />
-                    </StackPanel>
-                </MenuItem>
-                <Separator />
-                <MenuItem Header="Remove All Meshes" Command="{Binding ClearSceneCommand}" />
+            <!-- View Menu -->
+            <MenuItem Header="View">
+                <MenuItem Header="Reset View" Command="{Binding ResetViewCommand}"/>
+                <MenuItem Header="Toggle Hierarchy" Command="{Binding ToggleHierarchyCommand}"/>
             </MenuItem>
 
+            <!-- Tools Menu -->
+            <MenuItem Header="Tools">
+                <MenuItem Header="Replace Scene with Bounding Boxes" Command="{Binding ReplaceSceneWithBoundingBoxesCommand}"/>
+                <Separator/>
+                <MenuItem Header="Simplify All (QEC)" Command="{Binding SimplifyAllQECCommand}"/>
+                <MenuItem Header="Simplify All (FQD)" Command="{Binding SimplifyAllFQDCommand}"/>
+                <MenuItem Header="Simplify All (VC)" Command="{Binding SimplifyAllVCCommand}"/>
+            </MenuItem>
+
+            <!-- Settings Menu -->
             <MenuItem Header="Settings" Click="Settings_Click"/>
 
-            <MenuItem Header="Unfold">
-                <StackPanel Margin="10" VerticalAlignment="Bottom">
-                    <GroupBox Header="Page Dimensions">
-                        <Grid Margin="5">
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                            </Grid.RowDefinitions>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="40"/>
-                            </Grid.ColumnDefinitions>
-
-                            <!-- Width -->
-                            <Label Grid.Row="0" Grid.Column="0" Content="Width (m):" Margin="0,5,5,5"/>
-                            <TextBox Grid.Row="0" Grid.Column="1"  
-                                    Name="WidthTextBox"  
-                                    Text="{Binding PageWidth, Mode=OneWay}"  
-                                    MaxLength="5"  
-                                    Margin="0,5,0,5"  
-                                    PreviewTextInput="NumericTextBox_PreviewTextInput"  
-                                    PreviewKeyDown="NumericTextBox_PreviewKeyDown"  
-                                    TextChanged="NumericTextBox_TextChanged"  
-                                    LostFocus="NumericTextBox_LostFocus">
-                                <TextBox.ContextMenu>
-                                    <ContextMenu Visibility="Collapsed"/>
-                                </TextBox.ContextMenu>
-                            </TextBox>
-
-                            <!-- Height -->
-                            <Label Grid.Row="1" Grid.Column="0" Content="Height (m):" Margin="0,5,5,5"/>
-                            <TextBox Grid.Row="1" Grid.Column="1"  
-                                    Name="HeightTextBox"  
-                                    Text="{Binding PageHeight, Mode=OneWay}"  
-                                    MaxLength="5"  
-                                    Margin="0,5,0,5"  
-                                    PreviewTextInput="NumericTextBox_PreviewTextInput"  
-                                    PreviewKeyDown="NumericTextBox_PreviewKeyDown"  
-                                    TextChanged="NumericTextBox_TextChanged"  
-                                    LostFocus="NumericTextBox_LostFocus">
-                                <TextBox.ContextMenu>
-                                    <ContextMenu Visibility="Collapsed"/>
-                                </TextBox.ContextMenu>
-                            </TextBox>
-                        </Grid>
-                    </GroupBox>
-                </StackPanel>
-
-                <MenuItem Header="Export Model" Command="{Binding ExportUnfoldModelCommand}" />
+            <!-- Help Menu -->
+            <MenuItem Header="Help">
+                <MenuItem Header="About" Command="{Binding AboutCommand}"/>
             </MenuItem>
         </Menu>
 
-        <!-- Main Layout Grid -->
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
+
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto" MinWidth="150" MaxWidth="400"/>
-                <ColumnDefinition Width="5"/>
-                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="300" />  <!-- TreeView Column -->
+                <ColumnDefinition Width="5"/>     <!-- Splitter -->
+                <ColumnDefinition Width="*" />    <!-- OpenGL Host Column -->
+                <ColumnDefinition Width="300" />  <!-- Right Panel Column -->
             </Grid.ColumnDefinitions>
 
-            <!-- Mesh List -->
-            <TreeView Grid.Column="0"
-          Padding="10"
-          ItemsSource="{Binding Meshes}"
-          SelectedItemChanged="TreeView_SelectedItemChanged"
-          VirtualizingStackPanel.IsVirtualizing="True"
-          VirtualizingStackPanel.VirtualizationMode="Recycling"
-          ScrollViewer.CanContentScroll="True">
-                <TreeView.ItemTemplate>
-                    <DataTemplate>
-                        <TextBlock Tag="{Binding DataContext, RelativeSource={RelativeSource AncestorType=Window}}">
-                            <TextBlock.ContextMenu>
-                                <ContextMenu>
-                                    <MenuItem Header="Export Mesh"
-                                              Command="{Binding PlacementTarget.Tag.ExportMeshCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                                              CommandParameter="{Binding SourceMesh}" />
+            <!-- Left Panel: TreeView (Hierarchical Mesh View) -->
+            <!-- Replaced StackPanel with Grid to enable scrolling -->
+            <Grid Grid.Column="0">
+                <Grid.RowDefinitions>
+                    <!-- Header -->
+                    <RowDefinition Height="Auto"/>
+                    <!-- TreeView fills remaining space -->
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
 
-                                    <MenuItem Header="Replace with...">
-                                         <MenuItem Header="Cube" Command="{Binding PlacementTarget.Tag.ReplaceWithCubeOptionCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                                                   CommandParameter="{Binding SourceMesh}"
-                                                   ToolTip="Replaces this mesh with a cube of the same size and orientation."/> 
-                                        <MenuItem Header="Cylinder" Command="{Binding PlacementTarget.Tag.ReplaceWithCylinderOptionCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                                                  CommandParameter="{Binding SourceMesh}"
-                                                  ToolTip="Replaces this mesh with a cylinder of the same size and orientation."/>
-                                    </MenuItem>
-                                    <MenuItem Header="Reduce Mesh Complexity">
-                                        <StackPanel Orientation="Vertical" Margin="10,0,10,0">
-                                            <TextBlock Text="Reduce Mesh Complexity (%)" FontWeight="Bold" />
-                                            <TextBlock Text="Drag right to simplify more, left to keep more detail." 
-                                                       FontSize="11" Foreground="Gray" HorizontalAlignment="Center"/>
-                                            <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
-                                                <Slider Minimum="10" Maximum="100"
-                                                    Value="{Binding PlacementTarget.Tag.SimplificationRatio, RelativeSource={RelativeSource AncestorType=ContextMenu}, Mode=TwoWay}"
-                                                    Width="120"
-                                                    TickFrequency="10"
-                                                    IsSnapToTickEnabled="True"
-                                                    TickPlacement="BottomRight"
-                                                    HorizontalAlignment="Center"/>
+                <TextBlock Text="Meshes"
+               FontSize="16"
+               FontWeight="SemiBold"
+               Margin="10,10,0,5"
+               Grid.Row="0"/>
 
-                                                <TextBlock Text="{Binding PlacementTarget.Tag.SimplificationRatio, RelativeSource={RelativeSource AncestorType=ContextMenu}, StringFormat='Reducing by {0:F0}%'}"
-                                                    VerticalAlignment="Center" Margin="5,0,0,0" FontSize="11" Foreground="Gray" HorizontalAlignment="Center" />
-                                            </StackPanel>
+                <TreeView x:Name="MeshesTreeView"
+              Grid.Row="1"
+              Padding="10"
+              ItemsSource="{Binding Meshes}"
+              SelectedItemChanged="TreeView_SelectedItemChanged"
+              VirtualizingStackPanel.IsVirtualizing="True"
+              VirtualizingStackPanel.VirtualizationMode="Recycling"
+              ScrollViewer.CanContentScroll="True">
+                    <TreeView.ItemContainerStyle>
+                        <Style TargetType="TreeViewItem">
+                            <Setter Property="IsSelected"
+                                    Value="{Binding IsSelected, Mode=TwoWay}" />
+                            <Style.Triggers>
+                                <Trigger Property="IsSelected" Value="True">
+                                    <Setter Property="Background" Value="#FFCCE5FF"/>
+                                    <Setter Property="Foreground" Value="Black"/>
+                                </Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TreeView.ItemContainerStyle>
+                    <TreeView.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock>
+                        <Run Text="{Binding Name}" FontWeight="Bold"/>
+                        <Run Text=" (" Foreground="Gray"/>
+                        <Run Text="{Binding VertexCount}" Foreground="Gray"/>
+                        <Run Text=" vertices)" Foreground="Gray"/>
+                                </TextBlock>
 
-                                            <Separator Margin="0,10,0,5" />
+                                <Button Content="Export"
+                            Margin="10,0,0,0"
+                            Command="{Binding DataContext.ExportMeshCommand, RelativeSource={RelativeSource AncestorType=TreeView}}"
+                            CommandParameter="{Binding SourceMesh}"/>
 
-                                            <Button Content="High Quality (Slowest)"
-                                                    Command="{Binding PlacementTarget.Tag.SimplifyQECCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                                                    CommandParameter="{Binding SourceMesh}"
-                                                    ToolTip="Quadric Edge Collapse powered by Open3D"
-                                                    HorizontalAlignment="Stretch"
-                                                    Padding="5" />
+                                <Button Content="Delete"
+                            Margin="5,0,0,0"
+                            Command="{Binding DataContext.DeleteMeshCommand, RelativeSource={RelativeSource AncestorType=TreeView}}"
+                            CommandParameter="{Binding SourceMesh}"/>
+                            </StackPanel>
+                        </DataTemplate>
+                    </TreeView.ItemTemplate>
 
-                                            <Button Content="Moderate Quality (Fast)"
-                                                    Command="{Binding PlacementTarget.Tag.SimplifyFQDCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                                                    CommandParameter="{Binding SourceMesh}"
-                                                    ToolTip="Fast Quadric Decimation powered by PyVista"
-                                                    HorizontalAlignment="Stretch"
-                                                    Padding="5" />
+                </TreeView>
+            </Grid>
 
-                                            <Button Content="Lower Quality (Fastest)"
-                                                    Command="{Binding PlacementTarget.Tag.SimplifyVCCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                                                    CommandParameter="{Binding SourceMesh}"
-                                                    ToolTip="Vertex Clustering Simplification powered by Open3D"
-                                                    HorizontalAlignment="Stretch"
-                                                    Padding="5" />
-                                        </StackPanel>
-                                    </MenuItem>
+            <!-- Splitter between TreeView and OpenGL rendering host -->
+            <GridSplitter Grid.Column="1"
+                          Width="5"
+                          HorizontalAlignment="Stretch"
+                          Background="Gray"
+                          ShowsPreview="True"/>
 
-                                    <MenuItem Header="Unfold Mesh"
-                                        Command="{Binding PlacementTarget.Tag.UnfoldMeshCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                                        CommandParameter="{Binding SourceMesh}" />
-                                    <MenuItem Header="Delete"
-                                        Command="{Binding PlacementTarget.Tag.DeleteMeshCommand, RelativeSource={RelativeSource AncestorType=ContextMenu}}"
-                                        CommandParameter="{Binding SourceMesh}" />
-                                </ContextMenu>
-                            </TextBlock.ContextMenu>
+            <!-- Right Panel: Controls (Mesh Threshold, Dimensions, Export Buttons) -->
+            <StackPanel Grid.Column="3" Orientation="Vertical" Margin="10">
+                <!-- Small Mesh Threshold -->
+                <TextBlock Text="Small Mesh Threshold" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                <Slider x:Name="MeshThreshold" Minimum="0" Maximum="100" Value="{Binding SmallMeshThreshold, Mode=TwoWay}"
+                        ValueChanged="MeshThreshold_ValueChanged"/>
 
-                <!-- Display mesh name and vertex count -->
-                <Run Text="{Binding Name}" FontWeight="Bold" />
-                <Run Text=" (" Foreground="Gray" />
-                <Run Text="{Binding VertexCount}" Foreground="Gray" />
-                <Run Text=" vertices)" Foreground="Gray" />
-                        </TextBlock>
-                    </DataTemplate>
-                </TreeView.ItemTemplate>
-            </TreeView>
+                <!-- Page Size for Unfolding -->
+                <TextBlock Text="Page Size (for Unfold)" FontWeight="SemiBold" Margin="0,10,0,4"/>
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                    <TextBlock Text="W:" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                    <TextBox Name="PageWidthTextBox"
+                             Width="80"
+                             Text="{Binding PageWidth, UpdateSourceTrigger=PropertyChanged}"
+                             PreviewTextInput="NumericTextBox_PreviewTextInput"
+                             PreviewKeyDown="NumericTextBox_PreviewKeyDown"
+                             TextChanged="NumericTextBox_TextChanged"
+                             LostFocus="NumericTextBox_LostFocus"/>
+                    <TextBlock Text="  H:" VerticalAlignment="Center" Margin="10,0,6,0"/>
+                    <TextBox Name="PageHeightTextBox"
+                             Width="80"
+                             Text="{Binding PageHeight, UpdateSourceTrigger=PropertyChanged}"
+                             PreviewTextInput="NumericTextBox_PreviewTextInput"
+                             PreviewKeyDown="NumericTextBox_PreviewKeyDown"
+                             TextChanged="NumericTextBox_TextChanged"
+                             LostFocus="NumericTextBox_LostFocus"/>
+                </StackPanel>
+
+                <!-- Export Unfolded Options -->
+                <Button Content="Export Unfolded (SVG/PDF)..." Command="{Binding ExportUnfoldModelCommand}" Margin="0,0,0,10"/>
+
+                <!-- Replacement Tools -->
+                <TextBlock Text="Replacement Tools" FontWeight="SemiBold" Margin="0,10,0,4"/>
+                <StackPanel Orientation="Horizontal">
+                    <Button Content="To Cylinder"
+                            Margin="0,0,8,0"
+                            Command="{Binding ReplaceWithCylinderClickCommand}"
+                            CommandParameter="{Binding ElementName=MeshesTreeView, Path=SelectedItem.SourceMesh}" />
+
+                    <Button Content="To Cube"
+                            Margin="0,0,8,0"
+                            Command="{Binding ReplaceWithCubeClickCommand}"
+                            CommandParameter="{Binding ElementName=MeshesTreeView, Path=SelectedItem.SourceMesh}" />
+                    <Button Content="To Wedge"
+                            Command="{Binding ReplaceWithWedgeClickCommand}"
+                            CommandParameter="{Binding ElementName=MeshesTreeView, Path=SelectedItem.SourceMesh}" />
+                </StackPanel>
+
+                <!-- Scene Tools -->
+                <TextBlock Text="Scene Tools" FontWeight="SemiBold" Margin="0,10,0,4"/>
+                <StackPanel Orientation="Horizontal">
+                    <Button Content="Clear Scene" Command="{Binding ClearSceneCommand}" />
+                </StackPanel>
+
+                <!-- Import/Export -->
+                <TextBlock Text="Import/Export" FontWeight="SemiBold" Margin="0,10,0,4"/>
+                <StackPanel Orientation="Horizontal">
+                    <Button Content="Import OBJ..." Click="ImportModel_Click" />
+                    <Button Content="Export Scene as OBJ..." Click="ExportModel_Click" Margin="10,0,0,0"/>
+                </StackPanel>
+
+                <!-- Exit and Settings -->
+                <TextBlock Text="Application" FontWeight="SemiBold" Margin="0,10,0,4"/>
+                <StackPanel Orientation="Horizontal">
+                    <Button Content="Settings" Click="Settings_Click" />
+                    <Button Content="Exit" Click="Exit_Click" Margin="10,0,0,0"/>
+                </StackPanel>
+            </StackPanel>
 
             <!-- Splitter  -->
             <GridSplitter Grid.Column="1"

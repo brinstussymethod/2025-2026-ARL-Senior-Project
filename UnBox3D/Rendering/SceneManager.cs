@@ -19,6 +19,7 @@ namespace UnBox3D.Rendering
         Vector3 GetMeshCenter(DMesh3 mesh);
         Vector3 GetMeshDimensions(DMesh3 mesh);
         List<AppMesh> LoadBoundingBoxes();
+        Vector3 GetSmallestMeshDimensions(DMesh3 mesh);
     }
 
     public class SceneManager : ISceneManager
@@ -171,21 +172,25 @@ namespace UnBox3D.Rendering
 
             foreach (IAppMesh mesh in originalMeshes)
             {
-                if (mesh.Name != "GeneratedCylinder")
+
+                // if the mesh is a prism, then it already is a box mesh, so we can just add it to the list of box meshes without creating a new one
+                // we also want to leave cylinders as they are, so they can also be added to the list of box meshes without creating a new one, as well as wedges
+                if (mesh.Name.Contains("(Prims)") || mesh.Name.Contains("(Cylinder)") || mesh.Name.Contains("(Wedge)"))
+                {
+                    boxMeshes.Add((AppMesh)mesh);
+                }
+                // if the mesh has not been simplified, then we want to replace it with a box mesh of the same dimensions
+                else
                 {
                     DMesh3 geomMesh = mesh.GetG4Mesh();
                     Vector3 meshCenter = GetMeshCenter(geomMesh);
-                    Vector3 meshDimensions = GetMeshDimensions(geomMesh);
+                    Vector3 meshDimensions = GetSmallestMeshDimensions(geomMesh);
 
                     AppMesh boxMesh = GeometryGenerator.CreateBox(meshCenter, meshDimensions.X, meshDimensions.Y, meshDimensions.Z, mesh.Name);
                     boxMeshes.Add(boxMesh);
 
                     _sceneMeshes.Add(boxMesh);
                     _sceneMeshes.Remove(mesh);
-                }
-                else if (mesh.Name == "GeneratedCylinder")
-                {
-                    boxMeshes.Add((AppMesh)mesh);
                 }
             }
 
@@ -211,6 +216,46 @@ namespace UnBox3D.Rendering
             }
 
             return (max - min).Length;
+        }
+
+        public Vector3 GetSmallestMeshDimensions(DMesh3 mesh)
+        {
+            if (mesh.VertexCount > 0)
+            {
+                // the would-be smallest dimensions (x, y, z) are initialized at infinity (as to automatically adopt the first dimension it is compared to and kickstart the process)
+                float smallestXDimension = float.PositiveInfinity;
+                float smallestYDimension = float.PositiveInfinity;
+                float smallestZDimension = float.PositiveInfinity;
+
+                Vector3 meshCenter = GetMeshCenter(mesh);
+
+                for (int i = 0; i < mesh.VertexCount; i++)
+                {
+                    g4.Vector3d vertex = mesh.GetVertex(i);
+                    Vector3 vertexVec = new Vector3((float)vertex.x, (float)vertex.y, (float)vertex.z);
+
+                    // when the difference between the vertex in question and the centermost vertex is less than our current dimension (respective of x, y, z)
+                    // then that dimension assumes the value of their difference
+                    if (smallestXDimension > (vertexVec.X - meshCenter.X))
+                    {
+                        smallestXDimension = vertexVec.X - meshCenter.X;
+                    }
+                    if (smallestYDimension > (vertexVec.Y - meshCenter.Y))
+                    {
+                        smallestYDimension = vertexVec.Y - meshCenter.Y;
+                    }
+                    if (smallestZDimension > (vertexVec.Z - meshCenter.Z))
+                    {
+                        smallestZDimension = vertexVec.Z - meshCenter.Z;
+                    }
+                }
+
+                // each dimension is doubled because, as it stands, each dimension is a distance from the center to the opposite side, but that is only half the mesh
+                // the new dimensions are assigned to a vector to encapsulate them
+                return new Vector3(smallestXDimension * 2, smallestYDimension * 2, smallestZDimension * 2);
+            }
+
+            return Vector3.Zero;
         }
     }
 }

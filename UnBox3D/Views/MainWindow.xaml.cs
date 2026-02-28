@@ -1,64 +1,114 @@
-﻿using System.Diagnostics;
+using Microsoft.Extensions.DependencyInjection;
+using OpenTK.Mathematics;
+using System;
+using System.Diagnostics;
+using System.IO;
+using System.Linq;
+using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
+using UnBox3D.Controls;
+using UnBox3D.Models; // added for MeshSummary/IAppMesh
+using UnBox3D.Rendering;
 using UnBox3D.Rendering.OpenGL;
 using UnBox3D.Utils;
-using System.Windows.Input;
-using TextBox = System.Windows.Controls.TextBox;
-using UnBox3D.Rendering;
 using UnBox3D.ViewModels;
-using UnBox3D.Models;
-
+using Application = System.Windows.Application;
+using Control = System.Windows.Forms.Control;
+using TextBox = System.Windows.Controls.TextBox;
 namespace UnBox3D.Views
 {
     public partial class MainWindow : Window
     {
-        #region Fields
         private IBlenderInstaller _blenderInstaller;
         private IGLControlHost? _controlHost;
         private ILogger? _logger;
-        #endregion
+        private string? _pendingOpenPath;
 
-        #region Constructor
+        private MainViewModel VM => DataContext as MainViewModel;
+
         public MainWindow()
         {
             InitializeComponent();
 
+            try
+            {
+                DataContext ??= App.Services.GetRequiredService<MainViewModel>();
+            }
+            catch
+            {
+                Loaded += (_, __) =>
+                {
+                    if (DataContext == null)
+                    {
+                        DataContext = App.Services.GetRequiredService<MainViewModel>();
+                    }
+                };
+            }
+
             Loaded += MainWindow_Loaded;
             Closed += MainWindow_Closed;
         }
-        #endregion
 
-        #region Event Handlers
-        private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
+        public void Initialize(IGLControlHost controlHost, ILogger logger, IBlenderInstaller blenderInstaller)
+        {
+            _controlHost = controlHost ?? throw new ArgumentNullException(nameof(controlHost));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _blenderInstaller = blenderInstaller ?? throw new ArgumentNullException(nameof(blenderInstaller));
+
+            try
+            {
+                var m = VM?.GetType().GetMethod("Initialize");
+                if (m != null && VM != null)
+                    m.Invoke(VM, new object[] { controlHost, logger, blenderInstaller });
+            }
+            catch { }
+        }
+
+        private async void MainWindow_Loaded(object? sender, RoutedEventArgs e)
         {
             try
             {
                 _logger?.Info("MainWindow loaded. Initializing OpenGL...");
 
-                // Ensure Blender is installed
                 var loadingWindow = new LoadingWindow
                 {
                     StatusHint = "Installing Blender...",
-                    Owner = System.Windows.Application.Current.MainWindow,
+                    Owner = this,
                     IsProgressIndeterminate = false
                 };
                 loadingWindow.Show();
 
-                var progress = new Progress<double>(value =>
+                if (_blenderInstaller != null)
                 {
-                    loadingWindow.UpdateProgress(value * 100);
-                    loadingWindow.UpdateStatus($"Installing Blender... {Math.Round(value * 100)}%");
-                });
+                    var progress = new Progress<double>(value =>
+                    {
+                        loadingWindow.UpdateProgress(value * 100);
+                        loadingWindow.UpdateStatus($"Installing Blender... {Math.Round(value * 100)}%");
+                    });
 
-                await _blenderInstaller.CheckAndInstallBlender(progress);
+                    await _blenderInstaller.CheckAndInstallBlender(progress);
+                }
+                else
+                {
+                    _logger?.Warn("Blender installer dependency was null; skipping installation check.");
+                }
 
                 loadingWindow.Close();
 
-                // Attach GLControlHost to WindowsFormsHost
-                openGLHost.Child = (Control)_controlHost;
-
-                _logger?.Info("GLControlHost successfully attached to WindowsFormsHost.");
-                StartUpdateLoop();
+                if (_controlHost is not null)
+                {
+                    openGLHost.Child = (Control)_controlHost;
+                    var gl = openGLHost.Child;
+                    gl.MouseDown += OpenGL_MouseDown;
+                    _logger?.Info("GLControlHost successfully attached to WindowsFormsHost.");
+                    StartUpdateLoop();
+                }
+                else
+                {
+                    _logger?.Warn("GLControlHost not initialized; skipping rendering start.");
+                }
             }
             catch (Exception ex)
             {
@@ -83,57 +133,125 @@ namespace UnBox3D.Views
             }
         }
 
-
-        private void Settings_Click(object? sender, EventArgs e)
-        {
-            // click handler for Settings menu item: opens the settings window!
-            // NOTE: maybe refactor the SettingsWindow opening code to store a reusable instance of it in an App instance?
-            var settingsWindow = App.Current.Windows
-                .OfType<SettingsWindow>()
-                .FirstOrDefault();
-
-            if (settingsWindow != null)
-            {
-                settingsWindow.Show();
-                this.Hide();
-            }
-            else
-            {
-                _logger?.Warn("Failed to open settings window, found null instance instead.");
-            }
-
-        }
-        #endregion
-
-        #region Initialization
-        // Inject dependencies
-        public void Initialize(IGLControlHost controlHost, ILogger logger, IBlenderInstaller blenderInstaller)
-        {
-            _controlHost = controlHost ?? throw new ArgumentNullException(nameof(controlHost));
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _blenderInstaller = blenderInstaller ?? throw new ArgumentNullException(nameof(blenderInstaller));
-        }
-        #endregion
-
-        #region Update Loop
         private async void StartUpdateLoop()
         {
-            bool isRunning = true;
-            Stopwatch sw = new Stopwatch();
-
-            while (isRunning)
+            var sw = new Stopwatch();
+            while (IsLoaded)
             {
-                _controlHost.Render();
-                await Task.Delay(Math.Max(0, 16 - (int)sw.ElapsedMilliseconds));
+                _controlHost?.Render();
+                await Task.Delay(16);
             }
         }
-        #endregion
+
+        public void OpenFromPath(string path)
+        {
+            if (!IsLoaded)
+            {
+                _pendingOpenPath = path;
+                Loaded -= MainWindow_Loaded_OpenPending;
+                Loaded += MainWindow_Loaded_OpenPending;
+                return;
+            }
+            DoOpen(path);
+        }
+
+        private void MainWindow_Loaded_OpenPending(object? sender, RoutedEventArgs e)
+        {
+            Loaded -= MainWindow_Loaded_OpenPending;
+            if (!string.IsNullOrWhiteSpace(_pendingOpenPath))
+            {
+                DoOpen(_pendingOpenPath);
+                _pendingOpenPath = null;
+            }
+        }
+
+        private void DoOpen(string path)
+        {
+            try
+            {
+                var vm = VM;
+                var ext = System.IO.Path.GetExtension(path).ToLowerInvariant();
+
+                if (vm != null)
+                {
+                    var importMethod = vm.GetType().GetMethod("ImportModelFromPath");
+                    if (importMethod != null)
+                    {
+                        importMethod.Invoke(vm, new object[] { path });
+                    }
+                    else
+                    {
+                        _logger?.Warn("ImportModelFromPath not found on MainViewModel; cannot import without popping a dialog.");
+                        System.Windows.MessageBox.Show(this,
+                            "This build doesn’t support path-based import yet. Ask your team to add MainViewModel.ImportModelFromPath(string).",
+                            "UnBox3D", MessageBoxButton.OK, MessageBoxImage.Information);
+                        return;
+                    }
+
+                    vm.GetType().GetMethod("FrameScene")?.Invoke(vm, null);
+                }
+
+                this.Title = $"UnBox3D — {System.IO.Path.GetFileName(path)}";
+            }
+            catch (Exception ex)
+            {
+                System.Windows.MessageBox.Show(this,
+                    $"Failed to open '{System.IO.Path.GetFileName(path)}':\n{ex.Message}",
+                    "UnBox3D", MessageBoxButton.OK, MessageBoxImage.Error);
+                _logger?.Error($"Open failed: {ex}");
+            }
+        }
+
+        // Back to Main Menu (XAML button may exist elsewhere)
+        private void BackToMainMenu_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var mainMenu = new MainMenuWindow(App.Services);
+                mainMenu.Show();
+            }
+            finally
+            {
+                this.Close();
+            }
+        }
+
+        private void ImportModel_Click(object sender, RoutedEventArgs e)
+        {
+            if (VM?.ImportObjModelCommand is ICommand cmd && cmd.CanExecute(null))
+                cmd.Execute(null);
+        }
+
+        private void ExportModel_Click(object sender, RoutedEventArgs e)
+        {
+            if (VM?.ExportModelCommand is ICommand cmd && cmd.CanExecute(null))
+                cmd.Execute(null);
+        }
+
+        private void Exit_Click(object sender, RoutedEventArgs e)
+        {
+            var prop = VM?.GetType().GetProperty("ExitCommand");
+            if (prop?.GetValue(VM) is ICommand cmd && cmd.CanExecute(null))
+                cmd.Execute(null);
+            else
+                Application.Current.Shutdown();
+        }
+
+        private void Settings_Click(object sender, RoutedEventArgs e)
+        {
+            var settings = ActivatorUtilities.CreateInstance<SettingsWindow>(App.Services);
+            
+            var settingsManager = App.Services.GetRequiredService<ISettingsManager>();
+            settings.Initialize(_logger, settingsManager);
+
+            settings.Owner = this;
+            settings.ShowDialog();
+        }
 
         private void NumericTextBox_PreviewTextInput(object sender, TextCompositionEventArgs e)
         {
             var textBox = sender as TextBox;
 
-            // Only allow digits and one decimal
             if (!char.IsDigit(e.Text[0]) && e.Text != ".")
             {
                 e.Handled = true;
@@ -149,15 +267,13 @@ namespace UnBox3D.Views
 
         private void NumericTextBox_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
         {
-            // Allow navigation, deletion and control keys
-            if (e.Key == Key.Back || e.Key == Key.Delete || e.Key == Key.Left ||
-                e.Key == Key.Right || e.Key == Key.Tab)
+            if (e.Key == System.Windows.Input.Key.Back || e.Key == System.Windows.Input.Key.Delete || e.Key == System.Windows.Input.Key.Left ||
+                e.Key == System.Windows.Input.Key.Right || e.Key == System.Windows.Input.Key.Tab)
             {
                 return;
             }
 
-            // Handle clipboard operations
-            if (Keyboard.Modifiers == ModifierKeys.Control && e.Key == Key.V)
+            if (Keyboard.Modifiers == ModifierKeys.Control && e.Key == System.Windows.Input.Key.V)
             {
                 var textBox = sender as TextBox;
 
@@ -184,7 +300,7 @@ namespace UnBox3D.Views
             }
         }
 
-        private bool IsValidDecimalInput(string input)
+        private static bool IsValidDecimalInput(string input)
         {
             if (string.IsNullOrEmpty(input))
                 return false;
@@ -253,40 +369,144 @@ namespace UnBox3D.Views
             }
         }
 
-        private void MeshThreshold_ValueChanged(object sender, EventArgs e)
-        { 
-            if (sender is System.Windows.Controls.Slider slider)
+        // Slider hook -> SmallMeshThreshold + reapply filter (fixes mismatch)
+        private void MeshThreshold_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (VM != null)
             {
-                Debug.WriteLine(slider.Value);
-                if (DataContext is MainViewModel vm)
-                {
-                    vm.SmallMeshThreshold = (float)slider.Value;
-                    vm.ApplyMeshThreshold();
-                }
+                var prop = VM.GetType().GetProperty("SmallMeshThreshold");
+                if (prop != null && prop.CanWrite) prop.SetValue(VM, (float)e.NewValue);
+                VM.GetType().GetMethod("ApplyMeshThreshold")?.Invoke(VM, null);
             }
         }
 
-        // Runs whenever the user left-clicks a different item in the TreeView.
-        // e.NewValue is a MeshSummary, not the raw mesh object, so we pull the underlying SourceMesh.
+        // Extra signature for teammate XAML using EventArgs
+        private void MeshThreshold_ValueChanged(object sender, EventArgs e)
+        {
+            if (sender is System.Windows.Controls.Slider slider && DataContext is MainViewModel vm)
+            {
+                vm.SmallMeshThreshold = (float)slider.Value;
+                vm.ApplyMeshThreshold();
+            }
+        }
+
+        // Tree selection -> VM.SelectedMesh (adds back original behavior)
         private void TreeView_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
         {
             if (DataContext is not MainViewModel vm) return;
 
-
-            // The TreeView is bound to MeshSummary items. Select the *real* mesh:
-            if (e.NewValue is MeshSummary summary && summary.SourceMesh != null)
+            if (e.NewValue is MeshSummary summary)
             {
-                vm.SelectedMesh = summary.SourceMesh;   // -> triggers OnSelectedMeshChanged in the VM (/ViewModels/MainViewModel.cs)
-            }
-            else if (e.NewValue is IAppMesh mesh)       // (handles the case you ever bind meshes directly)
-            {
-                vm.SelectedMesh = mesh;
+                vm.SelectedMeshSummary = summary;
+                ScrollSelectedIntoView(summary);
             }
             else
             {
-                vm.SelectedMesh = null;                 // clicked a non-mesh node
+                vm.SelectedMeshSummary = null;
             }
+        }
+
+        private void EnsureTopLevelMainMenu()
+        {
+            try
+            {
+                var rootMenu = VisualChildrenFirstOrDefault<System.Windows.Controls.Menu>(this);
+                if (rootMenu == null) return;
+
+                bool exists = rootMenu.Items.OfType<System.Windows.Controls.MenuItem>()
+                    .Any(mi => string.Equals((mi.Header as string)?.Replace("_", "").Trim() ?? mi.Header?.ToString() ?? "",
+                                              "Main Menu", StringComparison.OrdinalIgnoreCase));
+
+                if (!exists)
+                {
+                    var item = new System.Windows.Controls.MenuItem { Header = "_Main Menu" };
+                    item.Click += BackToMainMenu_Click;
+                    rootMenu.Items.Add(item);
+                }
+            }
+            catch
+            {
+            }
+        }
+
+        private MainMenuWindow CreateMainMenuWindow()
+        {
+            try
+            {
+                var servicesProp = typeof(App).GetProperty("Services", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static);
+                var services = servicesProp?.GetValue(null) as System.IServiceProvider;
+
+                var ctor = typeof(MainMenuWindow).GetConstructor(new System.Type[] { typeof(System.IServiceProvider) });
+                if (ctor != null && services != null)
+                    return (MainMenuWindow)ctor.Invoke(new object[] { services });
+
+                return new MainMenuWindow(App.Services);
+            }
+            catch
+            {
+                return new MainMenuWindow(App.Services);
+            }
+        }
+
+        private static T? VisualChildrenFirstOrDefault<T>(System.Windows.DependencyObject? parent) where T : System.Windows.DependencyObject
+        {
+            if (parent == null) return default;
+            for (int i = 0; i < System.Windows.Media.VisualTreeHelper.GetChildrenCount(parent); i++)
+            {
+                var child = System.Windows.Media.VisualTreeHelper.GetChild(parent, i);
+                if (child is T tChild) return tChild;
+                var hit = VisualChildrenFirstOrDefault<T>(child);
+                if (hit != null) return hit;
+            }
+            return default;
+        }
+
+        private void OpenGL_MouseDown(object? sender, System.Windows.Forms.MouseEventArgs e)
+        {
+            if (e.Button != System.Windows.Forms.MouseButtons.Left) return;
+            if (DataContext is not MainViewModel vm) return;
+
+            // 1) Build ray in world space
+            RayCaster rayCaster = new RayCaster(_controlHost, vm.Camera);
+
+            // 2) Find hit mesh
+            Vector3 rayOrigin = vm.Camera.Position;
+            Vector3 rayDirection = rayCaster.GetRay();
+            var hit = rayCaster.GetClickedMesh(vm.SceneMeshes, rayOrigin, rayDirection);
+
+            // 3) Update selection
+            var hitSummary = vm.Meshes.FirstOrDefault(ms => ReferenceEquals(ms.SourceMesh, hit));
+            if (hitSummary == null)
+            {
+                _logger?.Warn("Pick hit a mesh, but no MeshSummary matched it (hitSummary == null).");
+                return;
+            }
+            vm.SelectedMeshSummary = hitSummary;
+            ScrollSelectedIntoView(hitSummary);
+        }
+
+        private void ScrollSelectedIntoView(MeshSummary? summary)
+        {
+            if (summary == null) return;
+
+            MeshesTreeView.Dispatcher.BeginInvoke(new Action(() =>
+            {
+                MeshesTreeView.UpdateLayout();
+
+                if (MeshesTreeView.ItemContainerGenerator.ContainerFromItem(summary) is TreeViewItem item)
+                {
+                    item.BringIntoView();
+                    item.Focus(); // optional, if you want keyboard selection/focus
+                }
+                else
+                {
+                    // Fallback: select-trigger + layout usually creates it next pass
+                    MeshesTreeView.UpdateLayout();
+                    (MeshesTreeView.ItemContainerGenerator.ContainerFromItem(summary) as TreeViewItem)?.BringIntoView();
+                }
+            }), System.Windows.Threading.DispatcherPriority.Background);
         }
 
     }
 }
+
