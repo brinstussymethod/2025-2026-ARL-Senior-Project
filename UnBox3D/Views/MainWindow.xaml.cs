@@ -1,12 +1,14 @@
 ﻿using System.Diagnostics;
+using System.IO;
+using System.Linq;
 using System.Windows;
-using UnBox3D.Rendering.OpenGL;
-using UnBox3D.Utils;
 using System.Windows.Input;
 using TextBox = System.Windows.Controls.TextBox;
-using UnBox3D.Rendering;
-using UnBox3D.ViewModels;
 using UnBox3D.Models;
+using UnBox3D.Rendering;
+using UnBox3D.Rendering.OpenGL;
+using UnBox3D.Utils;
+using UnBox3D.ViewModels;
 
 namespace UnBox3D.Views
 {
@@ -83,6 +85,44 @@ namespace UnBox3D.Views
             }
         }
 
+        // Drag/drop: show copy cursor for .obj files
+        private void Window_DragOver(object sender, System.Windows.DragEventArgs e)
+        {
+            e.Effects = System.Windows.DragDropEffects.None;
+
+            if (e.Data.GetDataPresent(System.Windows.DataFormats.FileDrop))
+            {
+                var files = (string[])e.Data.GetData(System.Windows.DataFormats.FileDrop);
+
+                if (files.Any(f => string.Equals(Path.GetExtension(f), ".obj", StringComparison.OrdinalIgnoreCase)))
+                    e.Effects = System.Windows.DragDropEffects.Copy;
+            }
+
+            e.Handled = true;
+        }
+
+        private void Window_Drop(object sender, System.Windows.DragEventArgs e)
+        {
+            if (!e.Data.GetDataPresent(System.Windows.DataFormats.FileDrop))
+                return;
+
+            var files = (string[])e.Data.GetData(System.Windows.DataFormats.FileDrop);
+
+            var objPath = files.FirstOrDefault(f =>
+                string.Equals(Path.GetExtension(f), ".obj", StringComparison.OrdinalIgnoreCase));
+
+            if (objPath == null)
+                return;
+
+            if (DataContext is MainViewModel vm)
+            {
+                vm.ImportObjModelCommand.Execute(objPath);
+            }
+
+            e.Handled = true;
+        }
+
+
 
         private void Settings_Click(object? sender, EventArgs e)
         {
@@ -101,7 +141,6 @@ namespace UnBox3D.Views
             {
                 _logger?.Warn("Failed to open settings window, found null instance instead.");
             }
-
         }
         #endregion
 
@@ -254,7 +293,7 @@ namespace UnBox3D.Views
         }
 
         private void MeshThreshold_ValueChanged(object sender, EventArgs e)
-        { 
+        {
             if (sender is System.Windows.Controls.Slider slider)
             {
                 Debug.WriteLine(slider.Value);
@@ -272,7 +311,6 @@ namespace UnBox3D.Views
         {
             if (DataContext is not MainViewModel vm) return;
 
-
             // The TreeView is bound to MeshSummary items. Select the *real* mesh:
             if (e.NewValue is MeshSummary summary && summary.SourceMesh != null)
             {
@@ -287,6 +325,5 @@ namespace UnBox3D.Views
                 vm.SelectedMesh = null;                 // clicked a non-mesh node
             }
         }
-
     }
 }
