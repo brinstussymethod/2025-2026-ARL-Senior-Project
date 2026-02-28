@@ -90,40 +90,53 @@ namespace UnBox3D.ViewModels
         #region Model Import Methods
 
         [RelayCommand]
-        private void ImportObjModel()
+        private void ImportObjModel(string? filePath)
         {
-            var openFileDialog = new Microsoft.Win32.OpenFileDialog
+            string? selectedPath = null;
+
+            // If drag/drop provided a path, use it
+            if (!string.IsNullOrWhiteSpace(filePath) && File.Exists(filePath))
             {
-                Filter = "3D Models (*.obj;)|*.obj;"
-            };
-
-            // Show the dialog and check if the result is true
-            bool? result = openFileDialog.ShowDialog();
-            if (result == true)
+                selectedPath = filePath;
+            }
+            else
             {
-                string filePath = openFileDialog.FileName;
-                _importedFilePath = EnsureImportDirectory(filePath);
-                List<IAppMesh> importedMeshes = _modelImporter.ImportModel(_importedFilePath);
-
-                _latestImportedModel = importedMeshes; // Purpose: Remember the model that was imported so that the user can freely mess with something like size thresholds and go back.
-
-                foreach (var mesh in importedMeshes)
+                // Otherwise fall back to file picker (menu click)
+                var openFileDialog = new Microsoft.Win32.OpenFileDialog
                 {
-                    _sceneManager.AddMesh(mesh);
-                    Meshes.Add(new MeshSummary(mesh));
-                }
+                    Filter = "3D Models (*.obj;)|*.obj;"
+                };
 
-                if (_modelImporter.WasScaled)
+                bool? result = openFileDialog.ShowDialog();
+                if (result == true)
+                    selectedPath = openFileDialog.FileName;
+            }
+
+            // user cancelled or invalid
+            if (string.IsNullOrWhiteSpace(selectedPath))
+                return;
+
+            _importedFilePath = EnsureImportDirectory(selectedPath);
+
+            List<IAppMesh> importedMeshes = _modelImporter.ImportModel(_importedFilePath);
+            _latestImportedModel = importedMeshes;
+
+            foreach (var mesh in importedMeshes)
+            {
+                _sceneManager.AddMesh(mesh);
+                Meshes.Add(new MeshSummary(mesh));
+            }
+
+            if (_modelImporter.WasScaled)
+            {
+                var exportPath = _modelExporter.ExportToObj(_sceneManager.GetMeshes().ToList());
+                if (exportPath != null)
                 {
-                    var exportPath = _modelExporter.ExportToObj(_sceneManager.GetMeshes().ToList());
-                    if (exportPath != null)
-                    {
-                        _importedFilePath = exportPath;
-                    }
-
+                    _importedFilePath = exportPath;
                 }
             }
         }
+
 
         // Don't call this function directly.
         // Reference _importedFilePath if you want access to the ImportedModels directory.
