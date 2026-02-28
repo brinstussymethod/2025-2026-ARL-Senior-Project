@@ -33,3 +33,5 @@ project.assets.json
 
 /UnBox3D/Blender/blender4.2
 UnBox3D/Scripts/simplify.exe
+
+.idea/

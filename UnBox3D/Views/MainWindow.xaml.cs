@@ -506,6 +506,7 @@ namespace UnBox3D.Views
                 }
             }), System.Windows.Threading.DispatcherPriority.Background);
         }
+
     }
 }
 

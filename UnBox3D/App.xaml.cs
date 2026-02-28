@@ -23,6 +23,8 @@ namespace UnBox3D
         protected override void OnStartup(StartupEventArgs e)
         {
             base.OnStartup(e);
+
+            // Configure the service provider (Dependency Injection container)
             _serviceProvider = ConfigureServices();
 
             // Apply theme early and open the main menu first
@@ -58,14 +60,16 @@ namespace UnBox3D
                 float defaultAspectRatio = 16f / 9f;
                 return new Camera(defaultPos, defaultAspectRatio);
             });
-            services.AddSingleton<IRenderer, SceneRenderer>(provider =>
+            services.AddSingleton<IRenderer, SceneRenderer>(provider =>             // IRenderer, SceneRenderer
             {
                 var logger = provider.GetRequiredService<ILogger>();
                 var settings = provider.GetRequiredService<ISettingsManager>();
                 var scene = provider.GetRequiredService<ISceneManager>();
                 return new SceneRenderer(logger, settings, scene);
             });
-            services.AddSingleton<GLControlHost>(provider =>
+            // GLControlHost is the WinForms GL surface bridge. It now receives the unified DI Camera.
+            // IMPORTANT: host no longer owns/creates its own Camera/Mouse/Ray; that was the source of duplicates.
+            services.AddSingleton<GLControlHost>(provider =>                        // GLControlHost
             {
                 var scene    = provider.GetRequiredService<ISceneManager>();
                 var renderer = provider.GetRequiredService<IRenderer>();
@@ -148,8 +152,10 @@ namespace UnBox3D
                     AppSettings.CleanupExportOnExit
                 );
 
+                // 2. If the user wants cleanup, do it
                 if (cleanupOnExit)
                 {
+                    // Also fetch the export directory from settings
                     string? exportDir = settingsManager.GetSetting<string>(
                         new AppSettings().GetKey(),
                         AppSettings.ExportDirectory
@@ -172,7 +178,7 @@ namespace UnBox3D
                     }
                 }
             }
-
+            // Clean up the service provider on exit
             _serviceProvider?.Dispose();
             base.OnExit(e);
         }
