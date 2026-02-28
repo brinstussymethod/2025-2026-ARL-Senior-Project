@@ -95,6 +95,7 @@ namespace UnBox3D.ViewModels
                 OnPropertyChanged(nameof(SelectedMeshSummary));
             }
         }
+        public IGLControlHost GLControlHost => _glControlHost;
         #endregion
 
         #region Constructor

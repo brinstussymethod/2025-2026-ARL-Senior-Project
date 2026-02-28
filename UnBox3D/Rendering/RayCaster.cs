@@ -41,11 +41,13 @@ namespace UnBox3D.Rendering
         // Get the current mouse position in window coordinates; top-left is (0, 0)
         public Vector2 GetMousePosition()
         {
-            // Get the screen coordinates of the mouse
-            var mousePosition = Control.MousePosition;
+            var screen = Control.MousePosition;
 
-            // Return the client-relative mouse position as a Vector2
-            return new Vector2(mousePosition.X, mousePosition.Y);
+            // You need the actual WinForms control here (GLControl).
+            var control = (Control)_glControlHost;
+            var client = control.PointToClient(screen);
+
+            return new Vector2(client.X, client.Y);
         }
 
         // Step 1:

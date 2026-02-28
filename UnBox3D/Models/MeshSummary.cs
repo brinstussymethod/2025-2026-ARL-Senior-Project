@@ -34,7 +34,6 @@ namespace UnBox3D.Models
             SourceMesh = source;
             Name = source.Name;
             VertexCount = source.VertexCount;
-            IsSelected = source.GetHighlighted();
         }
     }
 }

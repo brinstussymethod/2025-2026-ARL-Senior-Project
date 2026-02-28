@@ -84,6 +84,12 @@
                         <Style TargetType="TreeViewItem">
                             <Setter Property="IsSelected"
                                     Value="{Binding IsSelected, Mode=TwoWay}" />
+                            <Style.Triggers>
+                                <Trigger Property="IsSelected" Value="True">
+                                    <Setter Property="Background" Value="#FFCCE5FF"/>
+                                    <Setter Property="Foreground" Value="Black"/>
+                                </Trigger>
+                            </Style.Triggers>
                         </Style>
                     </TreeView.ItemContainerStyle>
                     <TreeView.ItemTemplate>

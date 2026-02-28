@@ -1,4 +1,3 @@
-// MainWindow.xaml.cs — MERGED
 using Microsoft.Extensions.DependencyInjection;
 using OpenTK.Mathematics;
 using System;
@@ -396,7 +395,15 @@ namespace UnBox3D.Views
         {
             if (DataContext is not MainViewModel vm) return;
 
-            vm.SelectedMeshSummary = e.NewValue as MeshSummary;
+            if (e.NewValue is MeshSummary summary)
+            {
+                vm.SelectedMeshSummary = summary;
+                ScrollSelectedIntoView(summary);
+            }
+            else
+            {
+                vm.SelectedMeshSummary = null;
+            }
         }
 
         private void EnsureTopLevelMainMenu()
@@ -457,30 +464,47 @@ namespace UnBox3D.Views
         private void OpenGL_MouseDown(object? sender, System.Windows.Forms.MouseEventArgs e)
         {
             if (e.Button != System.Windows.Forms.MouseButtons.Left) return;
+            if (DataContext is not MainViewModel vm) return;
 
             // 1) Build ray in world space
-            RayCaster rayCaster = new RayCaster(_controlHost, VM.Camera);
+            RayCaster rayCaster = new RayCaster(_controlHost, vm.Camera);
 
             // 2) Find hit mesh
-            Vector2 mousePosition = rayCaster.GetMousePosition();
-            Vector3 rayDirection = rayCaster.ConvertToNDC(mousePosition);
-            Vector3 rayOrigin = rayCaster.GetRay();
-            var hit = rayCaster.GetClickedMesh(VM.SceneMeshes, rayOrigin, rayDirection);
-            
+            Vector3 rayOrigin = vm.Camera.Position;
+            Vector3 rayDirection = rayCaster.GetRay();
+            var hit = rayCaster.GetClickedMesh(vm.SceneMeshes, rayOrigin, rayDirection);
+
             // 3) Update selection
-            if (DataContext is MainViewModel vm)
+            var hitSummary = vm.Meshes.FirstOrDefault(ms => ReferenceEquals(ms.SourceMesh, hit));
+            if (hitSummary == null)
             {
-                vm.SelectedMesh = hit;
-                var hitSummary = vm.Meshes.FirstOrDefault(ms => ReferenceEquals(ms.SourceMesh, hit));
-                vm.SelectedMeshSummary = hitSummary;
-                
-                MeshesTreeView.Dispatcher.BeginInvoke(new Action(() =>
-                {
-                    MeshesTreeView.UpdateLayout();
-                    var container = (TreeViewItem)MeshesTreeView.ItemContainerGenerator.ContainerFromItem(vm.SelectedMeshSummary);
-                    container?.BringIntoView();
-                }), System.Windows.Threading.DispatcherPriority.Background);
+                _logger?.Warn("Pick hit a mesh, but no MeshSummary matched it (hitSummary == null).");
+                return;
             }
+            vm.SelectedMeshSummary = hitSummary;
+            ScrollSelectedIntoView(hitSummary);
+        }
+
+        private void ScrollSelectedIntoView(MeshSummary? summary)
+        {
+            if (summary == null) return;
+
+            MeshesTreeView.Dispatcher.BeginInvoke(new Action(() =>
+            {
+                MeshesTreeView.UpdateLayout();
+
+                if (MeshesTreeView.ItemContainerGenerator.ContainerFromItem(summary) is TreeViewItem item)
+                {
+                    item.BringIntoView();
+                    item.Focus(); // optional, if you want keyboard selection/focus
+                }
+                else
+                {
+                    // Fallback: select-trigger + layout usually creates it next pass
+                    MeshesTreeView.UpdateLayout();
+                    (MeshesTreeView.ItemContainerGenerator.ContainerFromItem(summary) as TreeViewItem)?.BringIntoView();
+                }
+            }), System.Windows.Threading.DispatcherPriority.Background);
         }
     }
 }
