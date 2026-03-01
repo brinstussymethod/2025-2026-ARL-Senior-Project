@@ -23,14 +23,12 @@ namespace UnBox3D.Utils
         private string ProgramFilesBlenderExecutable;
         private readonly string BlenderZipPath;
         public string ExecutablePath => BlenderExecutable;
+        private static readonly string BlenderSeries   = "4.5";
+        private static readonly string BlenderRevision = "4.5.3";
         private static readonly string BlenderDownloadUrl = $"https://download.blender.org/release/Blender{BlenderSeries}/blender-{BlenderRevision}-windows-x64.zip";
         // Quick test URL for invalid URL handling
         //private static string BlenderDownloadUrl = "https://invalid.url.fake/blender.zip";
         private Task? _blenderInstallTask;
-
-        private static readonly string BlenderSeries   = "4.5";
-        private static readonly string BlenderRevision = "4.5.3";
-
         public BlenderInstaller(IFileSystem fileSystem)
         {
             _fileSystem = fileSystem;
