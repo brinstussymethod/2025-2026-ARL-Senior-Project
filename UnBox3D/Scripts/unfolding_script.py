@@ -183,7 +183,8 @@ def unfold(output_path: pathlib.Path):
         # Optional retry signal for the C# side (if it's looking for "continue")
         msg = str(e).lower()
         if any(k in msg for k in ("fit", "does not fit", "doesn't fit", "page", "too large")):
-            print("continue")
+            # Raise a RuntimeError so that "continue" appears on stderr for the C# side
+            raise RuntimeError("continue") from e
         print(f"Failed to export paper model: {e}")
         traceback.print_exc()
         raise
