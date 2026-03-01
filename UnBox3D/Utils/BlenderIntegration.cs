@@ -86,7 +86,7 @@ namespace UnBox3D.Utils
                 }
 
                 // Extract runtime error message if exists
-                string runtimeErrorMessage = ExtractRuntimeError(error);
+                string? runtimeErrorMessage = ExtractRuntimeError(error);
 
                 if (string.IsNullOrEmpty(runtimeErrorMessage))
                 {
@@ -124,6 +124,12 @@ namespace UnBox3D.Utils
 
                 using (var taskKillProcess = Process.Start(startInfo))
                 {
+                    if (taskKillProcess == null)
+                    {
+                        _logger.Error("Failed to start taskkill process.");
+                        return;
+                    }
+                    
                     string output = taskKillProcess.StandardOutput.ReadToEnd();
                     string error = taskKillProcess.StandardError.ReadToEnd();
                     taskKillProcess.WaitForExit();
@@ -141,7 +147,7 @@ namespace UnBox3D.Utils
             }
         }
 
-        private string ExtractRuntimeError(string error)
+        private string? ExtractRuntimeError(string error)
         {
             if (error.Contains("ZeroDivisionError: float division by zero") ||
                 error.Contains("RuntimeError: Invalid Input Error: An island is too big to fit onto page"))

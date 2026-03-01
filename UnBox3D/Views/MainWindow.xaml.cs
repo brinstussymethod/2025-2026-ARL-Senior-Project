@@ -72,6 +72,7 @@ namespace UnBox3D.Views
             {
                 _logger?.Info("MainWindow loaded. Initializing OpenGL...");
 
+                // Ensure Blender is installed
                 var loadingWindow = new LoadingWindow
                 {
                     StatusHint = "Installing Blender...",
@@ -250,8 +251,9 @@ namespace UnBox3D.Views
 
         private void NumericTextBox_PreviewTextInput(object sender, TextCompositionEventArgs e)
         {
-            var textBox = sender as TextBox;
+            if (sender is not TextBox textBox) return;
 
+            // Only allow digits and one decimal
             if (!char.IsDigit(e.Text[0]) && e.Text != ".")
             {
                 e.Handled = true;
@@ -267,16 +269,18 @@ namespace UnBox3D.Views
 
         private void NumericTextBox_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
         {
-            if (e.Key == System.Windows.Input.Key.Back || e.Key == System.Windows.Input.Key.Delete || e.Key == System.Windows.Input.Key.Left ||
-                e.Key == System.Windows.Input.Key.Right || e.Key == System.Windows.Input.Key.Tab)
+            if (sender is not TextBox textBox) return;
+
+            // Allow navigation, deletion and control keys
+            if (e.Key == Key.Back || e.Key == Key.Delete || e.Key == Key.Left ||
+                e.Key == Key.Right || e.Key == Key.Tab)
             {
                 return;
             }
 
-            if (Keyboard.Modifiers == ModifierKeys.Control && e.Key == System.Windows.Input.Key.V)
+            // Handle clipboard operations
+            if (Keyboard.Modifiers == ModifierKeys.Control && e.Key == Key.V)
             {
-                var textBox = sender as TextBox;
-
                 if (System.Windows.Clipboard.ContainsText())
                 {
                     string clipboardText = System.Windows.Clipboard.GetText();
@@ -300,7 +304,7 @@ namespace UnBox3D.Views
             }
         }
 
-        private static bool IsValidDecimalInput(string input)
+        private bool IsValidDecimalInput(string input)
         {
             if (string.IsNullOrEmpty(input))
                 return false;
@@ -326,7 +330,8 @@ namespace UnBox3D.Views
 
         private void NumericTextBox_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
         {
-            var textBox = sender as TextBox;
+            if (sender is not TextBox textBox) return;
+
             int cursorPosition = textBox.SelectionStart;
             string originalText = textBox.Text;
 
@@ -353,7 +358,7 @@ namespace UnBox3D.Views
 
         private void NumericTextBox_LostFocus(object sender, RoutedEventArgs e)
         {
-            var textBox = sender as TextBox;
+            if (sender is not TextBox textBox) return;
 
             if (string.IsNullOrWhiteSpace(textBox.Text) || textBox.Text == ".")
             {

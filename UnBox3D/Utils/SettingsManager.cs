@@ -70,7 +70,7 @@ namespace UnBox3D.Utils
                         _logger.Info($"Settings file found. Loading settings from: {_settingsFilePath}");
                         // Load existing settings from file.
                         var json = _fileSystem.ReadFile(_settingsFilePath);
-                        _settings = JsonConvert.DeserializeObject<JObject>(json);
+                        _settings = JsonConvert.DeserializeObject<JObject>(json) ?? GetDefaultSettings(); // fall back to defaults if JSON is invalid
                         _logger.Info("Settings loaded successfully.");
                     }
                     else

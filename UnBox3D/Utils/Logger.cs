@@ -29,7 +29,7 @@ namespace UnBox3D.Utils
 
         public Logger(
             IFileSystem fileSystem,
-            string logDirectory = null,
+            string? logDirectory = null,
             string logFileName = "UnBox3D.log",
             long maxFileSizeInBytes = 5 * 1024 * 1024,
             int maxArchiveFiles = 5)
