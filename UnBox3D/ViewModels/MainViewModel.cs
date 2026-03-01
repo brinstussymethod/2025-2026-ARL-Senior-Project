@@ -1,19 +1,23 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+﻿using Assimp.Configs;
+using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using System.Collections.ObjectModel;
-using UnBox3D.Models;
-using UnBox3D.Utils;
-using UnBox3D.Rendering;
-using System.Diagnostics;
-using System.IO;
-using System.Windows;
-using UnBox3D.Views;
-using UnBox3D.Controls;
-using UnBox3D.Rendering.OpenGL;
-using UnBox3D.Commands;
 using OpenTK.Mathematics;
 using PdfSharpCore.Pdf;
+using System.Collections.ObjectModel;
+using System.Diagnostics;
+using System.IO;
+using System.Security.Cryptography;
+using System.Windows;
+using UnBox3D.Commands;
+using UnBox3D.Controls;
+using UnBox3D.Models;
+using UnBox3D.Rendering;
+using UnBox3D.Rendering.OpenGL;
+using UnBox3D.Utils;
+using UnBox3D.Views;
 
+using System.Linq;
+using System.Threading;
 namespace UnBox3D.ViewModels
 {
     public partial class MainViewModel : ObservableObject
@@ -60,6 +64,39 @@ namespace UnBox3D.ViewModels
 
         public ObservableCollection<MeshSummary> Meshes { get; } = new();
 
+        public ICamera Camera => _camera;
+
+        public ObservableCollection<IAppMesh> SceneMeshes => _sceneManager.GetMeshes();
+
+        private MeshSummary? _selectedMeshSummary;
+        public MeshSummary? SelectedMeshSummary
+        {
+            get => _selectedMeshSummary;
+            set
+            {
+                if (_selectedMeshSummary == value) return;
+
+                // unselect old
+                if (_selectedMeshSummary != null)
+                    _selectedMeshSummary.IsSelected = false;
+
+                _selectedMeshSummary = value;
+
+                // select new
+                if (_selectedMeshSummary != null)
+                {
+                    _selectedMeshSummary.IsSelected = true;
+                    SelectedMesh = _selectedMeshSummary.SourceMesh; // keep your existing property updated
+                }
+                else
+                {
+                    SelectedMesh = null;
+                }
+
+                OnPropertyChanged(nameof(SelectedMeshSummary));
+            }
+        }
+        public IGLControlHost GLControlHost => _glControlHost;
         #endregion
 
         #region Constructor
@@ -81,7 +118,7 @@ namespace UnBox3D.ViewModels
             _glControlHost = glControlHost;
             _camera = camera;
             _commandHistory = commandHistory;
-
+            // setup selection highlight colors
             LoadColors();
         }
 
@@ -137,6 +174,7 @@ namespace UnBox3D.ViewModels
             }
 
             string destinationPath = _fileSystem.CombinePaths(importDirectory, Path.GetFileName(filePath));
+            
             try
             {
                 File.Copy(filePath, destinationPath, overwrite: true);
@@ -149,6 +187,84 @@ namespace UnBox3D.ViewModels
 
             return destinationPath;
         }
+
+        public void ImportModelFromPath(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+                throw new FileNotFoundException("Model file not found.", path);
+
+            var importedMeshes = TryImportWithShadowCopy(path);
+
+            _latestImportedModel = importedMeshes;
+
+            foreach (var mesh in importedMeshes)
+            {
+                _sceneManager.AddMesh(mesh);
+                Meshes.Add(new MeshSummary(mesh));
+            }
+
+            _importedFilePath = path;
+
+            if (_modelImporter.WasScaled)
+            {
+                var exportPath = _modelExporter.ExportToObj(_sceneManager.GetMeshes().ToList());
+                if (!string.IsNullOrEmpty(exportPath))
+                    _importedFilePath = exportPath;
+            }
+        }
+
+        private List<IAppMesh> TryImportWithShadowCopy(string sourcePath)
+        {
+            try
+            {
+                return _modelImporter.ImportModel(sourcePath);
+            }
+            catch (IOException ioEx) when (IsSharingViolation(ioEx))
+            {
+                var tempDir = Path.Combine(Path.GetTempPath(), "UnBox3D", "ShadowCopies");
+                Directory.CreateDirectory(tempDir);
+                var tempPath = Path.Combine(
+                    tempDir, $"{Path.GetFileNameWithoutExtension(sourcePath)}_{Guid.NewGuid():N}{Path.GetExtension(sourcePath)}");
+
+                SafeCopyWithRetry(sourcePath, tempPath, attempts: 10, delayMs: 80);
+                try
+                {
+                    return _modelImporter.ImportModel(tempPath);
+                }
+                finally
+                {
+                    try { File.Delete(tempPath); } catch { /* best-effort cleanup */ }
+                }
+            }
+        }
+
+        private static bool IsSharingViolation(IOException ex) =>
+            (ex.HResult & 0xFFFF) == 32           // ERROR_SHARING_VIOLATION
+         || (ex.HResult & 0xFFFF) == 33           // ERROR_LOCK_VIOLATION
+         || ex.Message.IndexOf("being used by another process", StringComparison.OrdinalIgnoreCase) >= 0;
+
+        private static void SafeCopyWithRetry(string src, string dst, int attempts, int delayMs)
+        {
+            for (int i = 0; i < attempts; i++)
+            {
+                try
+                {
+                    using var s = new FileStream(src, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                    using var d = new FileStream(dst, FileMode.Create, FileAccess.Write, FileShare.Read);
+                    s.CopyTo(d);
+                    return;
+                }
+                catch (IOException) when (i < attempts - 1)
+                {
+                    Thread.Sleep(delayMs * (i + 1));
+                }
+            }
+
+            using var sFinal = new FileStream(src, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            using var dFinal = new FileStream(dst, FileMode.Create, FileAccess.Write, FileShare.Read);
+            sFinal.CopyTo(dFinal);
+        }
+
 
         #endregion
 
@@ -516,25 +632,22 @@ namespace UnBox3D.ViewModels
         [RelayCommand]
         private void DeleteMesh(IAppMesh mesh)
         {
-            if (mesh == null)
-                return;
+            if (mesh == null) return;
 
             _sceneManager.DeleteMesh(mesh);
 
-            // Dispose of the mesh's unmanaged resources
+            _latestImportedModel?.Remove(mesh);
+
             if (mesh is IDisposable disposableMesh)
-            {
                 disposableMesh.Dispose();
-            }
 
             // Remove the corresponding MeshSummary from the UI-bound collection.
             // Assuming Meshes is an ObservableCollection<MeshSummary>
             var summaryToRemove = Meshes.FirstOrDefault(ms => ms.SourceMesh == mesh);
             if (summaryToRemove != null)
-            {
                 Meshes.Remove(summaryToRemove);
-            }
         }
+
 
         [RelayCommand]
         private async Task ExportModel()
@@ -615,15 +728,33 @@ namespace UnBox3D.ViewModels
             float radius = Math.Max(Math.Min(meshDimensions.X, meshDimensions.Z), meshDimensions.Y) / 2;
             float height = isXAligned ? meshDimensions.X : meshDimensions.Z;
 
-            AppMesh cylinder = GeometryGenerator.CreateRotatedCylinder(center, radius, height, 32, Vector3.UnitX);
-
-            var summaryToRemove = Meshes.FirstOrDefault(ms => ms.SourceMesh == mesh);
-            if (summaryToRemove != null)
+            // the name displayed in the hierarchy is subject to change depending on what kind of mesh it is
+            string name;
+            // if the name already has '(Cylinder)' attached to it, then it has been replaced before and this new replacement shouldn't affect its name
+            if (mesh.Name.Contains("(Cylinder)"))
             {
-                Meshes.Remove(summaryToRemove);
+                name = mesh.Name;
+            }
+            // if it ends with anything beside '(Cylinder)', then it has been replaced before and this new replacement should just replace the end of the name to show what kind of simplification it is now
+            else if (mesh.Name.Contains("(Prism)"))
+            {
+                name = mesh.Name.Replace("(Prism)", "(Cylinder)");
+            }
+            else if (mesh.Name.Contains("(Wedge)"))
+            {
+                name = mesh.Name.Replace("(Wedge)", "(Cylinder)");
+            }
+            // if it does not, then it must be the first time it is being simplified, therefore, the keyword '(Cylinder)' needs to be added to show in the hiearchy that this mesh is unique
+            else
+            {
+                name = mesh.Name + " (Cylinder)";
             }
 
+            AppMesh cylinder = GeometryGenerator.CreateRotatedCylinder(center, radius, height, 32, Vector3.UnitX, name);
+
             _sceneManager.ReplaceMesh(mesh, cylinder);
+
+            DeleteMesh(mesh);
 
             Meshes.Add(new MeshSummary(cylinder));
 
@@ -633,47 +764,119 @@ namespace UnBox3D.ViewModels
 
         // If you want to implement replace with cylinder by clicking
         [RelayCommand]
-        private async Task ReplaceWithCylinderClick()
+        private async void ReplaceWithCylinderClick()
         {
-            var command = new SetReplaceStateCommand(_glControlHost, _mouseController, _sceneManager, new RayCaster(_glControlHost, _camera), _camera, _commandHistory, "cylinder");
-            command.Execute();
-            await ShowWpfMessageBoxAsync("Replaced!", "Replace", MessageBoxButton.OK, MessageBoxImage.Information);
+            if (SelectedMesh != null)
+            {
+                ReplaceWithCylinderOption(SelectedMesh);
+            }
+            else
+            {
+                await ShowWpfMessageBoxAsync("Select a mesh first.", "Replace", MessageBoxButton.OK, MessageBoxImage.Information);
+
+            }
         }
 
+        
+
         [RelayCommand]
-        private async Task ReplaceWithCubeOption(IAppMesh mesh)
+        private async void ReplaceWithCubeOption(IAppMesh mesh)
         {
             Vector3 center = _sceneManager.GetMeshCenter(mesh.GetG4Mesh());
-            Vector3 meshDimensions = _sceneManager.GetMeshDimensions(mesh.GetG4Mesh());
-    
-            AppMesh cube = GeometryGenerator.CreateBox(
-                        center,
-                        meshDimensions.X,
-                        meshDimensions.Y,
-                        meshDimensions.Z
-                    );
-    
-            var summaryToRemove = Meshes.FirstOrDefault(ms => ms.SourceMesh == mesh);
-            if (summaryToRemove != null)
+
+            // instead of using GetMeshDimensions(), which gets the largest dimensions of the mesh, GetSmallestMeshDimesions is utilized to get the smallest dimensions
+            // this is done to limit the size of the replacement cube, which before made it too big
+            Vector3 meshDimensions = _sceneManager.GetSmallestMeshDimensions(mesh.GetG4Mesh());
+
+            // the name displayed in the hierarchy is subject to change depending on what kind of mesh it is
+            string name;
+            // if the name already has '(Prism)' attached to it, then it has been replaced before and this new replacement shouldn't affect its name
+            if (mesh.Name.Contains("(Prism)"))
             {
-                Meshes.Remove(summaryToRemove);
+                name = mesh.Name;
             }
-    
+            else if (mesh.Name.Contains("(Cylinder)"))
+            {
+                name = mesh.Name.Replace("(Cylinder)", "(Prism)");
+            }
+            else if (mesh.Name.Contains("(Wedge)"))
+            {
+                name = mesh.Name.Replace("(Wedge)", "(Prism)");
+            }
+            // if it does not, then it must be the first time it is being simplified, therefore, the keyword 'simplified' needs to be added to show in the hiearchy that this mesh is unique
+            else
+            {
+                name = mesh.Name + " (Prism)";
+            }
+
+            AppMesh cube = GeometryGenerator.CreateBox(
+                            center,
+                            meshDimensions.X,
+                            meshDimensions.Y,
+                            meshDimensions.Z,
+                            name
+                        );
+
+            DeleteMesh(mesh);
+
             _sceneManager.ReplaceMesh(mesh, cube);
-    
+
             Meshes.Add(new MeshSummary(cube));
-            await Task.CompletedTask;
         }
 
         [RelayCommand]
-        private async Task ReplaceWithCubeClick()
+        private async void ReplaceWithCubeClick()
         {
-        var command = new SetReplaceStateCommand(_glControlHost, _mouseController, _sceneManager, new RayCaster(_glControlHost, _camera), _camera, _commandHistory, "cube");
-        
-        command.Execute();
-        await ShowWpfMessageBoxAsync("Replaced!", "Replace", MessageBoxButton.OK, MessageBoxImage.Information);
+            if (SelectedMesh != null)
+            {
+                ReplaceWithCubeOption(SelectedMesh);
+            }
+            else
+            {
+                await ShowWpfMessageBoxAsync("Select a mesh first.", "Replace", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
         }
 
+        [RelayCommand]
+        private async void ReplaceWithWedgeOption(IAppMesh mesh)
+        {
+            Vector3 center = _sceneManager.GetMeshCenter(mesh.GetG4Mesh());
+            Vector3 meshDimensions = _sceneManager.GetSmallestMeshDimensions(mesh.GetG4Mesh());
+            string name;
+            if (mesh.Name.Contains("(Wedge)"))
+            {
+                name = mesh.Name;
+            }
+            else if (mesh.Name.Contains("(Cylinder)"))
+            {
+                name = mesh.Name.Replace("(Cylinder)", "(Wedge)");
+            }
+            else if (mesh.Name.Contains("(Prism)"))
+            {
+                name = mesh.Name.Replace("(Prism)", "(Wedge)");
+            }
+            else
+            {
+                name = mesh.Name + " (Wedge)";
+            }
+            AppMesh wedge = GeometryGenerator.CreateWedge(center, meshDimensions.X, meshDimensions.Y, meshDimensions.Z, name);
+            DeleteMesh(mesh);
+            _sceneManager.ReplaceMesh(mesh, wedge);
+            Meshes.Add(new MeshSummary(wedge));
+        }
+
+        [RelayCommand]
+        private async void ReplaceWithWedgeClick()
+        {
+            if (SelectedMesh != null)
+            {
+                ReplaceWithWedgeOption(SelectedMesh);
+            }
+            else
+            {
+                await ShowWpfMessageBoxAsync("Select a mesh first.", "Replace", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+        }
 
         [RelayCommand]
         private async Task SimplifyQEC(IAppMesh mesh)
