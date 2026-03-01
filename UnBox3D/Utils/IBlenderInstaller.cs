@@ -23,20 +23,21 @@ namespace UnBox3D.Utils
         private string ProgramFilesBlenderExecutable;
         private readonly string BlenderZipPath;
         public string ExecutablePath => BlenderExecutable;
-        private static readonly string BlenderDownloadUrl = "https://download.blender.org/release/Blender4.5/blender-4.5.3-windows-x64.zip";
+        private static readonly string BlenderSeries   = "4.5";
+        private static readonly string BlenderRevision = "4.5.3";
+        private static readonly string BlenderDownloadUrl = $"https://download.blender.org/release/Blender{BlenderSeries}/blender-{BlenderRevision}-windows-x64.zip";
         // Quick test URL for invalid URL handling
         //private static string BlenderDownloadUrl = "https://invalid.url.fake/blender.zip";
         private Task? _blenderInstallTask;
-
         public BlenderInstaller(IFileSystem fileSystem)
         {
             _fileSystem = fileSystem;
 
             string baseDir = AppDomain.CurrentDomain.BaseDirectory;
             BlenderFolder = _fileSystem.CombinePaths(baseDir, "Blender");
-            BlenderExecutable = _fileSystem.CombinePaths(BlenderFolder, "blender-4.5.3-windows-x64", "blender.exe");
+            BlenderExecutable = _fileSystem.CombinePaths(BlenderFolder, $"blender-{BlenderRevision}-windows-x64", "blender.exe");
             ProgramFilesBlenderExecutable = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles)
-                    , "Blender Foundation", "blender-4.5.3", "blender.exe"); // this will be updated if found
+                    , "Blender Foundation", $"blender-{BlenderRevision}", "blender.exe"); // this will be updated if found
             BlenderZipPath = _fileSystem.CombinePaths(baseDir, "blender.zip");
 
             FindAndSetBlender();
@@ -104,12 +105,12 @@ namespace UnBox3D.Utils
         {
             if (!_fileSystem.DoesDirectoryExists(BlenderFolder) || !_fileSystem.DoesFileExists(BlenderExecutable))
             {
-                Debug.WriteLine("Blender 4.5 is not installed. Downloading now...");
+                Debug.WriteLine($"Blender {BlenderRevision} is not installed. Downloading now...");
                 await DownloadAndExtractBlender();
             }
             else
             {
-                Debug.WriteLine("Blender 4.5 is already installed.");
+                Debug.WriteLine($"Blender {BlenderRevision} is already installed.");
             }
         }
 
@@ -128,7 +129,7 @@ namespace UnBox3D.Utils
             
             if (!_fileSystem.DoesDirectoryExists(BlenderFolder) || !_fileSystem.DoesFileExists(BlenderExecutable))
             {
-                Debug.WriteLine("Blender 4.5 is not installed. Downloading now...");
+                Debug.WriteLine($"Blender {BlenderRevision} is not installed. Downloading now...");
 
                 try
                 {
@@ -143,7 +144,7 @@ namespace UnBox3D.Utils
             }
             else
             {
-                Debug.WriteLine("Blender 4.5 is already installed.");
+                Debug.WriteLine($"Blender {BlenderRevision} is already installed.");
                 progress?.Report(1.0);
             }
         }

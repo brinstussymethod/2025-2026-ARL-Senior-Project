@@ -68,6 +68,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Update="Scripts\io_export_paper_model.zip">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <ItemGroup>
     <Resource Include="Assets\Icons\logo.ico">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Resource>
