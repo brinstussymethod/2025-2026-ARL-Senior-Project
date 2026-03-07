@@ -10,6 +10,7 @@ using System.Security.Cryptography;
 using System.Windows;
 using UnBox3D.Commands;
 using UnBox3D.Controls;
+using UnBox3D.Controls.States;
 using UnBox3D.Models;
 using UnBox3D.Rendering;
 using UnBox3D.Rendering.OpenGL;
@@ -61,6 +62,18 @@ namespace UnBox3D.ViewModels
 
         [ObservableProperty]
         private float smallMeshThreshold = 0f;
+
+        /// <summary>Name of the currently active interaction mode shown in the toolbar.</summary>
+        [ObservableProperty]
+        private string activeMode = "Select";
+
+        /// <summary>True while a long-running background operation is in progress.</summary>
+        [ObservableProperty]
+        private bool isBusy = false;
+
+        /// <summary>Short status text shown next to the mesh count in the status bar while busy.</summary>
+        [ObservableProperty]
+        private string statusMessage = "Ready";
 
         public ObservableCollection<MeshSummary> Meshes { get; } = new();
 
@@ -149,6 +162,8 @@ namespace UnBox3D.ViewModels
                     _sceneManager.AddMesh(mesh);
                     Meshes.Add(new MeshSummary(mesh));
                 }
+
+                ToastService.Show($"Imported {importedMeshes.Count} mesh(es)");
 
                 if (_modelImporter.WasScaled)
                 {
@@ -571,9 +586,9 @@ namespace UnBox3D.ViewModels
         }
 
         [RelayCommand]
-        private async Task ResetView()
+        private void ResetView()
         {
-            await ShowWpfMessageBoxAsync("Resetting the view!", "Information", MessageBoxButton.OK, MessageBoxImage.Information);
+            ToastService.Show("View reset.", isError: false);
         }
 
         [RelayCommand]
@@ -618,31 +633,54 @@ namespace UnBox3D.ViewModels
         [RelayCommand]
         private async Task ClearScene()
         {
-            var result = await ShowWpfMessageBoxAsync("Are you sure you want to clear the scene?",
-                                                      "Clear Scene",
-                                                      MessageBoxButton.YesNo,
-                                                      MessageBoxImage.Warning);
-            if (result == MessageBoxResult.Yes)
+            bool confirmed = await System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
+            {
+                var dlg = new UnBox3D.Views.ConfirmDialog(
+                    title:         "Clear Scene",
+                    message:       "This will remove all meshes from the scene. This action cannot be undone.",
+                    confirmLabel:  "Clear",
+                    cancelLabel:   "Cancel");
+                dlg.Owner = System.Windows.Application.Current.MainWindow;
+                dlg.ShowDialog();
+                return dlg.Confirmed;
+            });
+
+            if (confirmed)
             {
                 _sceneManager.ClearScene();
                 Meshes.Clear();
             }
         }
 
-        [RelayCommand]
-        private void DeleteMesh(IAppMesh mesh)
+        // Internal helper used by Replace* operations — does NOT push to history.
+        private void DeleteMeshInternal(IAppMesh mesh)
         {
             if (mesh == null) return;
 
             _sceneManager.DeleteMesh(mesh);
-
             _latestImportedModel?.Remove(mesh);
 
             if (mesh is IDisposable disposableMesh)
                 disposableMesh.Dispose();
 
-            // Remove the corresponding MeshSummary from the UI-bound collection.
-            // Assuming Meshes is an ObservableCollection<MeshSummary>
+            var summaryToRemove = Meshes.FirstOrDefault(ms => ms.SourceMesh == mesh);
+            if (summaryToRemove != null)
+                Meshes.Remove(summaryToRemove);
+        }
+
+        // Called by the Delete button in the mesh hierarchy panel.
+        // Routes through CommandHistory so Ctrl+Z / Redo work correctly.
+        [RelayCommand]
+        private void DeleteMesh(IAppMesh mesh)
+        {
+            if (mesh == null) return;
+
+            var cmd = new DeleteCommand(_glControlHost, _sceneManager, mesh);
+            _commandHistory.PushCommand(cmd);
+            cmd.Execute();
+
+            // Keep the UI hierarchy in sync immediately.
+            _latestImportedModel?.Remove(mesh);
             var summaryToRemove = Meshes.FirstOrDefault(ms => ms.SourceMesh == mesh);
             if (summaryToRemove != null)
                 Meshes.Remove(summaryToRemove);
@@ -720,61 +758,43 @@ namespace UnBox3D.ViewModels
         [RelayCommand]
         private async Task ReplaceWithCylinderOption(IAppMesh mesh)
         {
+            if (mesh == null) return;
+
             Vector3 center = _sceneManager.GetMeshCenter(mesh.GetG4Mesh());
             Vector3 meshDimensions = _sceneManager.GetMeshDimensions(mesh.GetG4Mesh());
 
             bool isXAligned = (meshDimensions.X < meshDimensions.Z);
-
             float radius = Math.Max(Math.Min(meshDimensions.X, meshDimensions.Z), meshDimensions.Y) / 2;
             float height = isXAligned ? meshDimensions.X : meshDimensions.Z;
 
-            // the name displayed in the hierarchy is subject to change depending on what kind of mesh it is
             string name;
-            // if the name already has '(Cylinder)' attached to it, then it has been replaced before and this new replacement shouldn't affect its name
-            if (mesh.Name.Contains("(Cylinder)"))
-            {
-                name = mesh.Name;
-            }
-            // if it ends with anything beside '(Cylinder)', then it has been replaced before and this new replacement should just replace the end of the name to show what kind of simplification it is now
-            else if (mesh.Name.Contains("(Prism)"))
-            {
-                name = mesh.Name.Replace("(Prism)", "(Cylinder)");
-            }
-            else if (mesh.Name.Contains("(Wedge)"))
-            {
-                name = mesh.Name.Replace("(Wedge)", "(Cylinder)");
-            }
-            // if it does not, then it must be the first time it is being simplified, therefore, the keyword '(Cylinder)' needs to be added to show in the hiearchy that this mesh is unique
-            else
-            {
-                name = mesh.Name + " (Cylinder)";
-            }
+            if (mesh.Name.Contains("(Cylinder)"))      name = mesh.Name;
+            else if (mesh.Name.Contains("(Prism)"))    name = mesh.Name.Replace("(Prism)",  "(Cylinder)");
+            else if (mesh.Name.Contains("(Wedge)"))    name = mesh.Name.Replace("(Wedge)",  "(Cylinder)");
+            else                                       name = mesh.Name + " (Cylinder)";
 
             AppMesh cylinder = GeometryGenerator.CreateRotatedCylinder(center, radius, height, 32, Vector3.UnitX, name);
 
-            _sceneManager.ReplaceMesh(mesh, cylinder);
+            var cmd = new ReplaceMeshCommand(_sceneManager, _glControlHost, mesh, cylinder);
+            _commandHistory.PushCommand(cmd);
+            cmd.Execute();
 
-            DeleteMesh(mesh);
-
+            _latestImportedModel?.Remove(mesh);
+            var oldSummary = Meshes.FirstOrDefault(ms => ms.SourceMesh == mesh);
+            if (oldSummary != null) Meshes.Remove(oldSummary);
             Meshes.Add(new MeshSummary(cylinder));
 
-            //await ShowWpfMessageBoxAsync("Replaced Mesh!", "Replace", MessageBoxButton.OK, MessageBoxImage.Information);
             await Task.CompletedTask;
         }
 
         // If you want to implement replace with cylinder by clicking
         [RelayCommand]
-        private async void ReplaceWithCylinderClick()
+        private void ReplaceWithCylinderClick()
         {
             if (SelectedMesh != null)
-            {
                 ReplaceWithCylinderOption(SelectedMesh);
-            }
             else
-            {
-                await ShowWpfMessageBoxAsync("Select a mesh first.", "Replace", MessageBoxButton.OK, MessageBoxImage.Information);
-
-            }
+                ToastService.Show("Select a mesh first.", isError: false);
         }
 
         
@@ -782,100 +802,71 @@ namespace UnBox3D.ViewModels
         [RelayCommand]
         private async void ReplaceWithCubeOption(IAppMesh mesh)
         {
-            Vector3 center = _sceneManager.GetMeshCenter(mesh.GetG4Mesh());
+            if (mesh == null) return;
 
-            // instead of using GetMeshDimensions(), which gets the largest dimensions of the mesh, GetSmallestMeshDimesions is utilized to get the smallest dimensions
-            // this is done to limit the size of the replacement cube, which before made it too big
+            Vector3 center = _sceneManager.GetMeshCenter(mesh.GetG4Mesh());
             Vector3 meshDimensions = _sceneManager.GetSmallestMeshDimensions(mesh.GetG4Mesh());
 
-            // the name displayed in the hierarchy is subject to change depending on what kind of mesh it is
             string name;
-            // if the name already has '(Prism)' attached to it, then it has been replaced before and this new replacement shouldn't affect its name
-            if (mesh.Name.Contains("(Prism)"))
-            {
-                name = mesh.Name;
-            }
-            else if (mesh.Name.Contains("(Cylinder)"))
-            {
-                name = mesh.Name.Replace("(Cylinder)", "(Prism)");
-            }
-            else if (mesh.Name.Contains("(Wedge)"))
-            {
-                name = mesh.Name.Replace("(Wedge)", "(Prism)");
-            }
-            // if it does not, then it must be the first time it is being simplified, therefore, the keyword 'simplified' needs to be added to show in the hiearchy that this mesh is unique
-            else
-            {
-                name = mesh.Name + " (Prism)";
-            }
+            if (mesh.Name.Contains("(Prism)"))         name = mesh.Name;
+            else if (mesh.Name.Contains("(Cylinder)")) name = mesh.Name.Replace("(Cylinder)", "(Prism)");
+            else if (mesh.Name.Contains("(Wedge)"))    name = mesh.Name.Replace("(Wedge)",    "(Prism)");
+            else                                       name = mesh.Name + " (Prism)";
 
-            AppMesh cube = GeometryGenerator.CreateBox(
-                            center,
-                            meshDimensions.X,
-                            meshDimensions.Y,
-                            meshDimensions.Z,
-                            name
-                        );
+            AppMesh cube = GeometryGenerator.CreateBox(center, meshDimensions.X, meshDimensions.Y, meshDimensions.Z, name);
 
-            DeleteMesh(mesh);
+            var cmd = new ReplaceMeshCommand(_sceneManager, _glControlHost, mesh, cube);
+            _commandHistory.PushCommand(cmd);
+            cmd.Execute();
 
-            _sceneManager.ReplaceMesh(mesh, cube);
-
+            _latestImportedModel?.Remove(mesh);
+            var oldSummary = Meshes.FirstOrDefault(ms => ms.SourceMesh == mesh);
+            if (oldSummary != null) Meshes.Remove(oldSummary);
             Meshes.Add(new MeshSummary(cube));
         }
 
         [RelayCommand]
-        private async void ReplaceWithCubeClick()
+        private void ReplaceWithCubeClick()
         {
             if (SelectedMesh != null)
-            {
                 ReplaceWithCubeOption(SelectedMesh);
-            }
             else
-            {
-                await ShowWpfMessageBoxAsync("Select a mesh first.", "Replace", MessageBoxButton.OK, MessageBoxImage.Information);
-            }
+                ToastService.Show("Select a mesh first.", isError: false);
         }
 
         [RelayCommand]
         private async void ReplaceWithWedgeOption(IAppMesh mesh)
         {
+            if (mesh == null) return;
+
             Vector3 center = _sceneManager.GetMeshCenter(mesh.GetG4Mesh());
             Vector3 meshDimensions = _sceneManager.GetSmallestMeshDimensions(mesh.GetG4Mesh());
+
             string name;
-            if (mesh.Name.Contains("(Wedge)"))
-            {
-                name = mesh.Name;
-            }
-            else if (mesh.Name.Contains("(Cylinder)"))
-            {
-                name = mesh.Name.Replace("(Cylinder)", "(Wedge)");
-            }
-            else if (mesh.Name.Contains("(Prism)"))
-            {
-                name = mesh.Name.Replace("(Prism)", "(Wedge)");
-            }
-            else
-            {
-                name = mesh.Name + " (Wedge)";
-            }
+            if (mesh.Name.Contains("(Wedge)"))         name = mesh.Name;
+            else if (mesh.Name.Contains("(Cylinder)")) name = mesh.Name.Replace("(Cylinder)", "(Wedge)");
+            else if (mesh.Name.Contains("(Prism)"))    name = mesh.Name.Replace("(Prism)",    "(Wedge)");
+            else                                       name = mesh.Name + " (Wedge)";
+
             AppMesh wedge = GeometryGenerator.CreateWedge(center, meshDimensions.X, meshDimensions.Y, meshDimensions.Z, name);
-            DeleteMesh(mesh);
-            _sceneManager.ReplaceMesh(mesh, wedge);
+
+            var cmd = new ReplaceMeshCommand(_sceneManager, _glControlHost, mesh, wedge);
+            _commandHistory.PushCommand(cmd);
+            cmd.Execute();
+
+            _latestImportedModel?.Remove(mesh);
+            var oldSummary = Meshes.FirstOrDefault(ms => ms.SourceMesh == mesh);
+            if (oldSummary != null) Meshes.Remove(oldSummary);
             Meshes.Add(new MeshSummary(wedge));
         }
 
         [RelayCommand]
-        private async void ReplaceWithWedgeClick()
+        private void ReplaceWithWedgeClick()
         {
             if (SelectedMesh != null)
-            {
                 ReplaceWithWedgeOption(SelectedMesh);
-            }
             else
-            {
-                await ShowWpfMessageBoxAsync("Select a mesh first.", "Replace", MessageBoxButton.OK, MessageBoxImage.Information);
-            }
+                ToastService.Show("Select a mesh first.", isError: false);
         }
 
         [RelayCommand]
@@ -921,6 +912,9 @@ namespace UnBox3D.ViewModels
                 await ShowWpfMessageBoxAsync("No meshes to simplify.", "Warning", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
+
+            IsBusy = true;
+            StatusMessage = "Simplifying scene...";
 
             var loadingWindow = new LoadingWindow
             {
@@ -999,6 +993,8 @@ namespace UnBox3D.ViewModels
             finally
             {
                 loadingWindow.Close();
+                IsBusy = false;
+                StatusMessage = "Ready";
             }
         }
 
@@ -1017,6 +1013,9 @@ namespace UnBox3D.ViewModels
 
             // 2. Prepare the output from the simplify.exe
             string baseOutput = Path.Combine(Path.GetTempPath(), $"simplified_{method}.obj");
+
+            IsBusy = true;
+            StatusMessage = "Simplifying mesh...";
 
             // 3. Show a loading window
             var loadingWindow = new LoadingWindow
@@ -1091,6 +1090,8 @@ namespace UnBox3D.ViewModels
             finally
             {
                 loadingWindow.Close();
+                IsBusy = false;
+                StatusMessage = "Ready";
             }
         }
 
@@ -1238,6 +1239,91 @@ namespace UnBox3D.ViewModels
         private void Exit()
         {
             System.Windows.Application.Current.Shutdown();
+        }
+
+        #region Undo / Redo
+
+        [RelayCommand(CanExecute = nameof(CanUndoAction))]
+        private void UndoAction()
+        {
+            var cmd = _commandHistory.PopCommand();
+            if (cmd == null) return;
+            cmd.Undo();
+            _commandHistory.PushRedoCommand(cmd);
+            _glControlHost.Render();
+            RefreshMeshesCollection();
+        }
+        private bool CanUndoAction() => _commandHistory.CanUndo;
+
+        [RelayCommand(CanExecute = nameof(CanRedoAction))]
+        private void RedoAction()
+        {
+            var cmd = _commandHistory.PopRedoCommand();
+            if (cmd == null) return;
+            cmd.Execute();
+            _commandHistory.PushCommand(cmd);
+            _glControlHost.Render();
+            RefreshMeshesCollection();
+        }
+        private bool CanRedoAction() => _commandHistory.CanRedo;
+
+        // Re-evaluate CanExecute every time the history stacks change.
+        public void Initialize(IGLControlHost controlHost, ILogger logger, IBlenderInstaller blenderInstaller)
+        {
+            _commandHistory.HistoryChanged += (_, __) =>
+            {
+                UndoActionCommand.NotifyCanExecuteChanged();
+                RedoActionCommand.NotifyCanExecuteChanged();
+            };
+        }
+
+        #endregion
+
+        #region Mode-Switching Commands
+
+        [RelayCommand]
+        private void SetSelectMode()
+        {
+            ActiveMode = "Select";
+            var state = new DefaultState(_sceneManager, _glControlHost, _camera, new RayCaster(_glControlHost, _camera));
+            _mouseController.SetState(state);
+        }
+
+        [RelayCommand]
+        private void SetDeleteMode()
+        {
+            ActiveMode = "Delete";
+            var state = new DeleteState(_glControlHost, _sceneManager, _camera, new RayCaster(_glControlHost, _camera), _commandHistory);
+            _mouseController.SetState(state);
+        }
+
+        [RelayCommand]
+        private void SetMoveMode()
+        {
+            ActiveMode = "Move";
+            var state = new MoveState(_glControlHost, _sceneManager, _camera, new RayCaster(_glControlHost, _camera), _commandHistory);
+            _mouseController.SetState(state);
+        }
+
+        [RelayCommand]
+        private void SetRotateMode()
+        {
+            ActiveMode = "Rotate";
+            var state = new RotateState(_settingsManager, _sceneManager, _glControlHost, _camera, new RayCaster(_glControlHost, _camera), _commandHistory);
+            _mouseController.SetState(state);
+        }
+
+        #endregion
+
+        /// <summary>
+        /// Rebuilds the Meshes observable collection from the current scene.
+        /// Called after undo/redo so the hierarchy stays in sync.
+        /// </summary>
+        private void RefreshMeshesCollection()
+        {
+            Meshes.Clear();
+            foreach (var mesh in _sceneManager.GetMeshes())
+                Meshes.Add(new MeshSummary(mesh));
         }
 
         public void ApplyMeshThreshold()

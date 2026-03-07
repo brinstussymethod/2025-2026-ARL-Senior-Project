@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using OpenTK.Mathematics;
 using System;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -8,8 +9,9 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media.Animation;
 using UnBox3D.Controls;
-using UnBox3D.Models; // added for MeshSummary/IAppMesh
+using UnBox3D.Models;
 using UnBox3D.Rendering;
 using UnBox3D.Rendering.OpenGL;
 using UnBox3D.Utils;
@@ -25,6 +27,9 @@ namespace UnBox3D.Views
         private IGLControlHost? _controlHost;
         private ILogger? _logger;
         private string? _pendingOpenPath;
+        // Set to true by BackToMainMenu_Click so MainWindow_Closed knows
+        // NOT to dispose the singleton GLControlHost (it will be reused).
+        private bool _returningToMenu = false;
 
         private MainViewModel VM => DataContext as MainViewModel;
 
@@ -49,6 +54,20 @@ namespace UnBox3D.Views
 
             Loaded += MainWindow_Loaded;
             Closed += MainWindow_Closed;
+            DataContextChanged += OnDataContextChanged;
+
+            // Subscribe to toast notifications
+            ToastService.ToastRequested += ShowToast;
+
+            // Keyboard shortcuts for undo / redo
+            var undoGesture = new KeyBinding(
+                new RelayCommandAdapter(() => VM?.UndoActionCommand?.Execute(null)),
+                Key.Z, ModifierKeys.Control);
+            var redoGesture = new KeyBinding(
+                new RelayCommandAdapter(() => VM?.RedoActionCommand?.Execute(null)),
+                Key.Y, ModifierKeys.Control);
+            InputBindings.Add(undoGesture);
+            InputBindings.Add(redoGesture);
         }
 
         public void Initialize(IGLControlHost controlHost, ILogger logger, IBlenderInstaller blenderInstaller)
@@ -98,6 +117,8 @@ namespace UnBox3D.Views
 
                 loadingWindow.Close();
 
+                PlayEntranceAnimations();
+
                 if (_controlHost is not null)
                 {
                     openGLHost.Child = (Control)_controlHost;
@@ -119,8 +140,148 @@ namespace UnBox3D.Views
             }
         }
 
+        private void OnDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
+        {
+            if (e.OldValue is MainViewModel oldVm)
+                oldVm.PropertyChanged -= OnVmPropertyChanged;
+            if (e.NewValue is MainViewModel newVm)
+                newVm.PropertyChanged += OnVmPropertyChanged;
+        }
+
+        private void OnVmPropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName != nameof(MainViewModel.HierarchyVisible)) return;
+            if (sender is not MainViewModel vm) return;
+
+            Dispatcher.Invoke(() =>
+            {
+                bool show = vm.HierarchyVisible;
+
+                // Stop any running animation so the local value is writable again,
+                // then snap directly - instant and reliable.
+                HierarchyColumn.BeginAnimation(ColumnDefinition.WidthProperty, null);
+                HierarchyColumn.Width = new GridLength(show ? 260 : 0);
+
+                // Also hide the splitter so the 4px gap doesn't linger.
+                HierarchySplitter.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+            });
+        }
+
+        private System.Windows.Threading.DispatcherTimer? _toastTimer;
+        private System.Windows.Threading.DispatcherTimer? _notifyTimer;
+
+        private void ShowToast(string message, bool isError)
+        {
+            Dispatcher.Invoke(() => ShowNotification(message, isError));
+        }
+
+        private void ShowNotification(string message, bool isError)
+        {
+            var accentBrush = isError
+                ? new System.Windows.Media.SolidColorBrush(
+                      System.Windows.Media.Color.FromRgb(0xC0, 0x39, 0x2B))
+                : new System.Windows.Media.SolidColorBrush(
+                      System.Windows.Media.Color.FromRgb(0x00, 0xB3, 0x94));
+
+            var bgBrush = isError
+                ? new System.Windows.Media.SolidColorBrush(
+                      System.Windows.Media.Color.FromArgb(0xF5, 0x28, 0x0C, 0x0C))
+                : new System.Windows.Media.SolidColorBrush(
+                      System.Windows.Media.Color.FromArgb(0xF5, 0x08, 0x18, 0x14));
+
+            NotifyBanner.Background  = bgBrush;
+            NotifyBanner.BorderBrush = accentBrush;
+            NotifyIcon.Text          = isError ? "⚠" : "✓";
+            NotifyIcon.Foreground    = accentBrush;
+            NotifyText.Text          = message;
+            NotifyText.Foreground    = System.Windows.Media.Brushes.White;
+
+            NotifyBanner.Opacity = 0;
+            NotifyBanner.Measure(new System.Windows.Size(double.PositiveInfinity, double.PositiveInfinity));
+            double bannerW = Math.Max(NotifyBanner.DesiredSize.Width, 200);
+
+            NotifyPopup.PlacementTarget   = this;
+            NotifyPopup.Placement         = System.Windows.Controls.Primitives.PlacementMode.Relative;
+            NotifyPopup.HorizontalOffset  = (this.ActualWidth  - bannerW) / 2.0;
+            NotifyPopup.VerticalOffset    = 90;
+            NotifyPopup.IsOpen            = true;
+
+            NotifyBanner.RenderTransform = new System.Windows.Media.TranslateTransform(0, -8);
+            NotifyBanner.BeginAnimation(OpacityProperty,
+                new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(260))
+                { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } });
+            ((System.Windows.Media.TranslateTransform)NotifyBanner.RenderTransform)
+                .BeginAnimation(System.Windows.Media.TranslateTransform.YProperty,
+                    new DoubleAnimation(-8, 0, TimeSpan.FromMilliseconds(260))
+                    { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } });
+
+            _notifyTimer?.Stop();
+            _notifyTimer = new System.Windows.Threading.DispatcherTimer
+                { Interval = TimeSpan.FromSeconds(isError ? 4.0 : 2.8) };
+            _notifyTimer.Tick += (_, __) =>
+            {
+                _notifyTimer!.Stop();
+                var fadeOut = new DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(400))
+                    { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseIn } };
+                fadeOut.Completed += (__, ___) => NotifyPopup.IsOpen = false;
+                NotifyBanner.BeginAnimation(OpacityProperty, fadeOut);
+            };
+            _notifyTimer.Start();
+        }
+
+        private void PlayEntranceAnimations()
+        {
+            var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
+            const int dur = 420;
+
+            ToolbarBorder.Opacity = 0;
+            ToolbarBorder.RenderTransform = new System.Windows.Media.TranslateTransform(0, -32);
+            ToolbarBorder.BeginAnimation(OpacityProperty,
+                new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(dur)) { EasingFunction = ease });
+            ((System.Windows.Media.TranslateTransform)ToolbarBorder.RenderTransform)
+                .BeginAnimation(System.Windows.Media.TranslateTransform.YProperty,
+                    new DoubleAnimation(-32, 0, TimeSpan.FromMilliseconds(dur)) { EasingFunction = ease });
+
+            HierarchyPanel.Opacity = 0;
+            HierarchyPanel.RenderTransform = new System.Windows.Media.TranslateTransform(-40, 0);
+            HierarchyPanel.BeginAnimation(OpacityProperty,
+                new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(dur))
+                { EasingFunction = ease, BeginTime = TimeSpan.FromMilliseconds(80) });
+            ((System.Windows.Media.TranslateTransform)HierarchyPanel.RenderTransform)
+                .BeginAnimation(System.Windows.Media.TranslateTransform.XProperty,
+                    new DoubleAnimation(-40, 0, TimeSpan.FromMilliseconds(dur))
+                    { EasingFunction = ease, BeginTime = TimeSpan.FromMilliseconds(80) });
+
+            ToolsPanel.Opacity = 0;
+            ToolsPanel.RenderTransform = new System.Windows.Media.TranslateTransform(40, 0);
+            ToolsPanel.BeginAnimation(OpacityProperty,
+                new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(dur))
+                { EasingFunction = ease, BeginTime = TimeSpan.FromMilliseconds(160) });
+            ((System.Windows.Media.TranslateTransform)ToolsPanel.RenderTransform)
+                .BeginAnimation(System.Windows.Media.TranslateTransform.XProperty,
+                    new DoubleAnimation(40, 0, TimeSpan.FromMilliseconds(dur))
+                    { EasingFunction = ease, BeginTime = TimeSpan.FromMilliseconds(160) });
+        }
+
         private void MainWindow_Closed(object? sender, EventArgs e)
         {
+            ToastService.ToastRequested -= ShowToast;
+            if (DataContext is MainViewModel vm) vm.PropertyChanged -= OnVmPropertyChanged;
+
+            // Always unsubscribe the mouse handler from the shared WinForms control
+            // so stale handlers from old window instances don't keep firing.
+            try { if (openGLHost?.Child != null) openGLHost.Child.MouseDown -= OpenGL_MouseDown; }
+            catch { }
+
+            if (_returningToMenu)
+            {
+                // The GLControlHost is a DI singleton — a new MainWindow will reuse it.
+                // Do NOT dispose or clean it up here, only detach it from this host.
+                _logger?.Info("MainWindow closing to return to main menu. GL host preserved.");
+                return;
+            }
+
+            // Full exit path: safe to tear everything down.
             try
             {
                 _logger?.Info("MainWindow is closing. Performing cleanup...");
@@ -203,18 +364,15 @@ namespace UnBox3D.Views
             }
         }
 
-        // Back to Main Menu (XAML button may exist elsewhere)
         private void BackToMainMenu_Click(object sender, RoutedEventArgs e)
         {
-            try
-            {
-                var mainMenu = new MainMenuWindow(App.Services);
-                mainMenu.Show();
-            }
-            finally
-            {
-                this.Close();
-            }
+            // Tell Closed handler to preserve the singleton GL host.
+            _returningToMenu = true;
+            // Use DI so the transient MainMenuWindow is properly constructed.
+            var menu = App.Services.GetRequiredService<MainMenuWindow>();
+            Application.Current.MainWindow = menu;
+            menu.Show();
+            Close();
         }
 
         private void ImportModel_Click(object sender, RoutedEventArgs e)
@@ -236,6 +394,18 @@ namespace UnBox3D.Views
                 cmd.Execute(null);
             else
                 Application.Current.Shutdown();
+        }
+
+        private void Help_Click(object sender, RoutedEventArgs e)
+        {
+            var help = new HelpWindow(App.Services) { Owner = this };
+            help.ShowDialog();
+        }
+
+        private void About_Click(object sender, RoutedEventArgs e)
+        {
+            var about = new AboutWindow { Owner = this };
+            about.ShowDialog();
         }
 
         private void Settings_Click(object sender, RoutedEventArgs e)
@@ -512,6 +682,18 @@ namespace UnBox3D.Views
             }), System.Windows.Threading.DispatcherPriority.Background);
         }
 
+    }
+
+    /// <summary>
+    /// Minimal ICommand shim so a lambda can be used with WPF KeyBinding.
+    /// </summary>
+    internal sealed class RelayCommandAdapter : System.Windows.Input.ICommand
+    {
+        private readonly Action _execute;
+        public RelayCommandAdapter(Action execute) => _execute = execute;
+        public bool CanExecute(object? parameter) => true;
+        public void Execute(object? parameter) => _execute();
+        public event EventHandler? CanExecuteChanged { add { } remove { } }
     }
 }
 

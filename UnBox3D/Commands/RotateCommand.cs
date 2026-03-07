@@ -1,63 +1,48 @@
-﻿using Assimp;
-using g4;
 using OpenTK.Mathematics;
 using UnBox3D.Rendering;
-using System;
-using System.Collections.Generic;
-using Quaternion = OpenTK.Mathematics.Quaternion;
 
 namespace UnBox3D.Commands
 {
+    /// <summary>
+    /// Records a rotation gesture.
+    ///
+    /// Because RotateState applies the rotation live (incrementally during the drag),
+    /// the very first call to Execute() must be a no-op — the rotation is already on the mesh.
+    /// Every subsequent call (i.e. Redo after Undo) re-applies the forward rotation.
+    /// </summary>
     public class RotateCommand : ICommand
     {
-        private readonly IAppMesh _mesh;
-        private readonly Quaternion _rotation;
-        private readonly Stack<MeshRotateMemento> _rotatedMeshes;
+        private readonly IAppMesh   _mesh;
+        private readonly Quaternion _doRotation;    // total forward rotation (stored for Redo)
+        private readonly Quaternion _undoRotation;  // inverse (stored for Undo)
+        private bool _firstExecute = true;          // first call is a no-op (already applied live)
 
-        public RotateCommand(IAppMesh mesh, Quaternion rotation, float angle)
+        /// <param name="mesh">The mesh that was rotated.</param>
+        /// <param name="doRotation">The total forward rotation applied during the drag.</param>
+        /// <param name="undoRotation">The exact inverse of doRotation.</param>
+        public RotateCommand(IAppMesh mesh, Quaternion doRotation, Quaternion undoRotation)
         {
-            _mesh = mesh ?? throw new ArgumentNullException(nameof(mesh));
-
-            // Store the rotation quaternion
-            _rotation = Quaternion.FromAxisAngle(rotation.Xyz.Normalized(), MathHelper.DegreesToRadians(angle));
-            _rotatedMeshes = new Stack<MeshRotateMemento>();
+            _mesh         = mesh         ?? throw new ArgumentNullException(nameof(mesh));
+            _doRotation   = doRotation;
+            _undoRotation = undoRotation;
         }
 
         public void Execute()
         {
-            _mesh.Rotate(_rotation);
-
-            // Store the undo rotation matrix
-            Quaternion undoRotationMatrix = _rotation.Inverted();
-            _rotatedMeshes.Push(new MeshRotateMemento(_mesh, undoRotationMatrix));
+            if (_firstExecute)
+            {
+                // Rotation was already applied live during the drag — skip.
+                _firstExecute = false;
+                return;
+            }
+            // Redo path: re-apply the forward rotation.
+            _mesh.Rotate(_doRotation);
         }
 
         public void Undo()
         {
-            if (_rotatedMeshes.Count > 0)
-            {
-                // Retrieve the last rotation operation
-                MeshRotateMemento rotatedMeshMemento = _rotatedMeshes.Pop();
-
-                // Undo the rotation
-                rotatedMeshMemento.Mesh.Rotate(rotatedMeshMemento.UndoRotationMatrix);
-            }
-            else
-            {
-                throw new InvalidOperationException("No rotations to undo.");
-            }
-        }
-    }
-
-    public class MeshRotateMemento
-    {
-        public IAppMesh Mesh { get; }
-        public Quaternion UndoRotationMatrix { get; }
-
-        public MeshRotateMemento(IAppMesh mesh, Quaternion undoRotationMatrix)
-        {
-            Mesh = mesh ?? throw new ArgumentNullException(nameof(mesh));
-            UndoRotationMatrix = undoRotationMatrix;
+            _firstExecute = false;   // after an undo, next Execute() is always a redo
+            _mesh.Rotate(_undoRotation);
         }
     }
 }

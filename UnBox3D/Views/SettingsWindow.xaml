@@ -1,179 +1,235 @@
-﻿<Window x:Class="UnBox3D.Views.SettingsWindow"
+<Window x:Class="UnBox3D.Views.SettingsWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:local="clr-namespace:UnBox3D.Views"
-        mc:Ignorable="d"
-        Title="UnBox3D Settings" Height="450" Width="800"
-        ResizeMode="NoResize">
+        Title="UnBox3D — Settings"
+        Height="620" Width="780"
+        MinHeight="500" MinWidth="600"
+        ResizeMode="CanResize"
+        WindowStartupLocation="CenterOwner"
+        TextOptions.TextFormattingMode="Ideal"
+        TextOptions.TextRenderingMode="ClearType">
 
-    <ScrollViewer VerticalScrollBarVisibility="Auto" ClipToBounds="True">
-        <StackPanel CanVerticallyScroll="True" ClipToBounds="True">
-            <DockPanel>
-                <Menu>
-                    <Button Content="← Back" DockPanel.Dock="Top" Click="BackButton_Click"/>
-                </Menu>
-            </DockPanel>
-            <!-- TODO: add stacked forms for setting groups. However, responsive UI elements don't exist in our XAML schema. -->
-            <Grid x:Name="AppGroup">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                </Grid.RowDefinitions>
+    <DockPanel Background="{DynamicResource SurfaceBrush}">
+
+        <!-- Top bar -->
+        <Border DockPanel.Dock="Top"
+                Background="{DynamicResource NavBrush}"
+                BorderBrush="{DynamicResource BorderBrushLight}"
+                BorderThickness="0,0,0,1"
+                Padding="16,11">
+            <Grid>
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="266.67"/>
-                    <ColumnDefinition Width="266.67"/>
-                    <ColumnDefinition Width="266.66"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
-                <Label Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="3" HorizontalContentAlignment="Center" FontSize="20" FontWeight="Bold">General</Label>
-                <Label Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="1" HorizontalContentAlignment="Center" FontSize="16">Splash Screen Duration (s)</Label>
-                <TextBox x:Name="splash_screen_opt" Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="1" BorderThickness="2" Text="5" VerticalContentAlignment="Center" TextChanged="TextBox_InputChanged"></TextBox>
-                <Label Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="1" HorizontalContentAlignment="Center" FontSize="16">Export Directory</Label>
-                <TextBox x:Name="export_path_opt" Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="1" BorderThickness="2" Text="C:\\ProgramData\\UnBox3D\\Export" VerticalContentAlignment="Center" TextChanged="TextBox_PathChanged"></TextBox>
+                <Button Grid.Column="0"
+                        Content="← Back"
+                        Click="BackButton_Click"
+                        Padding="12,5"
+                        FontSize="12"/>
+                <StackPanel Grid.Column="1" Orientation="Horizontal"
+                            HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <Border Width="3" CornerRadius="1.5"
+                            Background="{DynamicResource HighlightBrush}"
+                            Margin="0,0,9,0"/>
+                    <TextBlock Text="Settings"
+                               FontFamily="Segoe UI"
+                               FontSize="15" FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextBrush}"/>
+                </StackPanel>
             </Grid>
-            <!-- Assimp settings -->
-            <Grid x:Name="AssimpGroup">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                </Grid.RowDefinitions>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="266.67"/>
-                    <ColumnDefinition Width="266.67"/>
-                    <ColumnDefinition Width="266.66"/>
-                </Grid.ColumnDefinitions>
-                <Label HorizontalContentAlignment="Center" FontSize="20" FontWeight="Bold" Grid.ColumnSpan="3">Assimp</Label>
-                <Label Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="1" HorizontalContentAlignment="Center" FontSize="16">Triangulation</Label>
-                <CheckBox x:Name="triangulation_opt" Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="1" BorderThickness="2" IsChecked="True" VerticalContentAlignment="Center" Click="CheckBox_Toggled"/>
-                <Label Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="1" HorizontalContentAlignment="Center" FontSize="16">Join Identical Vertices</Label>
-                <CheckBox x:Name="join_identical_vertices_opt" Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="1" BorderThickness="2" IsChecked="True" VerticalContentAlignment="Center" Click="CheckBox_Toggled"></CheckBox>
-                <Label Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="1" HorizontalContentAlignment="Center" FontSize="16">Component Removal</Label>
-                <CheckBox x:Name="component_removal_opt" Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="1" BorderThickness="2" IsChecked="False" VerticalContentAlignment="Center" Click="CheckBox_Toggled"></CheckBox>
-                <Label Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="1" HorizontalContentAlignment="Center" FontSize="16">Split Large Meshes</Label>
-                <CheckBox x:Name="split_large_meshes_opt" Grid.Row="4" Grid.Column="1" Grid.ColumnSpan="1" BorderThickness="2" IsChecked="True" VerticalContentAlignment="Center" Click="CheckBox_Toggled"></CheckBox>
-                <Label Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="1" HorizontalContentAlignment="Center" FontSize="16">Optimize Meshes</Label>
-                <CheckBox x:Name="optimize_meshes_opt" Grid.Row="5" Grid.Column="1" Grid.ColumnSpan="1" BorderThickness="2" IsChecked="True" VerticalContentAlignment="Center" Click="CheckBox_Toggled"></CheckBox>
-                <Label Grid.Row="6" Grid.Column="0" Grid.ColumnSpan="1" HorizontalContentAlignment="Center" FontSize="16">Find Degenerates</Label>
-                <CheckBox x:Name="find_degens_opt" Grid.Row="6" Grid.Column="1" Grid.ColumnSpan="1" BorderThickness="2" IsChecked="True" VerticalContentAlignment="Center" Click="CheckBox_Toggled"></CheckBox>
-                <Label Grid.Row="7" Grid.Column="0" Grid.ColumnSpan="1" HorizontalContentAlignment="Center" FontSize="16">Find Invalid Data</Label>
-                <CheckBox x:Name="find_invalid_data_opt" Grid.Row="7" Grid.Column="1" Grid.ColumnSpan="1" BorderThickness="2" IsChecked="True" VerticalContentAlignment="Center" Click="CheckBox_Toggled"></CheckBox>
-                <Label Grid.Row="8" Grid.Column="0" Grid.ColumnSpan="1" HorizontalContentAlignment="Center" FontSize="16">Ignore Invalid Data</Label>
-                <CheckBox x:Name="ignore_invalid_data_opt" Grid.Row="8" Grid.Column="1" Grid.ColumnSpan="1" BorderThickness="2" IsChecked="False" VerticalContentAlignment="Center" Click="CheckBox_Toggled"></CheckBox>
-            </Grid>
-            <!-- Rendering settings-->
-            <Grid x:Name="RenderingGroup">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                </Grid.RowDefinitions>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="266.67"/>
-                    <ColumnDefinition Width="266.67"/>
-                    <ColumnDefinition Width="266.66"/>
-                </Grid.ColumnDefinitions>
-                <Label HorizontalContentAlignment="Center" FontSize="20" FontWeight="Bold" Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="3">Rendering</Label>
-                <Label Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="1" HorizontalContentAlignment="Center" FontSize="16">Background Color</Label>
-                <TextBox x:Name="background_color_opt" Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="1" BorderThickness="2" Text="lightgrey" VerticalContentAlignment="Center"  TextChanged="TextBox_InputChanged"></TextBox>
-                <Label Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="1" HorizontalContentAlignment="Center" FontSize="16">Mesh Color</Label>
-                <TextBox x:Name="mesh_color_opt" Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="1" BorderThickness="2" Text="red" VerticalContentAlignment="Center"  TextChanged="TextBox_InputChanged"></TextBox>
-                <Label Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="1" HorizontalContentAlignment="Center" FontSize="16">Mesh Highlight Color</Label>
-                <TextBox x:Name="mesh_highlight_color_opt" Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="1" BorderThickness="2" Text="cyan" VerticalContentAlignment="Center"  TextChanged="TextBox_InputChanged"></TextBox>
-                <Label Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="1" HorizontalContentAlignment="Center" FontSize="16">Render Mode</Label>
-                <TextBox x:Name="render_mode_opt" Grid.Row="4" Grid.Column="1" Grid.ColumnSpan="1" BorderThickness="2" Text="wireframe" VerticalContentAlignment="Center"  TextChanged="TextBox_InputChanged"></TextBox>
-                <Label Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="1" HorizontalContentAlignment="Center" FontSize="16">Shading Model</Label>
-                <TextBox x:Name="shading_model_opt" Grid.Row="5" Grid.Column="1" Grid.ColumnSpan="1" BorderThickness="2" Text="smooth" VerticalContentAlignment="Center"  TextChanged="TextBox_InputChanged"></TextBox>
-                <Label Grid.Row="6" Grid.Column="0" Grid.ColumnSpan="1" HorizontalContentAlignment="Center" FontSize="16">Enable Lighting</Label>
-                <CheckBox x:Name="enable_lighting_opt" Grid.Row="6" Grid.Column="1" Grid.ColumnSpan="1" BorderThickness="2" IsChecked="True" VerticalContentAlignment="Center" Click="CheckBox_Toggled"></CheckBox>
-                <Label Grid.Row="7" Grid.Column="0" Grid.ColumnSpan="1" HorizontalContentAlignment="Center" FontSize="16">Enable Shadows</Label>
-                <CheckBox x:Name="enable_shadows_opt" Grid.Row="7" Grid.Column="1" Grid.ColumnSpan="1" BorderThickness="2" IsChecked="False" VerticalContentAlignment="Center" Click="CheckBox_Toggled"></CheckBox>
-            </Grid>
-            <!-- UI settings -->
-            <Grid x:Name="UIGroup">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                </Grid.RowDefinitions>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="266.67"/>
-                    <ColumnDefinition Width="266.67"/>
-                    <ColumnDefinition Width="266.66"/>
-                </Grid.ColumnDefinitions>
-                <Label HorizontalContentAlignment="Center" FontSize="20" FontWeight="Bold" Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="3">User Interface</Label>
-                <Label Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="1" HorizontalContentAlignment="Center" FontSize="16">Tool Strip Position</Label>
-                <TextBox x:Name="tool_strip_position_opt" Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="1" BorderThickness="2" Text="top" VerticalContentAlignment="Center" TextChanged="TextBox_InputChanged"></TextBox>
-                <Label Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="1" HorizontalContentAlignment="Center" FontSize="16">Camera Yaw Sensitivity</Label>
-                <TextBox x:Name="camera_yaw_factor_opt" Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="1" BorderThickness="2" Text="0.2" VerticalContentAlignment="Center" TextChanged="TextBox_InputChanged"></TextBox>
-                <Label Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="1" HorizontalContentAlignment="Center" FontSize="16">Camera Pitch Sensitivity</Label>
-                <TextBox x:Name="camera_pitch_factor_opt" Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="1" BorderThickness="2" Text="0.2" VerticalContentAlignment="Center" TextChanged="TextBox_InputChanged"></TextBox>
-                <Label Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="1" HorizontalContentAlignment="Center" FontSize="16">Camera Pan Sensitivity</Label>
-                <TextBox x:Name="camera_pan_factor_opt" Grid.Row="4" Grid.Column="1" Grid.ColumnSpan="1" BorderThickness="2" Text="10.0" VerticalContentAlignment="Center" TextChanged="TextBox_InputChanged"></TextBox>
-                <Label Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="1" HorizontalContentAlignment="Center" FontSize="16">Mesh Rotate Sensitivity</Label>
-                <TextBox x:Name="mesh_rotate_factor_opt" Grid.Row="5" Grid.Column="1" Grid.ColumnSpan="1" BorderThickness="2" Text="0.2" VerticalContentAlignment="Center" TextChanged="TextBox_InputChanged"></TextBox>
-                <Label Grid.Row="6" Grid.Column="0" Grid.ColumnSpan="1" HorizontalContentAlignment="Center" FontSize="16">Mesh Move Sensitivity</Label>
-                <TextBox x:Name="mesh_move_factor_opt" Grid.Row="6" Grid.Column="1" Grid.ColumnSpan="1" BorderThickness="2" Text="0.2" VerticalContentAlignment="Center" TextChanged="TextBox_InputChanged"></TextBox>
-                <Label Grid.Row="7" Grid.Column="0" Grid.ColumnSpan="1" HorizontalContentAlignment="Center" FontSize="16">Zoom Sensitivity</Label>
-                <TextBox x:Name="zoom_factor_opt" Grid.Row="7" Grid.Column="1" Grid.ColumnSpan="1" BorderThickness="2" Text="1.0" VerticalContentAlignment="Center" TextChanged="TextBox_InputChanged"></TextBox>
-            </Grid>
-            <!--Units settings -->
-            <Grid x:Name="UnitsGroup">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                </Grid.RowDefinitions>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="266.67"/>
-                    <ColumnDefinition Width="266.67"/>
-                    <ColumnDefinition Width="266.66"/>
-                </Grid.ColumnDefinitions>
-                <Label HorizontalContentAlignment="Center" FontSize="20" FontWeight="Bold" Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="3">Measurement Units</Label>
-                <Label Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="1" HorizontalContentAlignment="Center" FontSize="16">Default Unit</Label>
-                <TextBox x:Name="default_unit_opt" Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="1" BorderThickness="2" Text="Feet" VerticalContentAlignment="Center"  TextChanged="TextBox_InputChanged"></TextBox>
-                <Label Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="1" HorizontalContentAlignment="Center" FontSize="16">Use Metric System</Label>
-                <CheckBox x:Name="enable_metric_system_opt" Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="1" BorderThickness="2" IsChecked="False" VerticalContentAlignment="Center" Click="CheckBox_Toggled"></CheckBox>
-            </Grid>
-            <!-- Window settings -->
-            <Grid x:Name="WindowGroup">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="Auto"/>
-                </Grid.RowDefinitions>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="266.67"/>
-                    <ColumnDefinition Width="266.67"/>
-                    <ColumnDefinition Width="266.66"/>
-                </Grid.ColumnDefinitions>
-                <Label HorizontalContentAlignment="Center" FontSize="20" FontWeight="Bold" Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="3">Window Sizing</Label>
-                <Label Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="1" HorizontalContentAlignment="Center" FontSize="16">Enable Fullscreen</Label>
-                <CheckBox x:Name="fullscreen_opt" Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="1" BorderThickness="2" IsChecked="False" VerticalContentAlignment="Center" Click="CheckBox_Toggled"></CheckBox>
-                <Label Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="1" HorizontalContentAlignment="Center" FontSize="16">Default Height</Label>
-                <TextBox x:Name="default_window_height_opt" Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="1" BorderThickness="2" Text="720" VerticalContentAlignment="Center" TextChanged="TextBox_InputChanged"></TextBox>
-                <Label Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="1" HorizontalContentAlignment="Center" FontSize="16">Default Width</Label>
-                <TextBox x:Name="default_window_width_opt" Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="1" BorderThickness="2" Text="1280" VerticalContentAlignment="Center" TextChanged="TextBox_InputChanged"></TextBox>
-            </Grid>
-        </StackPanel>
-    </ScrollViewer>
+        </Border>
+
+        <!-- Content -->
+        <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="20,16">
+            <StackPanel>
+
+                <!-- ═══ GENERAL ═══ -->
+                <TextBlock Text="GENERAL" Style="{StaticResource SectionLabelStyle}"/>
+                <Border Style="{StaticResource CardBorderStyle}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="180"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Grid.Row="0" Grid.Column="0"
+                                   Text="Splash Screen Duration (s)"
+                                   VerticalAlignment="Center" Margin="0,0,0,10"/>
+                        <TextBox Grid.Row="0" Grid.Column="1"
+                                 x:Name="splash_screen_opt"
+                                 Text="5"
+                                 Margin="0,0,0,10"
+                                 TextChanged="TextBox_InputChanged"/>
+
+                        <TextBlock Grid.Row="1" Grid.Column="0"
+                                   Text="Export Directory"
+                                   VerticalAlignment="Center"/>
+                        <TextBox Grid.Row="1" Grid.Column="1"
+                                 x:Name="export_path_opt"
+                                 Text="C:\\ProgramData\\UnBox3D\\Export"
+                                 TextChanged="TextBox_PathChanged"/>
+                    </Grid>
+                </Border>
+
+                <!-- ═══ ASSIMP ═══ -->
+                <TextBlock Text="ASSIMP IMPORT" Style="{StaticResource SectionLabelStyle}" Margin="0,6,0,7"/>
+                <Border Style="{StaticResource CardBorderStyle}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="180"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="36"/>
+                            <RowDefinition Height="36"/>
+                            <RowDefinition Height="36"/>
+                            <RowDefinition Height="36"/>
+                            <RowDefinition Height="36"/>
+                            <RowDefinition Height="36"/>
+                            <RowDefinition Height="36"/>
+                            <RowDefinition Height="36"/>
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Triangulation"                 VerticalAlignment="Center"/>
+                        <CheckBox  Grid.Row="0" Grid.Column="1" x:Name="triangulation_opt"           IsChecked="True"  VerticalAlignment="Center" Click="CheckBox_Toggled"/>
+                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Join Identical Vertices"       VerticalAlignment="Center"/>
+                        <CheckBox  Grid.Row="1" Grid.Column="1" x:Name="join_identical_vertices_opt" IsChecked="True"  VerticalAlignment="Center" Click="CheckBox_Toggled"/>
+                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Component Removal"             VerticalAlignment="Center"/>
+                        <CheckBox  Grid.Row="2" Grid.Column="1" x:Name="component_removal_opt"       IsChecked="False" VerticalAlignment="Center" Click="CheckBox_Toggled"/>
+                        <TextBlock Grid.Row="3" Grid.Column="0" Text="Split Large Meshes"            VerticalAlignment="Center"/>
+                        <CheckBox  Grid.Row="3" Grid.Column="1" x:Name="split_large_meshes_opt"      IsChecked="True"  VerticalAlignment="Center" Click="CheckBox_Toggled"/>
+                        <TextBlock Grid.Row="4" Grid.Column="0" Text="Optimize Meshes"               VerticalAlignment="Center"/>
+                        <CheckBox  Grid.Row="4" Grid.Column="1" x:Name="optimize_meshes_opt"         IsChecked="True"  VerticalAlignment="Center" Click="CheckBox_Toggled"/>
+                        <TextBlock Grid.Row="5" Grid.Column="0" Text="Find Degenerates"              VerticalAlignment="Center"/>
+                        <CheckBox  Grid.Row="5" Grid.Column="1" x:Name="find_degens_opt"             IsChecked="True"  VerticalAlignment="Center" Click="CheckBox_Toggled"/>
+                        <TextBlock Grid.Row="6" Grid.Column="0" Text="Find Invalid Data"             VerticalAlignment="Center"/>
+                        <CheckBox  Grid.Row="6" Grid.Column="1" x:Name="find_invalid_data_opt"       IsChecked="True"  VerticalAlignment="Center" Click="CheckBox_Toggled"/>
+                        <TextBlock Grid.Row="7" Grid.Column="0" Text="Ignore Invalid Data"           VerticalAlignment="Center"/>
+                        <CheckBox  Grid.Row="7" Grid.Column="1" x:Name="ignore_invalid_data_opt"     IsChecked="False" VerticalAlignment="Center" Click="CheckBox_Toggled"/>
+                    </Grid>
+                </Border>
+
+                <!-- ═══ RENDERING ═══ -->
+                <TextBlock Text="RENDERING" Style="{StaticResource SectionLabelStyle}" Margin="0,6,0,7"/>
+                <Border Style="{StaticResource CardBorderStyle}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="180"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="36"/>
+                            <RowDefinition Height="36"/>
+                            <RowDefinition Height="36"/>
+                            <RowDefinition Height="36"/>
+                            <RowDefinition Height="36"/>
+                            <RowDefinition Height="36"/>
+                            <RowDefinition Height="36"/>
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Background Color"  VerticalAlignment="Center"/>
+                        <TextBox   Grid.Row="0" Grid.Column="1" x:Name="background_color_opt"     Text="lightgrey"  TextChanged="TextBox_InputChanged"/>
+                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Mesh Color"                 VerticalAlignment="Center" Margin="0,6,0,0"/>
+                        <TextBox   Grid.Row="1" Grid.Column="1" x:Name="mesh_color_opt"            Text="red"        TextChanged="TextBox_InputChanged" Margin="0,6,0,0"/>
+                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Mesh Highlight Color"        VerticalAlignment="Center" Margin="0,6,0,0"/>
+                        <TextBox   Grid.Row="2" Grid.Column="1" x:Name="mesh_highlight_color_opt"  Text="cyan"       TextChanged="TextBox_InputChanged" Margin="0,6,0,0"/>
+                        <TextBlock Grid.Row="3" Grid.Column="0" Text="Render Mode"                 VerticalAlignment="Center" Margin="0,6,0,0"/>
+                        <TextBox   Grid.Row="3" Grid.Column="1" x:Name="render_mode_opt"           Text="wireframe"  TextChanged="TextBox_InputChanged" Margin="0,6,0,0"/>
+                        <TextBlock Grid.Row="4" Grid.Column="0" Text="Shading Model"               VerticalAlignment="Center" Margin="0,6,0,0"/>
+                        <TextBox   Grid.Row="4" Grid.Column="1" x:Name="shading_model_opt"         Text="smooth"     TextChanged="TextBox_InputChanged" Margin="0,6,0,0"/>
+                        <TextBlock Grid.Row="5" Grid.Column="0" Text="Enable Lighting"             VerticalAlignment="Center" Margin="0,6,0,0"/>
+                        <CheckBox  Grid.Row="5" Grid.Column="1" x:Name="enable_lighting_opt"       IsChecked="True"  VerticalAlignment="Center" Click="CheckBox_Toggled" Margin="0,6,0,0"/>
+                        <TextBlock Grid.Row="6" Grid.Column="0" Text="Enable Shadows"              VerticalAlignment="Center" Margin="0,6,0,0"/>
+                        <CheckBox  Grid.Row="6" Grid.Column="1" x:Name="enable_shadows_opt"        IsChecked="False" VerticalAlignment="Center" Click="CheckBox_Toggled" Margin="0,6,0,0"/>
+                    </Grid>
+                </Border>
+
+                <!-- ═══ UI ═══ -->
+                <TextBlock Text="USER INTERFACE" Style="{StaticResource SectionLabelStyle}" Margin="0,6,0,7"/>
+                <Border Style="{StaticResource CardBorderStyle}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="180"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="36"/>
+                            <RowDefinition Height="36"/>
+                            <RowDefinition Height="36"/>
+                            <RowDefinition Height="36"/>
+                            <RowDefinition Height="36"/>
+                            <RowDefinition Height="36"/>
+                            <RowDefinition Height="36"/>
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Tool Strip Position"   VerticalAlignment="Center"/>
+                        <TextBox   Grid.Row="0" Grid.Column="1" x:Name="tool_strip_position_opt"  Text="top"  TextChanged="TextBox_InputChanged"/>
+                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Camera Yaw Sensitivity"     VerticalAlignment="Center" Margin="0,6,0,0"/>
+                        <TextBox   Grid.Row="1" Grid.Column="1" x:Name="camera_yaw_factor_opt"    Text="0.2"  TextChanged="TextBox_InputChanged" Margin="0,6,0,0"/>
+                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Camera Pitch Sensitivity"   VerticalAlignment="Center" Margin="0,6,0,0"/>
+                        <TextBox   Grid.Row="2" Grid.Column="1" x:Name="camera_pitch_factor_opt"  Text="0.2"  TextChanged="TextBox_InputChanged" Margin="0,6,0,0"/>
+                        <TextBlock Grid.Row="3" Grid.Column="0" Text="Camera Pan Sensitivity"     VerticalAlignment="Center" Margin="0,6,0,0"/>
+                        <TextBox   Grid.Row="3" Grid.Column="1" x:Name="camera_pan_factor_opt"    Text="10.0" TextChanged="TextBox_InputChanged" Margin="0,6,0,0"/>
+                        <TextBlock Grid.Row="4" Grid.Column="0" Text="Mesh Rotate Sensitivity"    VerticalAlignment="Center" Margin="0,6,0,0"/>
+                        <TextBox   Grid.Row="4" Grid.Column="1" x:Name="mesh_rotate_factor_opt"   Text="0.2"  TextChanged="TextBox_InputChanged" Margin="0,6,0,0"/>
+                        <TextBlock Grid.Row="5" Grid.Column="0" Text="Mesh Move Sensitivity"      VerticalAlignment="Center" Margin="0,6,0,0"/>
+                        <TextBox   Grid.Row="5" Grid.Column="1" x:Name="mesh_move_factor_opt"     Text="0.2"  TextChanged="TextBox_InputChanged" Margin="0,6,0,0"/>
+                        <TextBlock Grid.Row="6" Grid.Column="0" Text="Zoom Sensitivity"           VerticalAlignment="Center" Margin="0,6,0,0"/>
+                        <TextBox   Grid.Row="6" Grid.Column="1" x:Name="zoom_factor_opt"          Text="1.0"  TextChanged="TextBox_InputChanged" Margin="0,6,0,0"/>
+                    </Grid>
+                </Border>
+
+                <!-- ═══ UNITS ═══ -->
+                <TextBlock Text="MEASUREMENT UNITS" Style="{StaticResource SectionLabelStyle}" Margin="0,6,0,7"/>
+                <Border Style="{StaticResource CardBorderStyle}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="180"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="36"/>
+                            <RowDefinition Height="36"/>
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Default Unit"          VerticalAlignment="Center"/>
+                        <TextBox   Grid.Row="0" Grid.Column="1" x:Name="default_unit_opt"    Text="Feet"  TextChanged="TextBox_InputChanged"/>
+                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Use Metric System"     VerticalAlignment="Center" Margin="0,6,0,0"/>
+                        <CheckBox  Grid.Row="1" Grid.Column="1" x:Name="enable_metric_system_opt" IsChecked="False" VerticalAlignment="Center" Click="CheckBox_Toggled" Margin="0,6,0,0"/>
+                    </Grid>
+                </Border>
+
+                <!-- ═══ WINDOW ═══ -->
+                <TextBlock Text="WINDOW SIZING" Style="{StaticResource SectionLabelStyle}" Margin="0,6,0,7"/>
+                <Border Style="{StaticResource CardBorderStyle}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="180"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="36"/>
+                            <RowDefinition Height="36"/>
+                            <RowDefinition Height="36"/>
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Enable Fullscreen"     VerticalAlignment="Center"/>
+                        <CheckBox  Grid.Row="0" Grid.Column="1" x:Name="fullscreen_opt"      IsChecked="False" VerticalAlignment="Center" Click="CheckBox_Toggled"/>
+                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Default Height"        VerticalAlignment="Center" Margin="0,6,0,0"/>
+                        <TextBox   Grid.Row="1" Grid.Column="1" x:Name="default_window_height_opt" Text="720" TextChanged="TextBox_InputChanged" Margin="0,6,0,0"/>
+                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Default Width"         VerticalAlignment="Center" Margin="0,6,0,0"/>
+                        <TextBox   Grid.Row="2" Grid.Column="1" x:Name="default_window_width_opt"  Text="1280" TextChanged="TextBox_InputChanged" Margin="0,6,0,0"/>
+                    </Grid>
+                </Border>
+
+                <!-- bottom padding -->
+                <Border Height="20"/>
+            </StackPanel>
+        </ScrollViewer>
+    </DockPanel>
 </Window>

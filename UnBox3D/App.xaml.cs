@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using OpenTK.Mathematics;
+using System;
 using System.IO;
 using System.Windows;
 using UnBox3D.Controls;
@@ -24,16 +25,63 @@ namespace UnBox3D
         {
             base.OnStartup(e);
 
+            // ── Global exception traps ──────────────────────────────────────
+            // Write every unhandled exception to %TEMP%\UnBox3D_crash.txt AND
+            // show a MessageBox so the app never silently exits with code 0.
+            DispatcherUnhandledException += (_, ex) =>
+            {
+                WriteCrashLog(ex.Exception);
+                System.Windows.MessageBox.Show(
+                $"Unhandled UI exception:\n\n{ex.Exception.GetType().Name}: {ex.Exception.Message}" +
+                $"\n\n{ex.Exception.InnerException?.Message}" +
+                $"\n\nDetails written to:\n{CrashLogPath}",
+                "UnBox3D — Crash", System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Error);
+                ex.Handled = true;
+                Shutdown(1);
+            };
+            AppDomain.CurrentDomain.UnhandledException += (_, ex) =>
+            {
+                if (ex.ExceptionObject is Exception e2) WriteCrashLog(e2);
+            };
+            // ───────────────────────────────────────────────────────────────
+
             // Configure the service provider (Dependency Injection container)
             _serviceProvider = ConfigureServices();
 
-            // Apply theme early and open the main menu first
             var themeManager = _serviceProvider.GetRequiredService<IThemeManager>();
             themeManager.ApplySavedTheme(false);
 
-            var menu = _serviceProvider.GetRequiredService<MainMenuWindow>();
-            Current.MainWindow = menu;
-            menu.Show();
+            var splash = new SplashWindow();
+            splash.Show();
+
+            var timer = new System.Windows.Threading.DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(1700)
+            };
+            timer.Tick += (s, args) =>
+            {
+                timer.Stop();
+                try
+                {
+                    var menu = _serviceProvider.GetRequiredService<MainMenuWindow>();
+                    Current.MainWindow = menu;
+                    menu.Show();      // open menu BEFORE closing splash
+                    splash.Close();   // now safe — a window is already open
+                }
+                catch (Exception ex)
+                {
+                    // Keep splash alive so the app doesn't exit with no windows,
+                    // then show the real error before shutting down cleanly.
+                    System.Windows.MessageBox.Show(
+                        $"Startup failed:\n\n{ex.GetType().Name}: {ex.Message}\n\n{ex.InnerException?.Message}",
+                        "UnBox3D — Startup Error",
+                        System.Windows.MessageBoxButton.OK,
+                        System.Windows.MessageBoxImage.Error);
+                    splash.Close();
+                    Shutdown(1);
+                }
+            };
+            timer.Start();
         }
 
         private ServiceProvider ConfigureServices()
@@ -139,6 +187,34 @@ namespace UnBox3D
             services.AddSingleton<BlenderIntegration>();
 
             return services.BuildServiceProvider();
+        }
+
+        private static readonly string CrashLogPath =
+            System.IO.Path.Combine(System.IO.Path.GetTempPath(), "UnBox3D_crash.txt");
+
+        private static void WriteCrashLog(Exception ex)
+        {
+            try
+            {
+                var sb = new System.Text.StringBuilder();
+                sb.AppendLine($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] UnBox3D crash");
+                sb.AppendLine();
+                var current = ex;
+                int depth = 0;
+                while (current != null && depth < 6)
+                {
+                    sb.AppendLine($"--- Exception (depth {depth}) ---");
+                    sb.AppendLine($"Type   : {current.GetType().FullName}");
+                    sb.AppendLine($"Message: {current.Message}");
+                    sb.AppendLine($"Stack  :");
+                    sb.AppendLine(current.StackTrace);
+                    sb.AppendLine();
+                    current = current.InnerException;
+                    depth++;
+                }
+                System.IO.File.WriteAllText(CrashLogPath, sb.ToString());
+            }
+            catch { /* never let logging crash the crash handler */ }
         }
 
         protected override void OnExit(ExitEventArgs e)

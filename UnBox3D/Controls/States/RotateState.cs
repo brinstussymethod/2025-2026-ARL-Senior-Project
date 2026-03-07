@@ -47,7 +47,10 @@ namespace UnBox3D.Controls.States
         public void OnMouseDown(MouseEventArgs e)
         {
             _lastMousePosition = Control.MousePosition;
-            _accumulatedAngle = 0;
+            _accumulatedAngle  = 0;
+
+            // Default axis: world Y (vertical spin).  Dragging left/right rotates around Y.
+            _rotationAxis = new Quaternion(0f, 1f, 0f, 0f); // .Xyz = (0,1,0)
 
             Vector3 rayWorld = _rayCaster.GetRay();
             Vector3 rayOrigin = _camera.Position;
@@ -55,45 +58,49 @@ namespace UnBox3D.Controls.States
             if (_rayCaster.RayIntersectsMesh(_sceneManager.GetMeshes(), rayOrigin, rayWorld, out float _, out IAppMesh clickedMesh))
             {
                 _selectedMesh = clickedMesh;
+                _isRotating   = true;   // FIX: was never set — rotation never fired
                 _controlHost.Invalidate();
             }
-
-            // Future implementation: Check for gizmo interaction
-            // if (CheckGizmoInteraction(rayOrigin, rayWorld, out Vector3 axis))
-            // {
-            //     _rotationAxis = Quaternion.FromAxisAngle(axis.Normalized(), 1.0f);
-            //     _isRotating = true;
-            // }
         }
 
         public void OnMouseMove(MouseEventArgs e)
         {
-            if (_isRotating && _selectedMesh != null)
+            if (!_isRotating || _selectedMesh == null) return;
+
+            Point   currentMousePosition = Control.MousePosition;
+            Vector2 delta = new Vector2(
+                currentMousePosition.X - _lastMousePosition.X,
+                currentMousePosition.Y - _lastMousePosition.Y);
+
+            // Use signed X-delta so dragging left/right has the correct direction.
+            float angle = delta.X * _rotationSensitivity;
+            if (Math.Abs(angle) > 0.001f)
             {
-                Point currentMousePosition = Control.MousePosition;
-                Vector2 delta = new Vector2(currentMousePosition.X - _lastMousePosition.X, currentMousePosition.Y - _lastMousePosition.Y);
-
-                float angle = delta.Length * _rotationSensitivity;
-                if (angle > 0)
-                {
-                    Vector3 axis = _rotationAxis.Xyz.Normalized();
-                    _rotationAxis = Quaternion.FromAxisAngle(axis, angle);
-                }
-
+                Vector3   axis   = _rotationAxis.Xyz.Normalized();
+                Quaternion q     = Quaternion.FromAxisAngle(axis, MathHelper.DegreesToRadians(angle));
+                _selectedMesh.Rotate(q);     // live visual feedback
                 _accumulatedAngle += angle;
-                _lastMousePosition = currentMousePosition;
-
-                _controlHost.Invalidate();
             }
+
+            _lastMousePosition = currentMousePosition;
+            _controlHost.Invalidate();
         }
 
         public void OnMouseUp(MouseEventArgs e)
         {
-            if (_isRotating && _selectedMesh != null && _accumulatedAngle != 0)
+            if (_isRotating && _selectedMesh != null && Math.Abs(_accumulatedAngle) > 0.001f)
             {
-                var rotateCommand = new RotateCommand(_selectedMesh, _rotationAxis, _accumulatedAngle);
+                // Rotation was already applied live in OnMouseMove.
+                // Store BOTH directions so Undo reverses and Redo re-applies correctly.
+                Vector3 axis = _rotationAxis.Xyz.Normalized();
+                float   rad  = MathHelper.DegreesToRadians(_accumulatedAngle);
+
+                var doRotation   = Quaternion.FromAxisAngle(axis,  rad);
+                var undoRotation = Quaternion.FromAxisAngle(axis, -rad);
+
+                var rotateCommand = new RotateCommand(_selectedMesh, doRotation, undoRotation);
                 _commandHistory.PushCommand(rotateCommand);
-                rotateCommand.Execute();
+                // Do NOT call Execute() here — rotation is already on the mesh from OnMouseMove.
             }
 
             ResetRotationState();

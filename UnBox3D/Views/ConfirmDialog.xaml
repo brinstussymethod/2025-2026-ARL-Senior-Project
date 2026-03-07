@@ -1,0 +1,97 @@
+<Window x:Class="UnBox3D.Views.ConfirmDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="UnBox3D"
+        SizeToContent="WidthAndHeight"
+        MinWidth="360" MaxWidth="520"
+        ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False"
+        TextOptions.TextFormattingMode="Ideal"
+        TextOptions.TextRenderingMode="ClearType"
+        Background="{DynamicResource SurfaceBrush}"
+        Icon="pack://application:,,,/Assets/Icons/logo.ico">
+
+    <DockPanel>
+
+        <!-- Top accent strip — amber for warning, teal for info -->
+        <Border x:Name="AccentStrip" DockPanel.Dock="Top" Height="3"
+                Background="{DynamicResource HighlightBrush}"/>
+
+        <!-- Bottom action bar -->
+        <Border DockPanel.Dock="Bottom"
+                Background="{DynamicResource NavBrush}"
+                BorderBrush="{DynamicResource BorderBrushLight}"
+                BorderThickness="0,1,0,0"
+                Padding="20,12">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <!-- Confirm (Yes) -->
+                <Button x:Name="BtnConfirm"
+                        Width="90" Margin="0,0,8,0"
+                        IsDefault="True"
+                        Click="Confirm_Click">
+                    <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                            <Setter Property="Background"  Value="{DynamicResource DangerActiveBrush}"/>
+                            <Setter Property="BorderBrush" Value="{DynamicResource DangerBrush}"/>
+                            <Setter Property="Foreground"  Value="{DynamicResource DangerBrush}"/>
+                            <Setter Property="FontWeight"  Value="SemiBold"/>
+                        </Style>
+                    </Button.Style>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock x:Name="ConfirmIcon" Text="✓" FontSize="13"
+                                   Margin="0,0,6,0" VerticalAlignment="Center"/>
+                        <TextBlock x:Name="ConfirmLabel" Text="Yes"
+                                   VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+
+                <!-- Cancel (No) -->
+                <Button Width="90"
+                        IsCancel="True"
+                        Click="Cancel_Click">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="✕" FontSize="12"
+                                   Margin="0,0,6,0" VerticalAlignment="Center"
+                                   Foreground="{DynamicResource AccentBrush}"/>
+                        <TextBlock x:Name="CancelLabel" Text="No"
+                                   VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+        </Border>
+
+        <!-- Body -->
+        <StackPanel Margin="28,24,28,20">
+
+            <!-- Icon + title row -->
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                <Border Width="40" Height="40" CornerRadius="10"
+                        Background="{DynamicResource DangerActiveBrush}"
+                        Margin="0,0,14,0" VerticalAlignment="Center">
+                    <TextBlock x:Name="DialogIcon"
+                               Text="⚠" FontSize="18"
+                               Foreground="{DynamicResource DangerBrush}"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"/>
+                </Border>
+                <TextBlock x:Name="TitleText"
+                           FontFamily="Segoe UI" FontSize="15" FontWeight="SemiBold"
+                           Foreground="{DynamicResource TextBrush}"
+                           VerticalAlignment="Center"
+                           TextWrapping="Wrap"/>
+            </StackPanel>
+
+            <!-- Separator -->
+            <Border Height="1" Background="{DynamicResource BorderBrushLight}"
+                    Margin="0,0,0,14"/>
+
+            <!-- Message -->
+            <TextBlock x:Name="MessageText"
+                       FontSize="13"
+                       Foreground="{DynamicResource AccentBrush}"
+                       TextWrapping="Wrap"
+                       LineHeight="20"/>
+        </StackPanel>
+    </DockPanel>
+</Window>

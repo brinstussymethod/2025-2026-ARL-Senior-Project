@@ -6,14 +6,37 @@ namespace UnBox3D.Controls
     public class KeyboardController
     {
         private readonly ICamera _camera;
+        private System.Windows.Window? _subscribedWindow;
 
         public KeyboardController(ICamera camera)
         {
             _camera = camera ?? throw new ArgumentNullException(nameof(camera));
 
-            // Hook into the application's input events
-            System.Windows.Application.Current.MainWindow.KeyDown += OnKeyDown;
-            System.Windows.Application.Current.MainWindow.KeyUp += OnKeyUp;
+            // Hook into the application's input events on the current MainWindow.
+            // Call ReAttach() whenever a new MainWindow instance takes over.
+            ReAttach(System.Windows.Application.Current.MainWindow);
+        }
+
+        /// <summary>
+        /// Unsubscribes from the old window and re-subscribes to the new one.
+        /// Call this every time a new MainWindow is shown (e.g. after Back to Menu).
+        /// </summary>
+        public void ReAttach(System.Windows.Window? newWindow)
+        {
+            // Detach from old window if any
+            if (_subscribedWindow != null)
+            {
+                _subscribedWindow.KeyDown -= OnKeyDown;
+                _subscribedWindow.KeyUp   -= OnKeyUp;
+            }
+
+            _subscribedWindow = newWindow;
+
+            if (_subscribedWindow != null)
+            {
+                _subscribedWindow.KeyDown += OnKeyDown;
+                _subscribedWindow.KeyUp   += OnKeyUp;
+            }
         }
         /* 
          * OnKeyDoown(Object sender, System.Windows.Input.KeyEventArgs e) 
