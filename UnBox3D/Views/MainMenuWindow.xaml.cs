@@ -23,8 +23,6 @@ namespace UnBox3D.Views
             new InputGestureCollection { new KeyGesture(Key.S, ModifierKeys.Alt) });
         public static readonly RoutedUICommand HelpCommand     = new("Help",     nameof(HelpCommand),     typeof(MainMenuWindow));
         public static readonly RoutedUICommand ExitCommand     = new("Exit",     nameof(ExitCommand),     typeof(MainMenuWindow));
-        // NOTE: Removed ToggleTheme Alt+D binding per request
-
         public MainMenuWindow(IServiceProvider services)
         {
             _services = services ?? throw new ArgumentNullException(nameof(services));
@@ -69,14 +67,13 @@ namespace UnBox3D.Views
 
             Application.Current.MainWindow = main;
             main.Show();
-            _services.GetRequiredService<KeyboardController>(); // Ensure it's created and registered before MainWindow's Loaded event
+            _services.GetRequiredService<KeyboardController>().ReAttach(main);
             Close();
         }
 
         private void Settings_Click(object? sender, RoutedEventArgs e)
         {
             var settings = _services.GetRequiredService<SettingsWindow>();
-            // Ensure the window has its dependencies before Loaded fires
             var logger = _services.GetRequiredService<ILogger>();
             var settingsManager = _services.GetRequiredService<ISettingsManager>();
             settings.Initialize(logger, settingsManager);
@@ -103,7 +100,6 @@ namespace UnBox3D.Views
                 if (!main.IsVisible) main.Show();
                 main.Activate();
 
-                // Pass the path directly
                 main.OpenFromPath(picker.ImportedFilePath);
 
                 Close();
@@ -113,10 +109,9 @@ namespace UnBox3D.Views
 
         private void Help_Click(object? sender, RoutedEventArgs e)
         {
-            //WpfMessageBox.Show("Help (coming soon).", "UnBox3D");
             var helpWindow = new HelpWindow(_services);
-            helpWindow.Show();
-            this.Close();
+            helpWindow.Owner = this;
+            helpWindow.ShowDialog(); // modal — keeps menu alive underneath
         }
 
         private void Exit_Click(object? sender, RoutedEventArgs e) => Application.Current.Shutdown();

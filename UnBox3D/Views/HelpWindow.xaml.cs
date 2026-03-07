@@ -64,22 +64,11 @@ namespace UnBox3D.Views
 
         private void Close_Click(object sender, RoutedEventArgs e) => this.Close();
 
-        private void Back_Click(object sender, RoutedEventArgs e)
-        {
-            var main = new MainMenuWindow(_services);
-            main.Show();
-            this.Close();
-        }
-
         protected override void OnKeyDown(System.Windows.Input.KeyEventArgs e)
         {
             base.OnKeyDown(e);
             if (e.Key == System.Windows.Input.Key.Escape)
-            {
-                var main = new MainMenuWindow(_services);
-                main.Show();
                 this.Close();
-            }
         }
     }
 }

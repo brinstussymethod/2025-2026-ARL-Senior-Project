@@ -26,6 +26,8 @@ namespace UnBox3D.Rendering
         #region Actions
         void SetColor(Vector3 color);
         void Rotate(Quaternion rotation);
+        /// <summary>Translates the mesh by <paramref name="delta"/> in world-space units and re-uploads to the GPU.</summary>
+        void Translate(Vector3 delta);
         #endregion
 
         #region OpenGL Handles
@@ -203,6 +205,40 @@ namespace UnBox3D.Rendering
         {
             _transform = rotation * _transform;
             _transform.Normalize();
+        }
+
+        public void Translate(Vector3 delta)
+        {
+            // 1. Update the geometry3Sharp mesh (math / raycasting source of truth)
+            for (int i = 0; i < _g4Mesh.VertexCount; i++)
+            {
+                var v = _g4Mesh.GetVertex(i);
+                _g4Mesh.SetVertex(i, new g4.Vector3d(v.x + delta.X, v.y + delta.Y, v.z + delta.Z));
+            }
+
+            // 2. Update the float vertex buffer in-place.
+            //    The buffer stores positions with Y/Z swapped relative to world space:
+            //      buf[0] = world X   (unchanged)
+            //      buf[1] = world Z   (render Y)
+            //      buf[2] = world Y   (render Z)
+            int stride = _assimpMesh.HasNormals ? 6 : 3;
+            for (int i = 0; i < _assimpMesh.VertexCount; i++)
+            {
+                int idx = i * stride;
+                _vertices[idx]     += delta.X;
+                _vertices[idx + 1] += delta.Z;  // render Y = world Z
+                _vertices[idx + 2] += delta.Y;  // render Z = world Y
+            }
+
+            // 3. Keep Assimp mesh in sync (used for export).
+            for (int i = 0; i < _assimpMesh.VertexCount; i++)
+            {
+                var v = _assimpMesh.Vertices[i];
+                _assimpMesh.Vertices[i] = new Assimp.Vector3D(v.X + delta.X, v.Y + delta.Y, v.Z + delta.Z);
+            }
+
+            // 4. Re-upload updated buffer to the GPU.
+            SetupMesh();
         }
         #endregion
 

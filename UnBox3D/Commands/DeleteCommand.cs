@@ -1,76 +1,39 @@
-﻿using g4;
 using OpenTK.Mathematics;
 using UnBox3D.Rendering;
 using UnBox3D.Rendering.OpenGL;
-using UnBox3D.Utils;
-
 
 namespace UnBox3D.Commands
-{    public class DeleteCommand : ICommand
+{
+    /// <summary>
+    /// Deletes a specific, pre-identified mesh from the scene.
+    /// The mesh is determined by the caller (DeleteState) via raycasting — NOT inside Execute(),
+    /// so Redo works correctly without needing a mouse click.
+    /// </summary>
+    public class DeleteCommand : ICommand
     {
         private readonly IGLControlHost _glControlHost;
-        private readonly ISceneManager _sceneManager;
-        private readonly ILogger _logger;
-        private readonly IRayCaster _rayCaster;
-        private readonly ICamera _camera;
-        private readonly Stack<MeshDeleteMemento> deletedMeshes;
+        private readonly ISceneManager  _sceneManager;
+        private readonly IAppMesh       _mesh;   // the exact mesh to delete/restore
 
-        public DeleteCommand(IGLControlHost glControlHost, ISceneManager sceneManager, IRayCaster rayCaster, ICamera camera)
+        public DeleteCommand(IGLControlHost glControlHost, ISceneManager sceneManager, IAppMesh mesh)
         {
-            _glControlHost = glControlHost;
-            _sceneManager = sceneManager;
-            this._rayCaster = rayCaster;
-            _camera = camera;
-
-            deletedMeshes = new Stack<MeshDeleteMemento>();
+            _glControlHost = glControlHost  ?? throw new ArgumentNullException(nameof(glControlHost));
+            _sceneManager  = sceneManager   ?? throw new ArgumentNullException(nameof(sceneManager));
+            _mesh          = mesh           ?? throw new ArgumentNullException(nameof(mesh));
         }
 
+        /// <summary>Delete the stored mesh. Safe to call on Redo — no raycasting needed.</summary>
         public void Execute()
         {
-            // Get the world space ray from the MousePicker
-            Vector3 rayWorld = _rayCaster.GetRay();
-            Vector3 rayOrigin = _camera.Position;
-
-            // Check for intersection with the model
-            if (_rayCaster.RayIntersectsMesh(_sceneManager.GetMeshes(), rayOrigin, rayWorld, out float distance, out IAppMesh clickedMesh))
-            {
-                // Set the color for the current mesh
-                MeshDeleteMemento deletedMesh = new MeshDeleteMemento(clickedMesh);
-
-                // Push mesh memento to deleted meshes stack
-                deletedMeshes.Push(deletedMesh);
-
-                _sceneManager.DeleteMesh(clickedMesh);
-
-                _glControlHost.Invalidate(); // Re-render
-            }
+            _sceneManager.DeleteMesh(_mesh);
+            _glControlHost.Invalidate();
         }
 
+        /// <summary>Restore the mesh that was deleted.</summary>
         public void Undo()
         {
-            if (deletedMeshes.Count > 0)
-            {
-                MeshDeleteMemento deletedMeshMemento = deletedMeshes.Pop();
-                IAppMesh MeshToRestore = deletedMeshMemento.Mesh;
-                Vector3 color = deletedMeshMemento.Color;
-                _logger.Info($"Restoring deleted mesh.");
-                _sceneManager.AddMesh(MeshToRestore);
-            }
-            else
-            {
-                _logger.Warn("No deleted meshes to undo.");
-            }
-        }
-    }
-
-    public class MeshDeleteMemento 
-    {
-        public IAppMesh Mesh { get; }
-        public Vector3 Color { get; }
-
-        public MeshDeleteMemento(IAppMesh mesh)
-        {
-            Mesh = mesh;
+            _sceneManager.AddMesh(_mesh);
+            _glControlHost.Invalidate();
         }
     }
 }
