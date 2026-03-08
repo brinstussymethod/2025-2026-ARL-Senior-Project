@@ -28,6 +28,10 @@ namespace UnBox3D.Rendering
         void Rotate(Quaternion rotation);
         /// <summary>Translates the mesh by <paramref name="delta"/> in world-space units and re-uploads to the GPU.</summary>
         void Translate(Vector3 delta);
+        /// <summary>Returns the mesh center in render/GPU coordinate space (computed from the vertex buffer).</summary>
+        Vector3 GetRenderCenter();
+        /// <summary>Returns the half-extents radius of the mesh in render space (largest dimension / 2).</summary>
+        float GetRenderRadius();
         #endregion
 
         #region OpenGL Handles
@@ -192,6 +196,37 @@ namespace UnBox3D.Rendering
         public List<Vector3> GetEdges() => _edges;
         public Quaternion GetTransform() => _transform;
         public int[] GetIndices() => _indices;
+
+        public Vector3 GetRenderCenter()
+        {
+            int stride = _assimpMesh.HasNormals ? 6 : 3;
+            var min = new Vector3(float.MaxValue);
+            var max = new Vector3(float.MinValue);
+            for (int i = 0; i < _assimpMesh.VertexCount; i++)
+            {
+                int idx = i * stride;
+                var v = new Vector3(_vertices[idx], _vertices[idx + 1], _vertices[idx + 2]);
+                min = Vector3.ComponentMin(min, v);
+                max = Vector3.ComponentMax(max, v);
+            }
+            return (min + max) * 0.5f;
+        }
+
+        public float GetRenderRadius()
+        {
+            int stride = _assimpMesh.HasNormals ? 6 : 3;
+            var min = new Vector3(float.MaxValue);
+            var max = new Vector3(float.MinValue);
+            for (int i = 0; i < _assimpMesh.VertexCount; i++)
+            {
+                int idx = i * stride;
+                var v = new Vector3(_vertices[idx], _vertices[idx + 1], _vertices[idx + 2]);
+                min = Vector3.ComponentMin(min, v);
+                max = Vector3.ComponentMax(max, v);
+            }
+            return (max - min).Length * 0.5f;
+        }
+
         #endregion
 
         #region Setters

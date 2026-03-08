@@ -8,9 +8,12 @@ namespace UnBox3D.Rendering
     public class Gizmo
     {
         private Vector3 center = new Vector3();
-        private readonly float radius;
+        private float radius;
         private readonly int numSegments;
         private bool isVisible { get; set; }
+
+        /// <summary>How close (in world units) the ray must pass to the ring edge to count as a hit.</summary>
+        public float HitTolerance { get; set; } = -1f; // negative = auto (25% of radius)
 
         public Gizmo(float radius, int numSegments)
         {
@@ -79,8 +82,9 @@ namespace UnBox3D.Rendering
             // Calculate the distance from the intersection point to the gizmo's center
             float distanceToCenter = (intersectionPoint - gizmoCenter).Length;
 
-            // If distance to center is less than the radius of the gizmo's circle, ray intersects
-            return distanceToCenter <= radius;
+            // Check if the intersection point is near the ring boundary (not the whole disk)
+            float tolerance = HitTolerance > 0 ? HitTolerance : radius * 0.25f;
+            return Math.Abs(distanceToCenter - radius) <= tolerance;
         }
 
 

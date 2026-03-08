@@ -14,8 +14,9 @@ namespace UnBox3D.Commands
         private readonly ISceneManager     _sceneManager;
         private readonly ICamera           _camera;
         private readonly IRayCaster        _rayCaster;
-        private readonly MouseController   _mouseController;   // FIX: was declared but never injected
+        private readonly MouseController   _mouseController;
         private readonly ICommandHistory   _commandHistory;
+        private readonly IRenderer         _renderer;
         private IState? _defaultState;
 
         public SetRotateStateCommand(
@@ -25,7 +26,8 @@ namespace UnBox3D.Commands
             ISceneManager    sceneManager,
             ICamera          camera,
             IRayCaster       rayCaster,
-            ICommandHistory  commandHistory)
+            ICommandHistory  commandHistory,
+            IRenderer        renderer)
         {
             _settingsManager = settingsManager ?? throw new ArgumentNullException(nameof(settingsManager));
             _mouseController = mouseController ?? throw new ArgumentNullException(nameof(mouseController));
@@ -34,11 +36,12 @@ namespace UnBox3D.Commands
             _camera          = camera          ?? throw new ArgumentNullException(nameof(camera));
             _rayCaster       = rayCaster       ?? throw new ArgumentNullException(nameof(rayCaster));
             _commandHistory  = commandHistory  ?? throw new ArgumentNullException(nameof(commandHistory));
+            _renderer        = renderer        ?? throw new ArgumentNullException(nameof(renderer));
         }
 
         public void Execute()
         {
-            var rotateState = new RotateState(_settingsManager, _sceneManager, _controlHost, _camera, _rayCaster, _commandHistory);
+            var rotateState = new RotateState(_settingsManager, _sceneManager, _controlHost, _camera, _rayCaster, _commandHistory, _renderer);
             _mouseController.SetState(rotateState);
         }
 

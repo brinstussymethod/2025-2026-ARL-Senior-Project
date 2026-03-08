@@ -16,7 +16,8 @@ namespace UnBox3D.Rendering.OpenGL
         int GetHeight();
         void Render();
         void Cleanup();
-
+        /// <summary>Changes the mouse cursor displayed over the GL viewport.</summary>
+        void SetCursor(Cursor cursor);
     }
 
     // Enumeration for rendering modes
@@ -130,6 +131,8 @@ namespace UnBox3D.Rendering.OpenGL
         {
             Invalidate();
         }
+
+        public void SetCursor(Cursor cursor) => Cursor = cursor;
         public void SetRenderMode(RenderMode mode)
         {
             currentRenderMode = mode;

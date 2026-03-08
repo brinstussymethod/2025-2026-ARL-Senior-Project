@@ -158,6 +158,28 @@
                     </StackPanel>
                 </Button>
 
+                <!-- Gimbal -->
+                <Button ToolTip="Gimbal — click mesh to select, drag rings to rotate on axis, drag body to move"
+                        Command="{Binding SetGimbalModeCommand}">
+                    <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource ToolbarButtonStyle}">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding ActiveMode}" Value="Gimbal">
+                                    <Setter Property="Background"  Value="{DynamicResource CardBrush}"/>
+                                    <Setter Property="BorderBrush" Value="{DynamicResource HighlightBrush}"/>
+                                    <Setter Property="FontWeight"  Value="SemiBold"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#x29BF;" FontSize="13" Margin="0,0,5,0"
+                                   Foreground="{DynamicResource HighlightBrush}"
+                                   VerticalAlignment="Center"/>
+                        <TextBlock Text="Gimbal" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+
                 <!-- Delete -->
                 <Button ToolTip="Delete — click a mesh to remove it"
                         Command="{Binding SetDeleteModeCommand}">

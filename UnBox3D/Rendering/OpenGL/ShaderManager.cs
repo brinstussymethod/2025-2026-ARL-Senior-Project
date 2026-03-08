@@ -4,6 +4,7 @@
     {
         private static Shader? _lightingShader;
         private static Shader? _lampShader;
+        private static Shader? _gizmoShader;
 
         public static Shader LightingShader
         {
@@ -29,13 +30,21 @@
             }
         }
 
+        public static Shader GizmoShader
+        {
+            get
+            {
+                if (_gizmoShader == null)
+                    _gizmoShader = new Shader("Rendering/OpenGL/Shaders/gizmo.vert", "Rendering/OpenGL/Shaders/gizmo.frag");
+                return _gizmoShader;
+            }
+        }
+
         public static void Cleanup()
         {
-            // Optionally dispose shaders
-            //_lightingShader?.Dispose();
-            //_lampShader?.Dispose();
             _lightingShader = null;
             _lampShader = null;
+            _gizmoShader = null;
         }
     }
 }

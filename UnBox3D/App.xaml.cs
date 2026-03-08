@@ -181,7 +181,8 @@ namespace UnBox3D
                 var camera   = provider.GetRequiredService<ICamera>();
                 var host     = provider.GetRequiredService<IGLControlHost>();
                 var history  = provider.GetRequiredService<ICommandHistory>();
-                return new MainViewModel(logger, settings, scene, fs, blender, installer, exporter, mouse, host, camera, history);
+                var renderer = provider.GetRequiredService<IRenderer>();
+                return new MainViewModel(logger, settings, scene, fs, blender, installer, exporter, mouse, host, camera, history, renderer);
             });
 
             services.AddSingleton<BlenderIntegration>();

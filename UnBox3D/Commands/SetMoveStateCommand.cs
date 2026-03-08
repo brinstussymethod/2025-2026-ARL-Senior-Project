@@ -14,6 +14,7 @@ namespace UnBox3D.Commands
         private ISceneManager _sceneManager;
         private IRayCaster _rayCaster;
         private ICamera _camera;
+        private IRenderer _renderer;
 
         private IState? _defaultState;
         private ICommandHistory _commandHistory;
@@ -23,22 +24,21 @@ namespace UnBox3D.Commands
                                    ISceneManager sceneManager,
                                    ICamera camera,
                                    IRayCaster rayCaster,
-                                   ICommandHistory commandHistory)
+                                   ICommandHistory commandHistory,
+                                   IRenderer renderer)
                {
-                    _mouseController = mouseController;
-                   _controlHost = controlHost;
                    _mouseController = mouseController;
+                   _controlHost = controlHost;
                    _sceneManager = sceneManager;
                    _camera = camera;
                    _rayCaster = rayCaster;
                    _commandHistory = commandHistory;
-
-
+                   _renderer = renderer;
         }
 
         public void Execute()
         {
-            var moveState = new MoveState(_controlHost, _sceneManager,  _camera, _rayCaster , _commandHistory);
+            var moveState = new MoveState(_controlHost, _sceneManager, _camera, _rayCaster, _commandHistory, _renderer);
             _mouseController.SetState(moveState);
         }
 
