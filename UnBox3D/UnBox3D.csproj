@@ -9,8 +9,6 @@
     <UseWindowsForms>true</UseWindowsForms>
     <ApplicationIcon>Assets\Icons\logo.ico</ApplicationIcon>
     <OutputType>WinExe</OutputType>
-    <BaseIntermediateOutputPath>$(TEMP)\UnBox3D\obj\</BaseIntermediateOutputPath>
-    <BaseOutputPath>$(TEMP)\UnBox3D\bin\</BaseOutputPath>
   </PropertyGroup>
 
   <ItemGroup>
