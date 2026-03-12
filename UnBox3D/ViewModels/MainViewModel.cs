@@ -771,7 +771,9 @@ namespace UnBox3D.ViewModels
             if (mesh.Name.Contains("(Cylinder)"))      name = mesh.Name;
             else if (mesh.Name.Contains("(Prism)"))    name = mesh.Name.Replace("(Prism)",  "(Cylinder)");
             else if (mesh.Name.Contains("(Wedge)"))    name = mesh.Name.Replace("(Wedge)",  "(Cylinder)");
-            else                                       name = mesh.Name + " (Cylinder)";
+            else if (mesh.Name.Contains("(Trapezoid)"))    name = mesh.Name.Replace("(Trapezoid)",  "(Cylinder)");
+            else if (mesh.Name.Contains("(Triangular Prism)"))    name = mesh.Name.Replace("(Triangular Prism)",  "(Cylinder)");
+            else name = mesh.Name + " (Cylinder)";
 
             AppMesh cylinder = GeometryGenerator.CreateRotatedCylinder(center, radius, height, 32, Vector3.UnitX, name);
 
@@ -811,7 +813,9 @@ namespace UnBox3D.ViewModels
             if (mesh.Name.Contains("(Prism)"))         name = mesh.Name;
             else if (mesh.Name.Contains("(Cylinder)")) name = mesh.Name.Replace("(Cylinder)", "(Prism)");
             else if (mesh.Name.Contains("(Wedge)"))    name = mesh.Name.Replace("(Wedge)",    "(Prism)");
-            else                                       name = mesh.Name + " (Prism)";
+            else if (mesh.Name.Contains("(Trapezoid)"))    name = mesh.Name.Replace("(Trapezoid)",    "(Prism)");
+            else if (mesh.Name.Contains("(Triangular Prism)"))    name = mesh.Name.Replace("(Triangular Prism)",    "(Prism)");
+            else name = mesh.Name + " (Prism)";
 
             AppMesh cube = GeometryGenerator.CreateBox(center, meshDimensions.X, meshDimensions.Y, meshDimensions.Z, name);
 
@@ -846,7 +850,9 @@ namespace UnBox3D.ViewModels
             if (mesh.Name.Contains("(Wedge)"))         name = mesh.Name;
             else if (mesh.Name.Contains("(Cylinder)")) name = mesh.Name.Replace("(Cylinder)", "(Wedge)");
             else if (mesh.Name.Contains("(Prism)"))    name = mesh.Name.Replace("(Prism)",    "(Wedge)");
-            else                                       name = mesh.Name + " (Wedge)";
+            else if (mesh.Name.Contains("(Trapezoid)"))    name = mesh.Name.Replace("(Trapezoid)",    "(Wedge)");
+            else if (mesh.Name.Contains("(Triangular Prism)"))    name = mesh.Name.Replace("(Triangular Prism)",    "(Wedge)");
+            else name = mesh.Name + " (Wedge)";
 
             AppMesh wedge = GeometryGenerator.CreateWedge(center, meshDimensions.X, meshDimensions.Y, meshDimensions.Z, name);
 
@@ -865,6 +871,70 @@ namespace UnBox3D.ViewModels
         {
             if (SelectedMesh != null)
                 ReplaceWithWedgeOption(SelectedMesh);
+            else
+                ToastService.Show("Select a mesh first.", isError: false);
+        }
+
+        [RelayCommand]
+        private void ReplaceWithTrapezoidOption(IAppMesh mesh)
+        {
+            if (mesh == null) return;
+            Vector3 center = _sceneManager.GetMeshCenter(mesh.GetG4Mesh());
+            Vector3 meshDimensions = _sceneManager.GetSmallestMeshDimensions(mesh.GetG4Mesh());
+            string name;
+            if (mesh.Name.Contains("(Trapezoid)"))   name = mesh.Name;
+            else if (mesh.Name.Contains("(Cylinder)")) name = mesh.Name.Replace("(Cylinder)", "(Trapezoid)");
+            else if (mesh.Name.Contains("(Prism)"))    name = mesh.Name.Replace("(Prism)",    "(Trapezoid)");
+            else if (mesh.Name.Contains("(Wedge)"))    name = mesh.Name.Replace("(Wedge)",    "(Trapezoid)");
+            else if (mesh.Name.Contains("(Triangular Prism)"))    name = mesh.Name.Replace("(Triangular Prism)",    "(Trapezoid)");
+            else name = mesh.Name + " (Trapezoid)";
+            AppMesh trapezoid = GeometryGenerator.CreateTrapezoid(center, meshDimensions.X, meshDimensions.Y, meshDimensions.Z, name);
+            var cmd = new ReplaceMeshCommand(_sceneManager, _glControlHost, mesh, trapezoid);
+            _commandHistory.PushCommand(cmd);
+            cmd.Execute();
+            _latestImportedModel?.Remove(mesh);
+            var oldSummary = Meshes.FirstOrDefault(ms => ms.SourceMesh == mesh);
+            if (oldSummary != null) Meshes.Remove(oldSummary);
+            Meshes.Add(new MeshSummary(trapezoid));
+        }
+
+        [RelayCommand]
+        private void ReplaceWithTrapezoidClick()
+        {
+            if (SelectedMesh != null)
+                ReplaceWithTrapezoidOption(SelectedMesh);
+            else
+                ToastService.Show("Select a mesh first.", isError: false);
+        }
+
+        [RelayCommand]
+        private void ReplaceWithTriangularPrismOption(IAppMesh mesh)
+        {
+            if (mesh == null) return;
+            Vector3 center = _sceneManager.GetMeshCenter(mesh.GetG4Mesh());
+            Vector3 meshDimensions = _sceneManager.GetSmallestMeshDimensions(mesh.GetG4Mesh());
+            string name;
+            if (mesh.Name.Contains("(Triangular Prism)"))   name = mesh.Name;
+            else if (mesh.Name.Contains("(Cylinder)"))      name = mesh.Name.Replace("(Cylinder)", "(Triangular Prism)");
+            else if (mesh.Name.Contains("(Prism)"))         name = mesh.Name.Replace("(Prism)",    "(Triangular Prism)");
+            else if (mesh.Name.Contains("(Wedge)"))         name = mesh.Name.Replace("(Wedge)",    "(Triangular Prism)");
+            else if (mesh.Name.Contains("(Trapezoid)"))     name = mesh.Name.Replace("(Trapezoid)",    "(Triangular Prism)");
+            else                                            name = mesh.Name + " (Triangular Prism)";
+            AppMesh triangularPrism = GeometryGenerator.CreateTriangularPrism(center, meshDimensions.X, meshDimensions.Y, meshDimensions.Z, name);
+            var cmd = new ReplaceMeshCommand(_sceneManager, _glControlHost, mesh, triangularPrism);
+            _commandHistory.PushCommand(cmd);
+            cmd.Execute();
+            _latestImportedModel?.Remove(mesh);
+            var oldSummary = Meshes.FirstOrDefault(ms => ms.SourceMesh == mesh);
+            if (oldSummary != null) Meshes.Remove(oldSummary);
+            Meshes.Add(new MeshSummary(triangularPrism));
+        }
+
+        [RelayCommand]
+        private void ReplaceWithTriangularPrismClick()
+        {
+            if (SelectedMesh != null)
+                ReplaceWithTriangularPrismOption(SelectedMesh);
             else
                 ToastService.Show("Select a mesh first.", isError: false);
         }

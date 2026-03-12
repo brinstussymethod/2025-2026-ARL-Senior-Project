@@ -7,7 +7,7 @@ namespace UnBox3D.Rendering
 {
     public class GeometryGenerator
     {
-        public static AppMesh CreateBox(Vector3 center, float width, float height, float depth, string name="Box")
+        public static AppMesh CreateBox(Vector3 center, float width, float height, float depth, string name = "Box")
         {
             Mesh assimpMesh = new Mesh(name, PrimitiveType.Triangle);
             DMesh3 g4Mesh = new DMesh3();
@@ -84,7 +84,7 @@ namespace UnBox3D.Rendering
             return appMesh;
         }
 
-        public static AppMesh CreateCylinder(Vector3 center, float radius, float height, int segments, string name="GeneratedCylinder")
+        public static AppMesh CreateCylinder(Vector3 center, float radius, float height, int segments, string name = "GeneratedCylinder")
         {
             Mesh assimpMesh = new Mesh(name, PrimitiveType.Triangle);
             DMesh3 g4Mesh = new DMesh3();
@@ -151,7 +151,7 @@ namespace UnBox3D.Rendering
             return new AppMesh(g4Mesh, assimpMesh);
         }
 
-        public static AppMesh CreateRotatedCylinder(Vector3 center, float radius, float height, int segments, Vector3 direction, string name="GeneratedCylinder")
+        public static AppMesh CreateRotatedCylinder(Vector3 center, float radius, float height, int segments, Vector3 direction, string name = "GeneratedCylinder")
         {
             Mesh assimpMesh = new Mesh(name, PrimitiveType.Triangle);
             DMesh3 g4Mesh = new DMesh3();
@@ -351,6 +351,112 @@ namespace UnBox3D.Rendering
                 assimpMesh.Normals.Add(new Assimp.Vector3D(n.X, n.Y, n.Z));
             }
 
+            AppMesh appMesh = new AppMesh(g4Mesh, assimpMesh);
+            appMesh.SetColor(Colors.Red);
+            return appMesh;
+        }
+
+        public static AppMesh CreateTrapezoid(Vector3 center, float width, float height, float depth, string name = "Trapezoid")
+        {
+            Mesh assimpMesh = new Mesh(name, PrimitiveType.Triangle);
+            DMesh3 g4Mesh = new DMesh3();
+            float ht = height / 2, hd = depth / 2;
+            float topWidth = width * 0.75f; // Top is narrower than bottom
+            float bottomWidth = width;
+            float hwTop = topWidth / 2, hwBottom = bottomWidth / 2;
+            Vector3[] vertices =
+            [
+                new Vector3(center.X - hwBottom, center.Y - ht, center.Z - hd), // 0 front bottom-left
+                new Vector3(center.X + hwBottom, center.Y - ht, center.Z - hd), // 1 front bottom-right
+                new Vector3(center.X - hwTop, center.Y + ht, center.Z - hd),    // 2 front top-left
+                new Vector3(center.X + hwTop, center.Y + ht, center.Z - hd),    // 3 front top-right
+                new Vector3(center.X - hwBottom, center.Y - ht, center.Z + hd), // 4 back bottom-left
+                new Vector3(center.X + hwBottom, center.Y - ht, center.Z + hd), // 5 back bottom-right
+                new Vector3(center.X - hwTop, center.Y + ht, center.Z + hd),    // 6 back top-left
+                new Vector3(center.X + hwTop, center.Y + ht, center.Z + hd),    // 7 back top-right
+            ];
+            foreach (var v in vertices)
+            {
+                assimpMesh.Vertices.Add(new Assimp.Vector3D(v.X, v.Y, v.Z));
+                g4Mesh.AppendVertex(new g4.Vector3d(v.X, v.Y, v.Z));
+            }
+            int[][] faces =
+            [
+                [0, 1, 2], [1, 3, 2],       // Front face
+                [4, 6, 5], [5, 6, 7],       // Back face
+                [0, 4, 5], [0, 5, 1],       // Bottom face
+                [2, 6, 7], [2, 7, 3],       // Top face
+                [0, 2, 6], [0, 6, 4],       // Left face
+                [1, 5, 7], [1, 7, 3]       // Right face
+            ];
+            Vector3[] vertexNormals = new Vector3[vertices.Length];
+            foreach (var face in faces)
+            {
+                Vector3 v0 = vertices[face[0]];
+                Vector3 v1 = vertices[face[1]];
+                Vector3 v2 = vertices[face[2]];
+                Vector3 faceNormal = Vector3.Cross(v1 - v0, v2 - v0).Normalized();
+                vertexNormals[face[0]] += faceNormal;
+                vertexNormals[face[1]] += faceNormal;
+                vertexNormals[face[2]] += faceNormal;
+                assimpMesh.Faces.Add(new Face(face));
+                g4Mesh.AppendTriangle(face[0], face[1], face[2]);
+            }
+            foreach (var normal in vertexNormals)
+            {
+                var n = normal.Normalized();
+                assimpMesh.Normals.Add(new Assimp.Vector3D(n.X, n.Y, n.Z));
+            }
+            AppMesh appMesh = new AppMesh(g4Mesh, assimpMesh);
+            appMesh.SetColor(Colors.Red);
+            return appMesh;
+        }
+
+        public static AppMesh CreateTriangularPrism(Vector3 center, float width, float height, float depth, string name = "TriangularPrism")
+        {
+            Mesh assimpMesh = new Mesh(name, PrimitiveType.Triangle);
+            DMesh3 g4Mesh = new DMesh3();
+            float hw = width / 2, hh = height / 2, hd = depth / 2;
+            Vector3[] vertices =
+            [
+                new Vector3(center.X - hw, center.Y - hh, center.Z - hd), // 0 front bottom-left
+                new Vector3(center.X + hw, center.Y - hh, center.Z - hd), // 1 front bottom-right
+                new Vector3(center.X, center.Y + hh, center.Z - hd),      // 2 front top-center
+                new Vector3(center.X - hw, center.Y - hh, center.Z + hd), // 3 back bottom-left
+                new Vector3(center.X + hw, center.Y - hh, center.Z + hd), // 4 back bottom-right
+                new Vector3(center.X, center.Y + hh, center.Z + hd),      // 5 back top-center
+            ];
+            foreach (var v in vertices)
+            {
+                assimpMesh.Vertices.Add(new Assimp.Vector3D(v.X, v.Y, v.Z));
+                g4Mesh.AppendVertex(new g4.Vector3d(v.X, v.Y, v.Z));
+            }
+            int[][] faces =
+            [
+                [0, 1, 2],       // Front triangle
+                [3, 5, 4],       // Back triangle
+                [0, 3, 4], [0, 4, 1], // Bottom quad
+                [0, 2, 5], [0, 5, 3], // Left quad
+                [1, 4, 5], [1, 5, 2], // Right quad
+            ];
+            Vector3[] vertexNormals = new Vector3[vertices.Length];
+            foreach (var face in faces)
+            {
+                Vector3 v0 = vertices[face[0]];
+                Vector3 v1 = vertices[face[1]];
+                Vector3 v2 = vertices[face[2]];
+                Vector3 faceNormal = Vector3.Cross(v1 - v0, v2 - v0).Normalized();
+                vertexNormals[face[0]] += faceNormal;
+                vertexNormals[face[1]] += faceNormal;
+                vertexNormals[face[2]] += faceNormal;
+                assimpMesh.Faces.Add(new Face(face));
+                g4Mesh.AppendTriangle(face[0], face[1], face[2]);
+            }
+            foreach (var normal in vertexNormals)
+            {
+                var n = normal.Normalized();
+                assimpMesh.Normals.Add(new Assimp.Vector3D(n.X, n.Y, n.Z));
+            }
             AppMesh appMesh = new AppMesh(g4Mesh, assimpMesh);
             appMesh.SetColor(Colors.Red);
             return appMesh;

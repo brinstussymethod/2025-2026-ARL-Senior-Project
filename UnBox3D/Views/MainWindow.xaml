@@ -522,7 +522,7 @@
                                         <TextBlock Text="Cube / Prism" VerticalAlignment="Center"/>
                                     </StackPanel>
                                 </Button>
-                                <Button HorizontalAlignment="Stretch"
+                                    <Button HorizontalAlignment="Stretch" Margin="0,0,0,6"
                                         Command="{Binding ReplaceWithWedgeClickCommand}">
                                     <StackPanel Orientation="Horizontal">
                                         <TextBlock Text="&#x25B7;" FontSize="13" Margin="0,0,8,0"
@@ -530,6 +530,24 @@
                                                    VerticalAlignment="Center"/>
                                         <TextBlock Text="Wedge" VerticalAlignment="Center"/>
                                     </StackPanel>
+                                </Button>
+                                    <Button HorizontalAlignment="Stretch" Margin="0,0,0,6"
+                                            Command="{Binding ReplaceWithTrapezoidClickCommand}">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#x23E2;" FontSize="13" Margin="0,0,8,0"
+                                                       Foreground="{DynamicResource HighlightBrush}"
+                                                       VerticalAlignment="Center"/>
+                                            <TextBlock Text="Trapezoidal Prism" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                </Button>
+                                <Button HorizontalAlignment="Stretch"
+                                        Command="{Binding ReplaceWithTriangularPrismClickCommand}">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="&#x25B3;" FontSize="13" Margin="0,0,8,0"
+                                                       Foreground="{DynamicResource HighlightBrush}"
+                                                       VerticalAlignment="Center"/>
+                                            <TextBlock Text="Triangular Prism" VerticalAlignment="Center"/>
+                                        </StackPanel>
                                 </Button>
                             </StackPanel>
 
