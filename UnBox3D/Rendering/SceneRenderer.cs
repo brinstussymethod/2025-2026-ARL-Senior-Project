@@ -31,6 +31,12 @@ namespace UnBox3D.Rendering
         /// GimbalState must use THESE values for hit-testing so the numbers match what is actually drawn.
         /// </summary>
         bool TryGetGizmoInfo(out Vector3 center, out float radius);
+        /// <summary>
+        /// Tells the renderer which gizmo element the mouse is currently hovering over so it
+        /// can be drawn fully opaque while all other elements remain semi-transparent.
+        /// Pass <see cref="GizmoHoverElement.None"/> when the mouse is not over any element.
+        /// </summary>
+        void SetHoveredGizmoElement(GizmoHoverElement element);
     }
 
     public class SceneRenderer : IRenderer
@@ -43,6 +49,7 @@ namespace UnBox3D.Rendering
         private Vector3    _gizmoCenter;
         private float      _gizmoRadius;
         private GizmoMode  _gizmoMode = GizmoMode.None;
+        private GizmoHoverElement  _hoveredGizmoElement = GizmoHoverElement.None;
 
         public void SetActiveGizmoMesh(IAppMesh? mesh)
         {
@@ -57,10 +64,13 @@ namespace UnBox3D.Rendering
             else
             {
                 _gizmoMode = GizmoMode.None;
+                _hoveredGizmoElement = GizmoHoverElement.None;
             }
         }
 
         public void SetGizmoMode(GizmoMode mode) => _gizmoMode = mode;
+
+        public void SetHoveredGizmoElement(GizmoHoverElement element) => _hoveredGizmoElement = element;
 
         public bool TryGetGizmoInfo(out Vector3 center, out float radius)
         {
@@ -88,7 +98,7 @@ namespace UnBox3D.Rendering
 
                 // Still draw gizmo rings if a mesh was selected before the scene was cleared
                 if (_gizmoMesh != null)
-                    _gizmoRenderer.Render(camera.GetViewMatrix(), camera.GetProjectionMatrix());
+                    _gizmoRenderer.Render(camera.GetViewMatrix(), camera.GetProjectionMatrix(), _gizmoMode, _hoveredGizmoElement);
                 return;
             }
 
@@ -117,7 +127,7 @@ namespace UnBox3D.Rendering
 
             // Draw gizmo on top of scene geometry
             if (_gizmoMesh != null && _gizmoMode != GizmoMode.None)
-                _gizmoRenderer.Render(camera.GetViewMatrix(), camera.GetProjectionMatrix(), _gizmoMode);
+                _gizmoRenderer.Render(camera.GetViewMatrix(), camera.GetProjectionMatrix(), _gizmoMode, _hoveredGizmoElement);
         }
     }
 }

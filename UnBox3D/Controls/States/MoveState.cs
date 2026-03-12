@@ -37,6 +37,7 @@ namespace UnBox3D.Controls.States
         private Point   _lastClientPos;
         private Vector3 _totalMovement;
         private float   _worldScale;
+        private GizmoHoverElement  _lastHoveredElement = GizmoHoverElement.None;
 
         public MoveState(
             IGLControlHost  controlHost,
@@ -84,6 +85,12 @@ namespace UnBox3D.Controls.States
                     _dragAxis   = axis;
                     _worldScale = WorldScaleFromCamera();
                     _controlHost.SetCursor(Cursors.SizeAll);
+                    // Clear hover highlight while dragging.
+                    if (_lastHoveredElement != GizmoHoverElement.None)
+                    {
+                        _lastHoveredElement = GizmoHoverElement.None;
+                        _renderer.SetHoveredGizmoElement(GizmoHoverElement.None);
+                    }
                     return;
                 }
             }
@@ -125,8 +132,9 @@ namespace UnBox3D.Controls.States
 
                 if (!insideGizmo)
                 {
-                    _selectedMesh = null;
-                    _renderer.SetActiveGizmoMesh(null);
+                    _selectedMesh       = null;
+                    _lastHoveredElement = GizmoHoverElement.None;
+                    _renderer.SetActiveGizmoMesh(null);   // also resets hover in SceneRenderer
                     _controlHost.SetCursor(Cursors.Default);
                     _controlHost.Invalidate();
                 }
@@ -137,12 +145,28 @@ namespace UnBox3D.Controls.States
 
         public void OnMouseMove(MouseEventArgs e)
         {
-            // Hover: update cursor when idle.
+            // Hover: update cursor and highlight the element under the cursor.
             if (_dragAxis == DragAxis.None)
             {
                 if (_selectedMesh != null)
-                    _controlHost.SetCursor(HitTestArrows(e.X, e.Y) != DragAxis.None
-                        ? Cursors.SizeAll : Cursors.Default);
+                {
+                    var axis = HitTestArrows(e.X, e.Y);
+                    _controlHost.SetCursor(axis != DragAxis.None ? Cursors.SizeAll : Cursors.Default);
+
+                    var newHover = axis switch
+                    {
+                        DragAxis.X => GizmoHoverElement.MoveX,
+                        DragAxis.Y => GizmoHoverElement.MoveY,
+                        DragAxis.Z => GizmoHoverElement.MoveZ,
+                        _          => GizmoHoverElement.None
+                    };
+                    if (newHover != _lastHoveredElement)
+                    {
+                        _lastHoveredElement = newHover;
+                        _renderer.SetHoveredGizmoElement(newHover);
+                        _controlHost.Render();
+                    }
+                }
                 return;
             }
 

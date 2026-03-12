@@ -94,8 +94,16 @@ namespace UnBox3D.Rendering
             _initialized = true;
         }
 
-        /// <summary>Draw the gizmo.  <paramref name="mode"/> controls which parts are visible.</summary>
-        public void Render(Matrix4 view, Matrix4 projection, GizmoMode mode = GizmoMode.Full)
+        // Alpha constants for hover highlight (Blender-style)
+        private const float DimAlpha  = 0.40f; // semi-transparent when not hovered
+        private const float FullAlpha = 1.00f; // fully opaque when hovered
+
+        /// <summary>Draw the gizmo.  <paramref name="mode"/> controls which parts are visible.
+        /// <paramref name="hovered"/> identifies the element under the cursor, which is drawn fully
+        /// opaque; all other elements are drawn at <see cref="DimAlpha"/> opacity.</summary>
+        public void Render(Matrix4 view, Matrix4 projection,
+                           GizmoMode mode = GizmoMode.Full,
+                           GizmoHoverElement hovered = GizmoHoverElement.None)
         {
             if (!_initialized || mode == GizmoMode.None) return;
 
@@ -106,6 +114,8 @@ namespace UnBox3D.Rendering
             shader.SetMatrix4("projection", projection);
 
             GL.Disable(EnableCap.DepthTest); // always draw on top
+            GL.Enable(EnableCap.Blend);
+            GL.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
 
             bool showRings   = mode == GizmoMode.RingsOnly || mode == GizmoMode.Full;
             bool showArrows  = mode == GizmoMode.ArrowsOnly || mode == GizmoMode.Full;
@@ -115,42 +125,52 @@ namespace UnBox3D.Rendering
             if (showRings)
             {
                 GL.LineWidth(3f);
-                DrawVAO(_vaoRX, RingSegs, PrimitiveType.LineLoop, ColX, shader);
-                DrawVAO(_vaoRY, RingSegs, PrimitiveType.LineLoop, ColY, shader);
-                DrawVAO(_vaoRZ, RingSegs, PrimitiveType.LineLoop, ColZ, shader);
+                DrawVAO(_vaoRX, RingSegs, PrimitiveType.LineLoop, WithAlpha(ColX, A(GizmoHoverElement.RotateX, hovered)), shader);
+                DrawVAO(_vaoRY, RingSegs, PrimitiveType.LineLoop, WithAlpha(ColY, A(GizmoHoverElement.RotateY, hovered)), shader);
+                DrawVAO(_vaoRZ, RingSegs, PrimitiveType.LineLoop, WithAlpha(ColZ, A(GizmoHoverElement.RotateZ, hovered)), shader);
             }
 
             // ── Arrow shafts + cones ──────────────────────────────────────
             if (showArrows)
             {
                 GL.LineWidth(4f);
-                DrawVAO(_vaoAX, 2,            PrimitiveType.Lines,     ColX, shader);
-                DrawVAO(_vaoAY, 2,            PrimitiveType.Lines,     ColY, shader);
-                DrawVAO(_vaoAZ, 2,            PrimitiveType.Lines,     ColZ, shader);
+                DrawVAO(_vaoAX, 2,            PrimitiveType.Lines,     WithAlpha(ColX, A(GizmoHoverElement.MoveX, hovered)), shader);
+                DrawVAO(_vaoAY, 2,            PrimitiveType.Lines,     WithAlpha(ColY, A(GizmoHoverElement.MoveY, hovered)), shader);
+                DrawVAO(_vaoAZ, 2,            PrimitiveType.Lines,     WithAlpha(ColZ, A(GizmoHoverElement.MoveZ, hovered)), shader);
 
                 GL.LineWidth(1f);
-                DrawVAO(_vaoCX, ConeSegs * 3, PrimitiveType.Triangles, ColX, shader);
-                DrawVAO(_vaoCY, ConeSegs * 3, PrimitiveType.Triangles, ColY, shader);
-                DrawVAO(_vaoCZ, ConeSegs * 3, PrimitiveType.Triangles, ColZ, shader);
+                DrawVAO(_vaoCX, ConeSegs * 3, PrimitiveType.Triangles, WithAlpha(ColX, A(GizmoHoverElement.MoveX, hovered)), shader);
+                DrawVAO(_vaoCY, ConeSegs * 3, PrimitiveType.Triangles, WithAlpha(ColY, A(GizmoHoverElement.MoveY, hovered)), shader);
+                DrawVAO(_vaoCZ, ConeSegs * 3, PrimitiveType.Triangles, WithAlpha(ColZ, A(GizmoHoverElement.MoveZ, hovered)), shader);
             }
 
             // ── Handle discs (Gimbal only) ──────────────────────────────────
             if (showHandles)
             {
                 GL.LineWidth(2f);
-                DrawVAO(_vaoHX, DiscSegs + 2, PrimitiveType.TriangleFan, ColHandle, shader);
-                DrawVAO(_vaoHY, DiscSegs + 2, PrimitiveType.TriangleFan, ColHandle, shader);
-                DrawVAO(_vaoHZ, DiscSegs + 2, PrimitiveType.TriangleFan, ColHandle, shader);
+                DrawVAO(_vaoHX, DiscSegs + 2, PrimitiveType.TriangleFan, WithAlpha(ColHandle, A(GizmoHoverElement.RotateX, hovered)), shader);
+                DrawVAO(_vaoHY, DiscSegs + 2, PrimitiveType.TriangleFan, WithAlpha(ColHandle, A(GizmoHoverElement.RotateY, hovered)), shader);
+                DrawVAO(_vaoHZ, DiscSegs + 2, PrimitiveType.TriangleFan, WithAlpha(ColHandle, A(GizmoHoverElement.RotateZ, hovered)), shader);
                 // Coloured outline so axes are clearly labelled
-                DrawVAO(_vaoHX, DiscSegs + 2, PrimitiveType.LineLoop,    ColX,      shader);
-                DrawVAO(_vaoHY, DiscSegs + 2, PrimitiveType.LineLoop,    ColY,      shader);
-                DrawVAO(_vaoHZ, DiscSegs + 2, PrimitiveType.LineLoop,    ColZ,      shader);
+                DrawVAO(_vaoHX, DiscSegs + 2, PrimitiveType.LineLoop, WithAlpha(ColX, A(GizmoHoverElement.RotateX, hovered)), shader);
+                DrawVAO(_vaoHY, DiscSegs + 2, PrimitiveType.LineLoop, WithAlpha(ColY, A(GizmoHoverElement.RotateY, hovered)), shader);
+                DrawVAO(_vaoHZ, DiscSegs + 2, PrimitiveType.LineLoop, WithAlpha(ColZ, A(GizmoHoverElement.RotateZ, hovered)), shader);
             }
 
+            GL.Disable(EnableCap.Blend);
             GL.Enable(EnableCap.DepthTest);
             GL.LineWidth(1f);
             GL.BindVertexArray(0);
         }
+
+        /// <summary>Returns FullAlpha when <paramref name="element"/> matches <paramref name="hovered"/>,
+        /// otherwise DimAlpha.</summary>
+        private static float A(GizmoHoverElement element, GizmoHoverElement hovered) =>
+            element == hovered ? FullAlpha : DimAlpha;
+
+        /// <summary>Returns a copy of <paramref name="color"/> with its alpha replaced.</summary>
+        private static Vector4 WithAlpha(Vector4 color, float alpha) =>
+            new(color.X, color.Y, color.Z, alpha);
 
         // ── Geometry builders ──────────────────────────────────────────────
 

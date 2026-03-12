@@ -64,6 +64,7 @@ namespace UnBox3D.Controls.States
         private float   _accumulatedAngle;
         private Vector3 _totalMovement;
         private float   _worldScale;
+        private GizmoHoverElement _lastHoveredElement = GizmoHoverElement.None;
 
         // ── Constructor ────────────────────────────────────────────────────
 
@@ -112,6 +113,12 @@ namespace UnBox3D.Controls.States
                     _dragMode  = hit;
                     _worldScale = WorldScaleFromCamera();
                     ApplyCursor(_dragMode);
+                    // Clear hover highlight while dragging.
+                    if (_lastHoveredElement != GizmoHoverElement.None)
+                    {
+                        _lastHoveredElement = GizmoHoverElement.None;
+                        _renderer.SetHoveredGizmoElement(GizmoHoverElement.None);
+                    }
                     return;
                 }
             }
@@ -157,8 +164,9 @@ namespace UnBox3D.Controls.States
 
                 if (!clickedInsideGizmoArea)
                 {
-                    _selectedMesh = null;
-                    _renderer.SetActiveGizmoMesh(null);
+                    _selectedMesh       = null;
+                    _lastHoveredElement = GizmoHoverElement.None;
+                    _renderer.SetActiveGizmoMesh(null);   // also resets hover in SceneRenderer
                     _controlHost.SetCursor(Cursors.Default);
                     _controlHost.Invalidate();
                 }
@@ -169,13 +177,35 @@ namespace UnBox3D.Controls.States
 
         public void OnMouseMove(MouseEventArgs e)
         {
-            // Hover cursor update when not dragging.
+            // Hover: update cursor and highlight the element under the cursor.
             if (_dragMode == GimbalDragMode.None)
             {
                 if (_selectedMesh != null)
-                    ApplyCursor(HitTestGizmo(e.X, e.Y));
+                {
+                    var hit = HitTestGizmo(e.X, e.Y);
+                    ApplyCursor(hit);
+
+                    var newHover = hit switch
+                    {
+                        GimbalDragMode.MoveX   => GizmoHoverElement.MoveX,
+                        GimbalDragMode.MoveY   => GizmoHoverElement.MoveY,
+                        GimbalDragMode.MoveZ   => GizmoHoverElement.MoveZ,
+                        GimbalDragMode.RotateX => GizmoHoverElement.RotateX,
+                        GimbalDragMode.RotateY => GizmoHoverElement.RotateY,
+                        GimbalDragMode.RotateZ => GizmoHoverElement.RotateZ,
+                        _                      => GizmoHoverElement.None
+                    };
+                    if (newHover != _lastHoveredElement)
+                    {
+                        _lastHoveredElement = newHover;
+                        _renderer.SetHoveredGizmoElement(newHover);
+                        _controlHost.Render();
+                    }
+                }
                 else
+                {
                     _controlHost.SetCursor(Cursors.Default);
+                }
                 return;
             }
 
@@ -284,19 +314,23 @@ namespace UnBox3D.Controls.States
             if (NearScreenLine(mx, my, center, GizmoRenderer.ArrowTipY(center, radius), ArrowPx)) return GimbalDragMode.MoveY;
             if (NearScreenLine(mx, my, center, GizmoRenderer.ArrowTipZ(center, radius), ArrowPx)) return GimbalDragMode.MoveZ;
 
-            // ── 3. Ring lines (sample RingSamples points around each ring) ─
+            // ── 3. Ring lines — consecutive arc segments for continuous coverage ─
             for (int i = 0; i < RingSamples; i++)
             {
-                float a   = 2f * MathF.PI * i / RingSamples;
-                float cos = MathF.Cos(a) * radius;
-                float sin = MathF.Sin(a) * radius;
+                float a0 = 2f * MathF.PI *  i          / RingSamples;
+                float a1 = 2f * MathF.PI * (i + 1)     / RingSamples;
+                float c0 = MathF.Cos(a0) * radius, s0 = MathF.Sin(a0) * radius;
+                float c1 = MathF.Cos(a1) * radius, s1 = MathF.Sin(a1) * radius;
 
                 // X ring: in render YZ plane
-                if (NearScreen(mx, my, center + new Vector3(0f,  cos, sin), RingLinePx)) return GimbalDragMode.RotateX;
+                if (NearScreenLine(mx, my, center + new Vector3(0f, c0, s0),
+                                           center + new Vector3(0f, c1, s1), RingLinePx)) return GimbalDragMode.RotateX;
                 // Y ring: in render XZ plane
-                if (NearScreen(mx, my, center + new Vector3(cos, 0f,  sin), RingLinePx)) return GimbalDragMode.RotateY;
+                if (NearScreenLine(mx, my, center + new Vector3(c0, 0f, s0),
+                                           center + new Vector3(c1, 0f, s1), RingLinePx)) return GimbalDragMode.RotateY;
                 // Z ring: in render XY plane
-                if (NearScreen(mx, my, center + new Vector3(cos, sin, 0f),  RingLinePx)) return GimbalDragMode.RotateZ;
+                if (NearScreenLine(mx, my, center + new Vector3(c0, s0, 0f),
+                                           center + new Vector3(c1, s1, 0f), RingLinePx)) return GimbalDragMode.RotateZ;
             }
 
             return GimbalDragMode.None;

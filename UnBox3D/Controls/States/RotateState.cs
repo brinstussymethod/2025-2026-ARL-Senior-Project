@@ -38,6 +38,7 @@ namespace UnBox3D.Controls.States
         private float  _rotationSensitivity;
         private Point  _lastClientPos;
         private float  _accumulatedAngle;
+        private GizmoHoverElement  _lastHoveredElement = GizmoHoverElement.None;
 
         public RotateState(
             ISettingsManager settingsManager,
@@ -87,6 +88,12 @@ namespace UnBox3D.Controls.States
                 {
                     _rotateAxis = axis;
                     _controlHost.SetCursor(Cursors.Hand);
+                    // Clear hover highlight while dragging.
+                    if (_lastHoveredElement != GizmoHoverElement.None)
+                    {
+                        _lastHoveredElement = GizmoHoverElement.None;
+                        _renderer.SetHoveredGizmoElement(GizmoHoverElement.None);
+                    }
                     return;
                 }
             }
@@ -127,8 +134,9 @@ namespace UnBox3D.Controls.States
 
                 if (!insideGizmo)
                 {
-                    _selectedMesh = null;
-                    _renderer.SetActiveGizmoMesh(null);
+                    _selectedMesh       = null;
+                    _lastHoveredElement = GizmoHoverElement.None;
+                    _renderer.SetActiveGizmoMesh(null);   // also resets hover in SceneRenderer
                     _controlHost.SetCursor(Cursors.Default);
                     _controlHost.Invalidate();
                 }
@@ -139,12 +147,28 @@ namespace UnBox3D.Controls.States
 
         public void OnMouseMove(MouseEventArgs e)
         {
-            // Hover cursor update.
+            // Hover: update cursor and highlight the ring under the cursor.
             if (_rotateAxis == RotateAxis.None)
             {
                 if (_selectedMesh != null)
-                    _controlHost.SetCursor(HitTestRings(e.X, e.Y) != RotateAxis.None
-                        ? Cursors.Hand : Cursors.Default);
+                {
+                    var axis = HitTestRings(e.X, e.Y);
+                    _controlHost.SetCursor(axis != RotateAxis.None ? Cursors.Hand : Cursors.Default);
+
+                    var newHover = axis switch
+                    {
+                        RotateAxis.X => GizmoHoverElement.RotateX,
+                        RotateAxis.Y => GizmoHoverElement.RotateY,
+                        RotateAxis.Z => GizmoHoverElement.RotateZ,
+                        _            => GizmoHoverElement.None
+                    };
+                    if (newHover != _lastHoveredElement)
+                    {
+                        _lastHoveredElement = newHover;
+                        _renderer.SetHoveredGizmoElement(newHover);
+                        _controlHost.Render();
+                    }
+                }
                 return;
             }
 
@@ -210,24 +234,49 @@ namespace UnBox3D.Controls.States
             if (!_renderer.TryGetGizmoInfo(out Vector3 center, out float radius))
                 return RotateAxis.None;
 
+            // Test consecutive arc segments rather than isolated sample points so
+            // the hit-zone is continuous around the full ring circumference.
             for (int i = 0; i < RingSamples; i++)
             {
-                float a   = 2f * MathF.PI * i / RingSamples;
-                float cos = MathF.Cos(a) * radius;
-                float sin = MathF.Sin(a) * radius;
+                float a0  = 2f * MathF.PI *  i          / RingSamples;
+                float a1  = 2f * MathF.PI * (i + 1)     / RingSamples;
+                float c0  = MathF.Cos(a0) * radius, s0 = MathF.Sin(a0) * radius;
+                float c1  = MathF.Cos(a1) * radius, s1 = MathF.Sin(a1) * radius;
 
                 // X ring: in render YZ plane
-                if (NearScreen(mx, my, center + new Vector3(0f,  cos, sin), RingLinePx)) return RotateAxis.X;
+                if (NearScreenLine(mx, my, center + new Vector3(0f, c0, s0),
+                                           center + new Vector3(0f, c1, s1), RingLinePx)) return RotateAxis.X;
                 // Y ring: in render XZ plane
-                if (NearScreen(mx, my, center + new Vector3(cos, 0f,  sin), RingLinePx)) return RotateAxis.Y;
+                if (NearScreenLine(mx, my, center + new Vector3(c0, 0f, s0),
+                                           center + new Vector3(c1, 0f, s1), RingLinePx)) return RotateAxis.Y;
                 // Z ring: in render XY plane
-                if (NearScreen(mx, my, center + new Vector3(cos, sin, 0f),  RingLinePx)) return RotateAxis.Z;
+                if (NearScreenLine(mx, my, center + new Vector3(c0, s0, 0f),
+                                           center + new Vector3(c1, s1, 0f), RingLinePx)) return RotateAxis.Z;
             }
 
             return RotateAxis.None;
         }
 
         // ── Screen-space projection helpers ───────────────────────────────
+
+        /// <summary>True when (mx,my) is within <paramref name="threshPx"/> pixels of the
+        /// screen-space line segment from <paramref name="worldA"/> to <paramref name="worldB"/>.</summary>
+        private bool NearScreenLine(int mx, int my, Vector3 worldA, Vector3 worldB, float threshPx)
+        {
+            var sa = ProjectToScreen(worldA);
+            var sb = ProjectToScreen(worldB);
+            if (sa == null || sb == null) return false;
+
+            Vector2 a = sa.Value, b = sb.Value, ab = b - a;
+            float lenSq = ab.LengthSquared;
+            float t = lenSq > 0.001f
+                ? Math.Clamp(Vector2.Dot(new Vector2(mx - a.X, my - a.Y), ab) / lenSq, 0f, 1f)
+                : 0f;
+
+            Vector2 closest = a + ab * t;
+            float dx = mx - closest.X, dy = my - closest.Y;
+            return dx * dx + dy * dy <= threshPx * threshPx;
+        }
 
         private bool NearScreen(int mx, int my, Vector3 worldPos, float threshPx)
         {
