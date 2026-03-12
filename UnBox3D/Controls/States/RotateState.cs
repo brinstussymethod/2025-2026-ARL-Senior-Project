@@ -1,116 +1,302 @@
-﻿using g4;
 using OpenTK.Mathematics;
+using System.Windows.Forms;
 using UnBox3D.Utils;
 using UnBox3D.Models;
 using UnBox3D.Commands;
-using UnBox3D.Controls.States;
 using UnBox3D.Rendering;
 using UnBox3D.Rendering.OpenGL;
-using System;
 
 namespace UnBox3D.Controls.States
 {
+    /// <summary>
+    /// Rotate mode.
+    ///
+    /// • Click a colored ring  → rotate around that ring's axis (axis-constrained)
+    /// • Click mesh body       → free Y-axis rotation (same as original behavior)
+    /// • Click empty space     → deselect, hide gizmo
+    ///
+    /// Hit-testing is screen-space — the same technique used by GimbalState.
+    /// </summary>
     public class RotateState : IState
     {
+        private const int   RingSamples = 24;   // sample points around each ring
+        private const float RingLinePx  = 16f;  // hit radius for ring lines (px)
+
         private readonly ISettingsManager _settingsManager;
-        private readonly ISceneManager _sceneManager;
-        private readonly IGLControlHost _controlHost;
-        private readonly ICamera _camera;
-        private readonly IRayCaster _rayCaster;
+        private readonly ISceneManager   _sceneManager;
+        private readonly IGLControlHost  _controlHost;
+        private readonly ICamera         _camera;
+        private readonly IRayCaster      _rayCaster;
         private readonly ICommandHistory _commandHistory;
+        private readonly IRenderer       _renderer;
 
         private IAppMesh? _selectedMesh;
-        private bool _isRotating = false;
-        private float _rotationSensitivity;
-        private Quaternion _rotationAxis;
-        private Point _lastMousePosition;
-        private float _accumulatedAngle;
+
+        private enum RotateAxis { None, X, Y, Z, Free }
+        private RotateAxis _rotateAxis = RotateAxis.None;
+
+        private float  _rotationSensitivity;
+        private Point  _lastClientPos;
+        private float  _accumulatedAngle;
+        private GizmoHoverElement  _lastHoveredElement = GizmoHoverElement.None;
 
         public RotateState(
             ISettingsManager settingsManager,
-            ISceneManager sceneManager,
-            IGLControlHost controlHost,
-            ICamera camera,
-            IRayCaster rayCaster,
-            ICommandHistory commandHistory)
+            ISceneManager   sceneManager,
+            IGLControlHost  controlHost,
+            ICamera         camera,
+            IRayCaster      rayCaster,
+            ICommandHistory commandHistory,
+            IRenderer       renderer)
         {
-            _settingsManager = settingsManager ?? throw new ArgumentNullException(nameof(settingsManager));
-            _sceneManager = sceneManager ?? throw new ArgumentNullException(nameof(sceneManager));
-            _controlHost = controlHost ?? throw new ArgumentNullException(nameof(controlHost));
-            _camera = camera ?? throw new ArgumentNullException(nameof(camera));
-            _rayCaster = rayCaster ?? throw new ArgumentNullException(nameof(rayCaster));
-            _commandHistory = commandHistory ?? throw new ArgumentNullException(nameof(commandHistory));
+            _settingsManager     = settingsManager ?? throw new ArgumentNullException(nameof(settingsManager));
+            _sceneManager        = sceneManager    ?? throw new ArgumentNullException(nameof(sceneManager));
+            _controlHost         = controlHost     ?? throw new ArgumentNullException(nameof(controlHost));
+            _camera              = camera          ?? throw new ArgumentNullException(nameof(camera));
+            _rayCaster           = rayCaster       ?? throw new ArgumentNullException(nameof(rayCaster));
+            _commandHistory      = commandHistory  ?? throw new ArgumentNullException(nameof(commandHistory));
+            _renderer            = renderer        ?? throw new ArgumentNullException(nameof(renderer));
 
-            _rotationSensitivity = _settingsManager.GetSetting<float>(new UISettings().GetKey(), UISettings.MeshRotationSensitivity);
+            _rotationSensitivity = _settingsManager.GetSetting<float>(
+                new UISettings().GetKey(), UISettings.MeshRotationSensitivity);
         }
 
-        public void OnMouseDown(MouseEventArgs e)
+        /// <summary>
+        /// Pre-selects a mesh so rings appear immediately when entering Rotate mode.
+        /// </summary>
+        public void SetSelectedMesh(IAppMesh mesh)
         {
-            _lastMousePosition = Control.MousePosition;
-            _accumulatedAngle  = 0;
-
-            // Default axis: world Y (vertical spin).  Dragging left/right rotates around Y.
-            _rotationAxis = new Quaternion(0f, 1f, 0f, 0f); // .Xyz = (0,1,0)
-
-            Vector3 rayWorld = _rayCaster.GetRay();
-            Vector3 rayOrigin = _camera.Position;
-
-            if (_rayCaster.RayIntersectsMesh(_sceneManager.GetMeshes(), rayOrigin, rayWorld, out float _, out IAppMesh clickedMesh))
-            {
-                _selectedMesh = clickedMesh;
-                _isRotating   = true;   // FIX: was never set — rotation never fired
-                _controlHost.Invalidate();
-            }
-        }
-
-        public void OnMouseMove(MouseEventArgs e)
-        {
-            if (!_isRotating || _selectedMesh == null) return;
-
-            Point   currentMousePosition = Control.MousePosition;
-            Vector2 delta = new Vector2(
-                currentMousePosition.X - _lastMousePosition.X,
-                currentMousePosition.Y - _lastMousePosition.Y);
-
-            // Use signed X-delta so dragging left/right has the correct direction.
-            float angle = delta.X * _rotationSensitivity;
-            if (Math.Abs(angle) > 0.001f)
-            {
-                Vector3   axis   = _rotationAxis.Xyz.Normalized();
-                Quaternion q     = Quaternion.FromAxisAngle(axis, MathHelper.DegreesToRadians(angle));
-                _selectedMesh.Rotate(q);     // live visual feedback
-                _accumulatedAngle += angle;
-            }
-
-            _lastMousePosition = currentMousePosition;
+            _selectedMesh = mesh;
+            _renderer.SetActiveGizmoMesh(mesh);
+            _renderer.SetGizmoMode(GizmoMode.RingsOnly);
             _controlHost.Invalidate();
         }
 
-        public void OnMouseUp(MouseEventArgs e)
+        // ── Mouse Down ─────────────────────────────────────────────────────
+
+        public void OnMouseDown(MouseEventArgs e)
         {
-            if (_isRotating && _selectedMesh != null && Math.Abs(_accumulatedAngle) > 0.001f)
+            _lastClientPos    = new Point(e.X, e.Y);
+            _accumulatedAngle = 0f;
+            _rotateAxis       = RotateAxis.None;
+
+            // 1. If a mesh is already selected, try ring hit-test first.
+            if (_selectedMesh != null)
             {
-                // Rotation was already applied live in OnMouseMove.
-                // Store BOTH directions so Undo reverses and Redo re-applies correctly.
-                Vector3 axis = _rotationAxis.Xyz.Normalized();
-                float   rad  = MathHelper.DegreesToRadians(_accumulatedAngle);
-
-                var doRotation   = Quaternion.FromAxisAngle(axis,  rad);
-                var undoRotation = Quaternion.FromAxisAngle(axis, -rad);
-
-                var rotateCommand = new RotateCommand(_selectedMesh, doRotation, undoRotation);
-                _commandHistory.PushCommand(rotateCommand);
-                // Do NOT call Execute() here — rotation is already on the mesh from OnMouseMove.
+                var axis = HitTestRings(e.X, e.Y);
+                if (axis != RotateAxis.None)
+                {
+                    _rotateAxis = axis;
+                    _controlHost.SetCursor(Cursors.Hand);
+                    // Clear hover highlight while dragging.
+                    if (_lastHoveredElement != GizmoHoverElement.None)
+                    {
+                        _lastHoveredElement = GizmoHoverElement.None;
+                        _renderer.SetHoveredGizmoElement(GizmoHoverElement.None);
+                    }
+                    return;
+                }
             }
 
-            ResetRotationState();
+            // 2. Ray-cast for mesh body click.
+            Vector3 rayOrigin    = _camera.Position;
+            Vector3 rayDirection = _rayCaster.GetRay();
+
+            if (_rayCaster.RayIntersectsMesh(_sceneManager.GetMeshes(), rayOrigin, rayDirection,
+                    out float _, out IAppMesh? clickedMesh))
+            {
+                // Guard: when a gizmo is active, never switch to a different mesh via
+                // ray-cast.  The precise screen-space hit-test above (HitTestRings)
+                // may miss by a few pixels; falling through to a different mesh here
+                // would cause the wrong mesh to be moved/rotated.  Free-drag the
+                // already-selected mesh instead.  To select a different mesh the user
+                // first clicks empty space to deselect, then clicks the target mesh.
+                if (_selectedMesh != null && clickedMesh != _selectedMesh)
+                {
+                    _rotateAxis = RotateAxis.Free;
+                    _controlHost.SetCursor(Cursors.Hand);
+                    return;
+                }
+
+                _selectedMesh = clickedMesh;
+                _renderer.SetActiveGizmoMesh(_selectedMesh);
+                _renderer.SetGizmoMode(GizmoMode.RingsOnly);
+                _rotateAxis   = RotateAxis.Free;   // default: drag = free Y-axis spin
+                _controlHost.SetCursor(Cursors.Hand);
+                _controlHost.Invalidate();
+            }
+            else
+            {
+                // Deselect only if clearly outside gizmo ring area.
+                bool insideGizmo = false;
+                if (_selectedMesh != null && _renderer.TryGetGizmoInfo(out Vector3 gc, out float gr))
+                    insideGizmo = NearScreen(e.X, e.Y, gc, gr * 1.2f);
+
+                if (!insideGizmo)
+                {
+                    _selectedMesh       = null;
+                    _lastHoveredElement = GizmoHoverElement.None;
+                    _renderer.SetActiveGizmoMesh(null);   // also resets hover in SceneRenderer
+                    _controlHost.SetCursor(Cursors.Default);
+                    _controlHost.Invalidate();
+                }
+            }
         }
 
-        private void ResetRotationState()
+        // ── Mouse Move ─────────────────────────────────────────────────────
+
+        public void OnMouseMove(MouseEventArgs e)
         {
-            _isRotating = false;
-            _rotationAxis = Quaternion.Identity;
-            _accumulatedAngle = 0;
+            // Hover: update cursor and highlight the ring under the cursor.
+            if (_rotateAxis == RotateAxis.None)
+            {
+                if (_selectedMesh != null)
+                {
+                    var axis = HitTestRings(e.X, e.Y);
+                    _controlHost.SetCursor(axis != RotateAxis.None ? Cursors.Hand : Cursors.Default);
+
+                    var newHover = axis switch
+                    {
+                        RotateAxis.X => GizmoHoverElement.RotateX,
+                        RotateAxis.Y => GizmoHoverElement.RotateY,
+                        RotateAxis.Z => GizmoHoverElement.RotateZ,
+                        _            => GizmoHoverElement.None
+                    };
+                    if (newHover != _lastHoveredElement)
+                    {
+                        _lastHoveredElement = newHover;
+                        _renderer.SetHoveredGizmoElement(newHover);
+                        _controlHost.Render();
+                    }
+                }
+                return;
+            }
+
+            if (_selectedMesh == null) return;
+
+            float pxX = e.X - _lastClientPos.X;
+            if (Math.Abs(pxX) < 0.5f)
+            {
+                _lastClientPos = new Point(e.X, e.Y);
+                return;
+            }
+
+            float angle = pxX * _rotationSensitivity;
+            if (Math.Abs(angle) > 0.001f)
+            {
+                Vector3 axis = _rotateAxis switch
+                {
+                    RotateAxis.X    => Vector3.UnitX,
+                    RotateAxis.Y    => Vector3.UnitY,
+                    RotateAxis.Z    => Vector3.UnitZ,
+                    RotateAxis.Free => Vector3.UnitY,   // free drag: spin around world Y
+                    _               => Vector3.UnitY
+                };
+
+                var q = Quaternion.FromAxisAngle(axis, MathHelper.DegreesToRadians(angle));
+                _selectedMesh.Rotate(q);
+                _accumulatedAngle += angle;
+            }
+
+            _lastClientPos = new Point(e.X, e.Y);
+            _controlHost.Invalidate();
+        }
+
+        // ── Mouse Up ───────────────────────────────────────────────────────
+
+        public void OnMouseUp(MouseEventArgs e)
+        {
+            if (_selectedMesh != null && Math.Abs(_accumulatedAngle) > 0.001f)
+            {
+                Vector3 axis = _rotateAxis switch
+                {
+                    RotateAxis.X    => Vector3.UnitX,
+                    RotateAxis.Y    => Vector3.UnitY,
+                    RotateAxis.Z    => Vector3.UnitZ,
+                    RotateAxis.Free => Vector3.UnitY,
+                    _               => Vector3.UnitY
+                };
+
+                float rad     = MathHelper.DegreesToRadians(_accumulatedAngle);
+                var   doRot   = Quaternion.FromAxisAngle(axis,  rad);
+                var   undoRot = Quaternion.FromAxisAngle(axis, -rad);
+                _commandHistory.PushCommand(new RotateCommand(_selectedMesh, doRot, undoRot));
+            }
+
+            _rotateAxis       = RotateAxis.None;
+            _accumulatedAngle = 0f;
+        }
+
+        // ── Ring hit-test (screen-space) ──────────────────────────────────
+
+        private RotateAxis HitTestRings(int mx, int my)
+        {
+            if (!_renderer.TryGetGizmoInfo(out Vector3 center, out float radius))
+                return RotateAxis.None;
+
+            // Test consecutive arc segments rather than isolated sample points so
+            // the hit-zone is continuous around the full ring circumference.
+            for (int i = 0; i < RingSamples; i++)
+            {
+                float a0  = 2f * MathF.PI *  i          / RingSamples;
+                float a1  = 2f * MathF.PI * (i + 1)     / RingSamples;
+                float c0  = MathF.Cos(a0) * radius, s0 = MathF.Sin(a0) * radius;
+                float c1  = MathF.Cos(a1) * radius, s1 = MathF.Sin(a1) * radius;
+
+                // X ring: in render YZ plane
+                if (NearScreenLine(mx, my, center + new Vector3(0f, c0, s0),
+                                           center + new Vector3(0f, c1, s1), RingLinePx)) return RotateAxis.X;
+                // Y ring: in render XZ plane
+                if (NearScreenLine(mx, my, center + new Vector3(c0, 0f, s0),
+                                           center + new Vector3(c1, 0f, s1), RingLinePx)) return RotateAxis.Y;
+                // Z ring: in render XY plane
+                if (NearScreenLine(mx, my, center + new Vector3(c0, s0, 0f),
+                                           center + new Vector3(c1, s1, 0f), RingLinePx)) return RotateAxis.Z;
+            }
+
+            return RotateAxis.None;
+        }
+
+        // ── Screen-space projection helpers ───────────────────────────────
+
+        /// <summary>True when (mx,my) is within <paramref name="threshPx"/> pixels of the
+        /// screen-space line segment from <paramref name="worldA"/> to <paramref name="worldB"/>.</summary>
+        private bool NearScreenLine(int mx, int my, Vector3 worldA, Vector3 worldB, float threshPx)
+        {
+            var sa = ProjectToScreen(worldA);
+            var sb = ProjectToScreen(worldB);
+            if (sa == null || sb == null) return false;
+
+            Vector2 a = sa.Value, b = sb.Value, ab = b - a;
+            float lenSq = ab.LengthSquared;
+            float t = lenSq > 0.001f
+                ? Math.Clamp(Vector2.Dot(new Vector2(mx - a.X, my - a.Y), ab) / lenSq, 0f, 1f)
+                : 0f;
+
+            Vector2 closest = a + ab * t;
+            float dx = mx - closest.X, dy = my - closest.Y;
+            return dx * dx + dy * dy <= threshPx * threshPx;
+        }
+
+        private bool NearScreen(int mx, int my, Vector3 worldPos, float threshPx)
+        {
+            var sp = ProjectToScreen(worldPos);
+            if (sp == null) return false;
+            float dx = mx - sp.Value.X, dy = my - sp.Value.Y;
+            return dx * dx + dy * dy <= threshPx * threshPx;
+        }
+
+        private Vector2? ProjectToScreen(Vector3 worldPos)
+        {
+            Matrix4 vp   = _camera.GetViewMatrix() * _camera.GetProjectionMatrix();
+            Vector4 clip = new Vector4(worldPos, 1f) * vp;
+            if (clip.W <= 0f) return null;
+
+            float invW = 1f / clip.W;
+            return new Vector2(
+                ( clip.X * invW + 1f) * 0.5f * _controlHost.GetWidth(),
+                (1f - clip.Y * invW) * 0.5f * _controlHost.GetHeight()
+            );
         }
     }
 }

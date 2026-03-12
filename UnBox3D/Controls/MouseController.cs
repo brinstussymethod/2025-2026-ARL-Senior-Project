@@ -149,7 +149,7 @@ namespace UnBox3D.Controls
             float dyAligned = dx * (float)Math.Sin(r) + dy * (float)Math.Cos(r);
 
             // Apply sensitivities as usual (note the minus for pitch to keep “move up -> look up”)
-            _camera.Yaw += dxAligned * _cameraYawSensitivity;   // degrees
+            _camera.Yaw -= dxAligned * _cameraYawSensitivity;   // degrees
             _camera.Pitch -= dyAligned * _cameraPitchSensitivity; // degrees
         }
 

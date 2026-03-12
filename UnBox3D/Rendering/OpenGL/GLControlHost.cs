@@ -16,7 +16,8 @@ namespace UnBox3D.Rendering.OpenGL
         int GetHeight();
         void Render();
         void Cleanup();
-
+        /// <summary>Changes the mouse cursor displayed over the GL viewport.</summary>
+        void SetCursor(Cursor cursor);
     }
 
     // Enumeration for rendering modes
@@ -77,7 +78,7 @@ namespace UnBox3D.Rendering.OpenGL
             -0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f
         };
 
-        private readonly Vector3 _lightPos = new Vector3(1.2f, 1.0f, 2.0f);
+        private readonly Vector3 _lightPos = new Vector3(5f, 8f, 5f);
 
         private int _vertexBufferObject;
 
@@ -97,8 +98,8 @@ namespace UnBox3D.Rendering.OpenGL
         private readonly ISceneManager _sceneManager;
         private readonly IRenderer _sceneRenderer;
         private  GridPlaneRenderer _gridRenderer;
-        private readonly string _vertShader = "Rendering/OpenGL/Shaders/shader.vert";
-        private readonly string _fragShader = "Rendering/OpenGL/Shaders/lighting.frag";
+        private readonly string _gridVertShader = "Rendering/OpenGL/Shaders/shader.vert";
+        private readonly string _gridFragShader = "Rendering/OpenGL/Shaders/grid.frag";
 
         private ICamera _camera;
 
@@ -130,6 +131,8 @@ namespace UnBox3D.Rendering.OpenGL
         {
             Invalidate();
         }
+
+        public void SetCursor(Cursor cursor) => Cursor = cursor;
         public void SetRenderMode(RenderMode mode)
         {
             currentRenderMode = mode;
@@ -231,17 +234,18 @@ namespace UnBox3D.Rendering.OpenGL
             GL.DepthFunc(DepthFunction.Less);
             GL.Disable(EnableCap.CullFace);
 
-            _gridRenderer = new GridPlaneRenderer(_vertShader, _fragShader);
+            _gridRenderer = new GridPlaneRenderer(_gridVertShader, _gridFragShader);
         }
 
         private void GlControl_Paint(object? sender, PaintEventArgs e)
         {
             GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
 
-            _sceneRenderer.RenderScene(_camera, _lightingShader);
-
+            // Draw grid first so the gizmo (rendered with depth test disabled) always
+            // appears on top of grid lines regardless of camera angle.
             _gridRenderer.DrawGrid(_camera.GetViewMatrix(), _camera.GetProjectionMatrix());
 
+            _sceneRenderer.RenderScene(_camera, _lightingShader, _lightPos);
 
             GL.BindVertexArray(_vaoLamp);
 

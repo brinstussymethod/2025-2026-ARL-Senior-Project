@@ -37,6 +37,7 @@ namespace UnBox3D.ViewModels
         private readonly IBlenderInstaller _blenderInstaller;
         private readonly ModelExporter _modelExporter;
         private readonly ICommandHistory _commandHistory;
+        private readonly IRenderer _renderer;
         private string? _importedFilePath; // Global filepath that should be referenced when simplifying
         private List<IAppMesh>? _latestImportedModel; // This is so we can keep track of the original model when playing around with small mesh thresholds.
         private IAppMesh? _lastSelectedMesh; // Keep track of the previously selected mesh so we can remove its highlight
@@ -117,7 +118,8 @@ namespace UnBox3D.ViewModels
         public MainViewModel(ILogger logger, ISettingsManager settingsManager, ISceneManager sceneManager,
             IFileSystem fileSystem, BlenderIntegration blenderIntegration,
             IBlenderInstaller blenderInstaller, ModelExporter modelExporter,
-            MouseController mouseController, IGLControlHost glControlHost, ICamera camera, ICommandHistory commandHistory)
+            MouseController mouseController, IGLControlHost glControlHost, ICamera camera, ICommandHistory commandHistory,
+            IRenderer renderer)
         {
             _logger = logger;
             _settingsManager = settingsManager;
@@ -131,6 +133,7 @@ namespace UnBox3D.ViewModels
             _glControlHost = glControlHost;
             _camera = camera;
             _commandHistory = commandHistory;
+            _renderer = renderer;
             // setup selection highlight colors
             LoadColors();
         }
@@ -1151,8 +1154,41 @@ namespace UnBox3D.ViewModels
             // 3) Remember the current selection so we can un-highlight it next time.
             _lastSelectedMesh = value;
 
-            // 4) Ask the GL view to repaint so the color change shows immediately.
+            // 4) Retarget the gizmo when the selection changes while a transform mode is active.
+            //    This ensures panel-driven selection updates the gizmo just like a viewport click.
+            RetargetGizmoToSelectedMesh();
+
+            // 5) Ask the GL view to repaint so the color change shows immediately.
             _glControlHost.Render();
+        }
+
+        /// <summary>
+        /// True while Move, Rotate, or Gimbal mode is the active mouse state.
+        /// Used by the MainWindow viewport click handler to avoid updating SelectedMesh
+        /// while the state machine owns mesh interaction.
+        /// </summary>
+        public bool IsTransformModeActive =>
+            _mouseController.GetState() is MoveState or RotateState or GimbalState;
+
+        /// <summary>
+        /// Points the active gizmo at the currently selected mesh, or hides it when nothing is selected.
+        /// Must be called any time the selected mesh or its world position changes (selection change, undo, redo).
+        /// </summary>
+        private void RetargetGizmoToSelectedMesh()
+        {
+            if (SelectedMesh != null)
+            {
+                switch (_mouseController.GetState())
+                {
+                    case GimbalState gs: gs.SetSelectedMesh(SelectedMesh); break;
+                    case MoveState ms:   ms.SetSelectedMesh(SelectedMesh); break;
+                    case RotateState rs: rs.SetSelectedMesh(SelectedMesh); break;
+                }
+            }
+            else
+            {
+                _renderer.SetActiveGizmoMesh(null);
+            }
         }
 
         /// <summary>
@@ -1250,8 +1286,9 @@ namespace UnBox3D.ViewModels
             if (cmd == null) return;
             cmd.Undo();
             _commandHistory.PushRedoCommand(cmd);
-            _glControlHost.Render();
             RefreshMeshesCollection();
+            RetargetGizmoToSelectedMesh();
+            _glControlHost.Render();
         }
         private bool CanUndoAction() => _commandHistory.CanUndo;
 
@@ -1262,8 +1299,9 @@ namespace UnBox3D.ViewModels
             if (cmd == null) return;
             cmd.Execute();
             _commandHistory.PushCommand(cmd);
-            _glControlHost.Render();
             RefreshMeshesCollection();
+            RetargetGizmoToSelectedMesh();
+            _glControlHost.Render();
         }
         private bool CanRedoAction() => _commandHistory.CanRedo;
 
@@ -1285,6 +1323,7 @@ namespace UnBox3D.ViewModels
         private void SetSelectMode()
         {
             ActiveMode = "Select";
+            _renderer.SetActiveGizmoMesh(null);
             var state = new DefaultState(_sceneManager, _glControlHost, _camera, new RayCaster(_glControlHost, _camera));
             _mouseController.SetState(state);
         }
@@ -1293,6 +1332,7 @@ namespace UnBox3D.ViewModels
         private void SetDeleteMode()
         {
             ActiveMode = "Delete";
+            _renderer.SetActiveGizmoMesh(null);
             var state = new DeleteState(_glControlHost, _sceneManager, _camera, new RayCaster(_glControlHost, _camera), _commandHistory);
             _mouseController.SetState(state);
         }
@@ -1301,7 +1341,12 @@ namespace UnBox3D.ViewModels
         private void SetMoveMode()
         {
             ActiveMode = "Move";
-            var state = new MoveState(_glControlHost, _sceneManager, _camera, new RayCaster(_glControlHost, _camera), _commandHistory);
+            var state = new MoveState(_glControlHost, _sceneManager, _camera, new RayCaster(_glControlHost, _camera), _commandHistory, _renderer);
+            // If a mesh is already selected, show arrows immediately — no need to click again.
+            if (SelectedMesh != null)
+                state.SetSelectedMesh(SelectedMesh);
+            else
+                _renderer.SetActiveGizmoMesh(null);
             _mouseController.SetState(state);
         }
 
@@ -1309,7 +1354,30 @@ namespace UnBox3D.ViewModels
         private void SetRotateMode()
         {
             ActiveMode = "Rotate";
-            var state = new RotateState(_settingsManager, _sceneManager, _glControlHost, _camera, new RayCaster(_glControlHost, _camera), _commandHistory);
+            var state = new RotateState(_settingsManager, _sceneManager, _glControlHost, _camera, new RayCaster(_glControlHost, _camera), _commandHistory, _renderer);
+            // If a mesh is already selected, show rings immediately — no need to click again.
+            if (SelectedMesh != null)
+                state.SetSelectedMesh(SelectedMesh);
+            else
+                _renderer.SetActiveGizmoMesh(null);
+            _mouseController.SetState(state);
+        }
+
+        [RelayCommand]
+        private void SetGimbalMode()
+        {
+            ActiveMode = "Gimbal";
+            var state = new GimbalState(_glControlHost, _sceneManager, _camera, new RayCaster(_glControlHost, _camera), _commandHistory, _renderer);
+
+            // If a mesh is already selected in the scene, show the gimbal rings immediately
+            // without making the user click again.
+            if (SelectedMesh != null)
+            {
+                state.SetSelectedMesh(SelectedMesh);
+                _glControlHost.Invalidate();
+            }
+
+            _renderer.SetGizmoMode(GizmoMode.Full);
             _mouseController.SetState(state);
         }
 
