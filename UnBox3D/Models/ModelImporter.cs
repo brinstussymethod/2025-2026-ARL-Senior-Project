@@ -125,10 +125,14 @@ namespace UnBox3D.Models
 
             g4.Vector3d center = scaledBounds.Center;
 
+            // Offset so the model is centered in X/Y but sits on top of the grid (Z=0 in g4 space maps to 
+            // render Y=0, which is where the grid plane lives).
+            g4.Vector3d spawnOffset = new g4.Vector3d(-center.x, -center.y, -scaledBounds.Min.z);
+
             foreach (var (dmesh, assimpMesh) in meshPairs)
             {
-                // Translate mesh to center it at origin
-                MeshTransforms.Translate(dmesh, -center);
+                // Translate mesh so it rests on top of the grid
+                MeshTransforms.Translate(dmesh, spawnOffset);
 
                 // Sync updated vertex positions back into the Assimp mesh
                 for (int vi = 0; vi < dmesh.VertexCount; vi++)
