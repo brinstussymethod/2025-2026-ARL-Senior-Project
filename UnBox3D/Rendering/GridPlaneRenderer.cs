@@ -15,8 +15,8 @@ namespace UnBox3D.Rendering
 
         public GridPlaneRenderer(string vertexShaderPath, string fragmentShaderPath)
         {
-            _gridSize = 1000.0f;
-            _gridLines = 1000;   // grid lines in ONE quadrant at one axis | Ex. 10 _gridLines = total 20 lines in 1 quadrant (10 x-axis & 10 z-axis)
+            _gridSize = 10f;
+            _gridLines = 25;   // grid lines in ONE quadrant at one axis | Ex. 10 _gridLines = total 20 lines in 1 quadrant (10 x-axis & 10 z-axis)
             _transparency = 0.3f;
 
             // Load Shader using your Shader class
@@ -72,8 +72,8 @@ namespace UnBox3D.Rendering
 
         public void DrawGrid(Matrix4 view, Matrix4 projection)
         {
-            //GL.Enable(EnableCap.Blend);
-            //GL.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
+            GL.Enable(EnableCap.Blend);
+            GL.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
             GL.Enable(EnableCap.DepthTest);
             GL.DepthMask(false);
 
@@ -82,6 +82,7 @@ namespace UnBox3D.Rendering
             _shader.SetMatrix4("view", view);
             _shader.SetMatrix4("projection", projection);
             _shader.SetMatrix4("model", Matrix4.Identity);
+            _shader.SetFloat("alpha", _transparency);
 
             // Bind VAO and draw
             GL.BindVertexArray(_vao);

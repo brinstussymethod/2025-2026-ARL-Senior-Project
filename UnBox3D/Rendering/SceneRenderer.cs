@@ -21,7 +21,7 @@ namespace UnBox3D.Rendering
 
     public interface IRenderer
     {
-        void RenderScene(ICamera camera, Shader shader);
+        void RenderScene(ICamera camera, Shader shader, Vector3 lightPosition);
         void SetActiveGizmoMesh(IAppMesh? mesh);
         /// <summary>Sets which parts of the gizmo are rendered. Call before or after SetActiveGizmoMesh.</summary>
         void SetGizmoMode(GizmoMode mode);
@@ -88,7 +88,7 @@ namespace UnBox3D.Rendering
             _logger.Info("Initializing SceneRenderer");
         }
 
-        public void RenderScene(ICamera camera, Shader shader)
+        public void RenderScene(ICamera camera, Shader shader, Vector3 lightPosition)
         {
             var meshes = _sceneManager.GetMeshes();
 
@@ -102,13 +102,12 @@ namespace UnBox3D.Rendering
                 return;
             }
 
-            Vector3 lightPos = new(1.2f, 1.0f, 2.0f);
             shader.Use();
 
             shader.SetMatrix4("view",       camera.GetViewMatrix());
             shader.SetMatrix4("projection", camera.GetProjectionMatrix());
             shader.SetVector3("lightColor", new Vector3(1f, 1f, 1f));
-            shader.SetVector3("lightPos",   lightPos);
+            shader.SetVector3("lightPos",   lightPosition);
             shader.SetVector3("viewPos",    camera.Position);
 
             foreach (var appMesh in meshes)

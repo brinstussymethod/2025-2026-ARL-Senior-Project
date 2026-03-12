@@ -50,6 +50,9 @@
     <None Update="Rendering\OpenGL\Shaders\gizmo.frag">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
+    <None Update="Rendering\OpenGL\Shaders\grid.frag">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
     <None Update="Scripts\simplify.exe">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
