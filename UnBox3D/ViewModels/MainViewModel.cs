@@ -1156,22 +1156,31 @@ namespace UnBox3D.ViewModels
 
             // 4) Retarget the gizmo when the selection changes while a transform mode is active.
             //    This ensures panel-driven selection updates the gizmo just like a viewport click.
-            if (value != null)
+            RetargetGizmoToSelectedMesh();
+
+            // 5) Ask the GL view to repaint so the color change shows immediately.
+            _glControlHost.Render();
+        }
+
+        /// <summary>
+        /// Points the active gizmo at the currently selected mesh, or hides it when nothing is selected.
+        /// Must be called any time the selected mesh or its world position changes (selection change, undo, redo).
+        /// </summary>
+        private void RetargetGizmoToSelectedMesh()
+        {
+            if (SelectedMesh != null)
             {
                 switch (_mouseController.GetState())
                 {
-                    case GimbalState gs: gs.SetSelectedMesh(value); break;
-                    case MoveState ms:   ms.SetSelectedMesh(value); break;
-                    case RotateState rs: rs.SetSelectedMesh(value); break;
+                    case GimbalState gs: gs.SetSelectedMesh(SelectedMesh); break;
+                    case MoveState ms:   ms.SetSelectedMesh(SelectedMesh); break;
+                    case RotateState rs: rs.SetSelectedMesh(SelectedMesh); break;
                 }
             }
             else
             {
                 _renderer.SetActiveGizmoMesh(null);
             }
-
-            // 5) Ask the GL view to repaint so the color change shows immediately.
-            _glControlHost.Render();
         }
 
         /// <summary>
@@ -1269,8 +1278,9 @@ namespace UnBox3D.ViewModels
             if (cmd == null) return;
             cmd.Undo();
             _commandHistory.PushRedoCommand(cmd);
-            _glControlHost.Render();
             RefreshMeshesCollection();
+            RetargetGizmoToSelectedMesh();
+            _glControlHost.Render();
         }
         private bool CanUndoAction() => _commandHistory.CanUndo;
 
@@ -1281,8 +1291,9 @@ namespace UnBox3D.ViewModels
             if (cmd == null) return;
             cmd.Execute();
             _commandHistory.PushCommand(cmd);
-            _glControlHost.Render();
             RefreshMeshesCollection();
+            RetargetGizmoToSelectedMesh();
+            _glControlHost.Render();
         }
         private bool CanRedoAction() => _commandHistory.CanRedo;
 
