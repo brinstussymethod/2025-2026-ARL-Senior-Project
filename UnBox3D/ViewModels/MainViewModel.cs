@@ -1154,7 +1154,23 @@ namespace UnBox3D.ViewModels
             // 3) Remember the current selection so we can un-highlight it next time.
             _lastSelectedMesh = value;
 
-            // 4) Ask the GL view to repaint so the color change shows immediately.
+            // 4) Retarget the gizmo when the selection changes while a transform mode is active.
+            //    This ensures panel-driven selection updates the gizmo just like a viewport click.
+            if (value != null)
+            {
+                switch (_mouseController.GetState())
+                {
+                    case GimbalState gs: gs.SetSelectedMesh(value); break;
+                    case MoveState ms:   ms.SetSelectedMesh(value); break;
+                    case RotateState rs: rs.SetSelectedMesh(value); break;
+                }
+            }
+            else
+            {
+                _renderer.SetActiveGizmoMesh(null);
+            }
+
+            // 5) Ask the GL view to repaint so the color change shows immediately.
             _glControlHost.Render();
         }
 
