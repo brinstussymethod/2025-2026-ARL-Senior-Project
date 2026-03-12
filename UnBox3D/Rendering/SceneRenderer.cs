@@ -104,7 +104,10 @@ namespace UnBox3D.Rendering
             foreach (var appMesh in meshes)
             {
                 GL.BindVertexArray(appMesh.GetVAO());
-                Matrix4 model = Matrix4.CreateFromQuaternion(appMesh.GetTransform());
+                Vector3 c     = appMesh.GetRenderCenter();
+                Matrix4 model = Matrix4.CreateTranslation(-c)
+                              * Matrix4.CreateFromQuaternion(appMesh.GetTransform())
+                              * Matrix4.CreateTranslation(c);
                 shader.SetMatrix4("model",       model);
                 shader.SetVector3("objectColor", appMesh.GetColor());
                 GL.DrawElements(PrimitiveType.Triangles, appMesh.GetIndices().Length, DrawElementsType.UnsignedInt, 0);
