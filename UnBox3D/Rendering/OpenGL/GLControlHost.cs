@@ -241,10 +241,11 @@ namespace UnBox3D.Rendering.OpenGL
         {
             GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
 
-            _sceneRenderer.RenderScene(_camera, _lightingShader);
-
+            // Draw grid first so the gizmo (rendered with depth test disabled) always
+            // appears on top of grid lines regardless of camera angle.
             _gridRenderer.DrawGrid(_camera.GetViewMatrix(), _camera.GetProjectionMatrix());
 
+            _sceneRenderer.RenderScene(_camera, _lightingShader);
 
             GL.BindVertexArray(_vaoLamp);
 

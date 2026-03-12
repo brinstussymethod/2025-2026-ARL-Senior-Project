@@ -641,6 +641,12 @@ namespace UnBox3D.Views
             if (e.Button != System.Windows.Forms.MouseButtons.Left) return;
             if (DataContext is not MainViewModel vm) return;
 
+            // While a transform gizmo is active the state machine owns all mesh interaction.
+            // Letting this handler update SelectedMesh would bypass the gizmo guards and
+            // reassign _selectedMesh in the active state to whatever the ray happens to hit
+            // behind the gizmo arrows or rings.
+            if (vm.IsTransformModeActive) return;
+
             // 1) Build ray in world space
             RayCaster rayCaster = new RayCaster(_controlHost, vm.Camera);
 

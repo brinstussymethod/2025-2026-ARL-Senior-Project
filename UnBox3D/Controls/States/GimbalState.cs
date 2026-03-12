@@ -123,6 +123,20 @@ namespace UnBox3D.Controls.States
             if (_rayCaster.RayIntersectsMesh(_sceneManager.GetMeshes(), rayOrigin, rayDirection,
                     out float _, out IAppMesh? clickedMesh))
             {
+                // Guard: when a gizmo is active, never switch to a different mesh via
+                // ray-cast.  The precise screen-space hit-test above (HitTestGizmo)
+                // may miss by a few pixels; falling through to a different mesh here
+                // would cause the wrong mesh to be moved/rotated.  Free-drag the
+                // already-selected mesh instead.  To select a different mesh the user
+                // first clicks empty space to deselect, then clicks the target mesh.
+                if (_selectedMesh != null && clickedMesh != _selectedMesh)
+                {
+                    _dragMode   = GimbalDragMode.FreeDrag;
+                    _worldScale = WorldScaleFromCamera();
+                    ApplyCursor(_dragMode);
+                    return;
+                }
+
                 _selectedMesh = clickedMesh;
                 _renderer.SetActiveGizmoMesh(_selectedMesh);
                 _dragMode     = GimbalDragMode.FreeDrag;

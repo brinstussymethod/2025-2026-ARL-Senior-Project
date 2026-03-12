@@ -1163,6 +1163,14 @@ namespace UnBox3D.ViewModels
         }
 
         /// <summary>
+        /// True while Move, Rotate, or Gimbal mode is the active mouse state.
+        /// Used by the MainWindow viewport click handler to avoid updating SelectedMesh
+        /// while the state machine owns mesh interaction.
+        /// </summary>
+        public bool IsTransformModeActive =>
+            _mouseController.GetState() is MoveState or RotateState or GimbalState;
+
+        /// <summary>
         /// Points the active gizmo at the currently selected mesh, or hides it when nothing is selected.
         /// Must be called any time the selected mesh or its world position changes (selection change, undo, redo).
         /// </summary>
