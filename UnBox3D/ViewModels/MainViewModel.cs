@@ -11,6 +11,7 @@ using System.Windows;
 using UnBox3D.Commands;
 using UnBox3D.Controls;
 using UnBox3D.Controls.States;
+using UnBox3D.Rendering.Rulers;
 using UnBox3D.Models;
 using UnBox3D.Rendering;
 using UnBox3D.Rendering.OpenGL;
@@ -38,6 +39,8 @@ namespace UnBox3D.ViewModels
         private readonly ModelExporter _modelExporter;
         private readonly ICommandHistory _commandHistory;
         private readonly IRenderer _renderer;
+        private readonly IRulerManager  _rulerManager;
+        private readonly RulerRenderer  _rulerRenderer;
         private string? _importedFilePath; // Global filepath that should be referenced when simplifying
         private List<IAppMesh>? _latestImportedModel; // This is so we can keep track of the original model when playing around with small mesh thresholds.
         private IAppMesh? _lastSelectedMesh; // Keep track of the previously selected mesh so we can remove its highlight
@@ -119,7 +122,7 @@ namespace UnBox3D.ViewModels
             IFileSystem fileSystem, BlenderIntegration blenderIntegration,
             IBlenderInstaller blenderInstaller, ModelExporter modelExporter,
             MouseController mouseController, IGLControlHost glControlHost, ICamera camera, ICommandHistory commandHistory,
-            IRenderer renderer)
+            IRenderer renderer, IRulerManager rulerManager, RulerRenderer rulerRenderer)
         {
             _logger = logger;
             _settingsManager = settingsManager;
@@ -134,6 +137,8 @@ namespace UnBox3D.ViewModels
             _camera = camera;
             _commandHistory = commandHistory;
             _renderer = renderer;
+            _rulerManager  = rulerManager;
+            _rulerRenderer = rulerRenderer;
             // setup selection highlight colors
             LoadColors();
         }
@@ -1171,7 +1176,7 @@ namespace UnBox3D.ViewModels
         /// while the state machine owns mesh interaction.
         /// </summary>
         public bool IsTransformModeActive =>
-            _mouseController.GetState() is MoveState or RotateState or GimbalState;
+            _mouseController.GetState() is MoveState or RotateState or GimbalState or RulerState;
 
         /// <summary>
         /// Points the active gizmo at the currently selected mesh, or hides it when nothing is selected.
@@ -1382,6 +1387,19 @@ namespace UnBox3D.ViewModels
 
             _renderer.SetGizmoMode(GizmoMode.Full);
             _mouseController.SetState(state);
+        }
+
+        [RelayCommand]
+        private void SetRulerMode()
+        {
+            ActiveMode = "Ruler";
+            _renderer.SetActiveGizmoMesh(null);
+            _renderer.SetGizmoMode(GizmoMode.None);
+            var state = new RulerState(
+                _glControlHost, _camera, new RayCaster(_glControlHost, _camera),
+                _commandHistory, _rulerManager, _rulerRenderer);
+            _mouseController.SetState(state);
+            _glControlHost.Invalidate();
         }
 
         #endregion

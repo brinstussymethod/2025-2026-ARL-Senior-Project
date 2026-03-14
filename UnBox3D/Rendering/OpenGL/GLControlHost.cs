@@ -4,6 +4,7 @@ using OpenTK.GLControl;
 using UnBox3D.Utils;
 using UnBox3D.Controls.States;
 using UnBox3D.Controls;
+using UnBox3D.Rendering.Rulers;
 using System.Diagnostics;
 
 namespace UnBox3D.Rendering.OpenGL
@@ -102,6 +103,8 @@ namespace UnBox3D.Rendering.OpenGL
         private readonly string _gridFragShader = "Rendering/OpenGL/Shaders/grid.frag";
 
         private ICamera _camera;
+        private IRulerManager? _rulerManager;
+        private RulerRenderer? _rulerRenderer;
 
         private RenderMode currentRenderMode;
         private ShadingModel currentShadingModel;
@@ -109,7 +112,8 @@ namespace UnBox3D.Rendering.OpenGL
 
         // The GLControlHost now receives the single DI-managed Camera instance.
         // It no longer constructs its own Camera/RayCaster/Mouse/Keyboard controllers.
-        public GLControlHost(ISceneManager sceneManager, IRenderer sceneRenderer, ISettingsManager settingsManager, ICamera camera)
+        public GLControlHost(ISceneManager sceneManager, IRenderer sceneRenderer, ISettingsManager settingsManager, ICamera camera,
+                             IRulerManager? rulerManager = null, RulerRenderer? rulerRenderer = null)
         {
             Dock = DockStyle.Fill;
 
@@ -117,6 +121,8 @@ namespace UnBox3D.Rendering.OpenGL
             _sceneRenderer      = sceneRenderer;
             _settingsManager    = settingsManager;
             _camera             = camera;
+            _rulerManager       = rulerManager;
+            _rulerRenderer      = rulerRenderer;
 
             // Attach event handlers
             // Only rendering lifecycle events are handled here.
@@ -259,6 +265,10 @@ namespace UnBox3D.Rendering.OpenGL
             _lampShader.SetMatrix4("projection", _camera.GetProjectionMatrix());
 
             GL.DrawArrays(PrimitiveType.Triangles, 0, 36);
+
+            // Draw rulers on top of everything (depth test disabled inside Render)
+            if (_rulerRenderer != null && _rulerManager != null)
+                _rulerRenderer.Render(_rulerManager.GetRulers(), _camera.GetViewMatrix(), _camera.GetProjectionMatrix());
 
             SwapBuffers();
         }
