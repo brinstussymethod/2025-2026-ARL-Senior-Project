@@ -59,15 +59,19 @@ namespace UnBox3D.Views
             // Subscribe to toast notifications
             ToastService.ToastRequested += ShowToast;
 
-            // Keyboard shortcuts for undo / redo
+            // Keyboard shortcuts for undo / redo / deselect
             var undoGesture = new KeyBinding(
                 new RelayCommandAdapter(() => VM?.UndoActionCommand?.Execute(null)),
                 Key.Z, ModifierKeys.Control);
             var redoGesture = new KeyBinding(
                 new RelayCommandAdapter(() => VM?.RedoActionCommand?.Execute(null)),
                 Key.Y, ModifierKeys.Control);
+            var deselectGesture = new KeyBinding(
+                new RelayCommandAdapter(() => VM?.DeselectCommand?.Execute(null)),
+                Key.Escape, ModifierKeys.None);
             InputBindings.Add(undoGesture);
             InputBindings.Add(redoGesture);
+            InputBindings.Add(deselectGesture);
         }
 
         public void Initialize(IGLControlHost controlHost, ILogger logger, IBlenderInstaller blenderInstaller)
@@ -148,24 +152,7 @@ namespace UnBox3D.Views
                 newVm.PropertyChanged += OnVmPropertyChanged;
         }
 
-        private void OnVmPropertyChanged(object? sender, PropertyChangedEventArgs e)
-        {
-            if (e.PropertyName != nameof(MainViewModel.HierarchyVisible)) return;
-            if (sender is not MainViewModel vm) return;
-
-            Dispatcher.Invoke(() =>
-            {
-                bool show = vm.HierarchyVisible;
-
-                // Stop any running animation so the local value is writable again,
-                // then snap directly - instant and reliable.
-                HierarchyColumn.BeginAnimation(ColumnDefinition.WidthProperty, null);
-                HierarchyColumn.Width = new GridLength(show ? 260 : 0);
-
-                // Also hide the splitter so the 4px gap doesn't linger.
-                HierarchySplitter.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
-            });
-        }
+        private void OnVmPropertyChanged(object? sender, PropertyChangedEventArgs e) { }
 
         private System.Windows.Threading.DispatcherTimer? _toastTimer;
         private System.Windows.Threading.DispatcherTimer? _notifyTimer;
@@ -435,6 +422,36 @@ namespace UnBox3D.Views
                 e.Handled = true;
                 return;
             }
+        }
+
+        /// <summary>
+        /// PreviewTextInput handler for the Precise Rotate angle fields.
+        /// Extends the standard numeric handler to also allow a leading minus sign
+        /// so the user can enter negative degree values (e.g. -90).
+        /// </summary>
+        private void AngleTextBox_PreviewTextInput(object sender, TextCompositionEventArgs e)
+        {
+            if (sender is not TextBox textBox) return;
+
+            char c = e.Text[0];
+
+            // Allow '-' only as the very first character and only once.
+            if (c == '-')
+            {
+                e.Handled = textBox.CaretIndex != 0 || textBox.Text.Contains('-');
+                return;
+            }
+
+            // Allow one decimal point.
+            if (c == '.')
+            {
+                e.Handled = textBox.Text.Contains('.');
+                return;
+            }
+
+            // Allow digits, block everything else.
+            if (!char.IsDigit(c))
+                e.Handled = true;
         }
 
         private void NumericTextBox_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
