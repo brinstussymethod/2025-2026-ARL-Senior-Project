@@ -65,6 +65,7 @@ namespace UnBox3D.Rendering.Rulers
                 VboCap   = vboCap,
                 VertCountBase  = DiscSegs + 2,
                 VertCountShaft = 2,
+                BaseRender     = baseR,
             };
 
             _gpuData[ruler.Id] = data;
@@ -109,6 +110,18 @@ namespace UnBox3D.Rendering.Rulers
             GL.Disable(EnableCap.Blend);
             GL.Enable(EnableCap.DepthTest);
             GL.BindVertexArray(0);
+        }
+
+        /// <summary>Returns the base disc centre (render space) for hit-testing.</summary>
+        public bool TryGetBaseCenter(Guid id, out Vector3 baseCenter)
+        {
+            if (_gpuData.TryGetValue(id, out var d))
+            {
+                baseCenter = d.BaseRender;
+                return true;
+            }
+            baseCenter = Vector3.Zero;
+            return false;
         }
 
         // ── Geometry builders ──────────────────────────────────────────────
@@ -175,6 +188,7 @@ namespace UnBox3D.Rendering.Rulers
             public int VaoCap,   VboCap;
             public int VertCountBase;
             public int VertCountShaft;
+            public Vector3 BaseRender;
 
             public void Dispose()
             {
