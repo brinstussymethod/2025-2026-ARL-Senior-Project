@@ -12,6 +12,7 @@ using UnBox3D.Utils;
 using UnBox3D.ViewModels;
 using UnBox3D.Views;
 using UnBox3D.Theming;
+using UnBox3D.Rendering.Rulers;
 using Application = System.Windows.Application;
 
 namespace UnBox3D
@@ -115,15 +116,22 @@ namespace UnBox3D
                 var scene = provider.GetRequiredService<ISceneManager>();
                 return new SceneRenderer(logger, settings, scene);
             });
+
+            // Ruler system
+            services.AddSingleton<IRulerManager, RulerManager>();
+            services.AddSingleton<RulerRenderer>();
+
             // GLControlHost is the WinForms GL surface bridge. It now receives the unified DI Camera.
             // IMPORTANT: host no longer owns/creates its own Camera/Mouse/Ray; that was the source of duplicates.
             services.AddSingleton<GLControlHost>(provider =>                        // GLControlHost
             {
-                var scene    = provider.GetRequiredService<ISceneManager>();
-                var renderer = provider.GetRequiredService<IRenderer>();
-                var settings = provider.GetRequiredService<ISettingsManager>();
-                var camera   = provider.GetRequiredService<ICamera>();
-                return new GLControlHost(scene, renderer, settings, camera); // adjusted to match 3‑arg constructornified pipeline
+                var scene         = provider.GetRequiredService<ISceneManager>();
+                var renderer      = provider.GetRequiredService<IRenderer>();
+                var settings      = provider.GetRequiredService<ISettingsManager>();
+                var camera        = provider.GetRequiredService<ICamera>();
+                var rulerManager  = provider.GetRequiredService<IRulerManager>();
+                var rulerRenderer = provider.GetRequiredService<RulerRenderer>();
+                return new GLControlHost(scene, renderer, settings, camera, rulerManager, rulerRenderer);
             });
             services.AddSingleton<IGLControlHost>(sp => sp.GetRequiredService<GLControlHost>());
 
@@ -182,7 +190,9 @@ namespace UnBox3D
                 var host     = provider.GetRequiredService<IGLControlHost>();
                 var history  = provider.GetRequiredService<ICommandHistory>();
                 var renderer = provider.GetRequiredService<IRenderer>();
-                return new MainViewModel(logger, settings, scene, fs, blender, installer, exporter, mouse, host, camera, history, renderer);
+                var rulerMgr = provider.GetRequiredService<IRulerManager>();
+                var rulerRdr = provider.GetRequiredService<RulerRenderer>();
+                return new MainViewModel(logger, settings, scene, fs, blender, installer, exporter, mouse, host, camera, history, renderer, rulerMgr, rulerRdr);
             });
 
             services.AddSingleton<BlenderIntegration>();
