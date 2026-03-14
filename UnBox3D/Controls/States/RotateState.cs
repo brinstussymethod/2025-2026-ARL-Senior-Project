@@ -22,13 +22,14 @@ namespace UnBox3D.Controls.States
         private const int   RingSamples = 24;   // sample points around each ring
         private const float RingLinePx  = 16f;  // hit radius for ring lines (px)
 
-        private readonly ISettingsManager _settingsManager;
-        private readonly ISceneManager   _sceneManager;
-        private readonly IGLControlHost  _controlHost;
-        private readonly ICamera         _camera;
-        private readonly IRayCaster      _rayCaster;
-        private readonly ICommandHistory _commandHistory;
-        private readonly IRenderer       _renderer;
+        private readonly ISettingsManager  _settingsManager;
+        private readonly ISceneManager     _sceneManager;
+        private readonly IGLControlHost    _controlHost;
+        private readonly ICamera           _camera;
+        private readonly IRayCaster        _rayCaster;
+        private readonly ICommandHistory   _commandHistory;
+        private readonly IRenderer         _renderer;
+        private readonly Action<IAppMesh?>? _onSelectionChanged;
 
         private IAppMesh? _selectedMesh;
 
@@ -41,21 +42,23 @@ namespace UnBox3D.Controls.States
         private GizmoHoverElement  _lastHoveredElement = GizmoHoverElement.None;
 
         public RotateState(
-            ISettingsManager settingsManager,
-            ISceneManager   sceneManager,
-            IGLControlHost  controlHost,
-            ICamera         camera,
-            IRayCaster      rayCaster,
-            ICommandHistory commandHistory,
-            IRenderer       renderer)
+            ISettingsManager   settingsManager,
+            ISceneManager      sceneManager,
+            IGLControlHost     controlHost,
+            ICamera            camera,
+            IRayCaster         rayCaster,
+            ICommandHistory    commandHistory,
+            IRenderer          renderer,
+            Action<IAppMesh?>? onSelectionChanged = null)
         {
-            _settingsManager     = settingsManager ?? throw new ArgumentNullException(nameof(settingsManager));
-            _sceneManager        = sceneManager    ?? throw new ArgumentNullException(nameof(sceneManager));
-            _controlHost         = controlHost     ?? throw new ArgumentNullException(nameof(controlHost));
-            _camera              = camera          ?? throw new ArgumentNullException(nameof(camera));
-            _rayCaster           = rayCaster       ?? throw new ArgumentNullException(nameof(rayCaster));
-            _commandHistory      = commandHistory  ?? throw new ArgumentNullException(nameof(commandHistory));
-            _renderer            = renderer        ?? throw new ArgumentNullException(nameof(renderer));
+            _settingsManager    = settingsManager ?? throw new ArgumentNullException(nameof(settingsManager));
+            _sceneManager       = sceneManager    ?? throw new ArgumentNullException(nameof(sceneManager));
+            _controlHost        = controlHost     ?? throw new ArgumentNullException(nameof(controlHost));
+            _camera             = camera          ?? throw new ArgumentNullException(nameof(camera));
+            _rayCaster          = rayCaster       ?? throw new ArgumentNullException(nameof(rayCaster));
+            _commandHistory     = commandHistory  ?? throw new ArgumentNullException(nameof(commandHistory));
+            _renderer           = renderer        ?? throw new ArgumentNullException(nameof(renderer));
+            _onSelectionChanged = onSelectionChanged;
 
             _rotationSensitivity = _settingsManager.GetSetting<float>(
                 new UISettings().GetKey(), UISettings.MeshRotationSensitivity);
@@ -119,6 +122,7 @@ namespace UnBox3D.Controls.States
                 }
 
                 _selectedMesh = clickedMesh;
+                _onSelectionChanged?.Invoke(_selectedMesh);
                 _renderer.SetActiveGizmoMesh(_selectedMesh);
                 _renderer.SetGizmoMode(GizmoMode.RingsOnly);
                 _rotateAxis   = RotateAxis.Free;   // default: drag = free Y-axis spin
@@ -136,6 +140,7 @@ namespace UnBox3D.Controls.States
                 {
                     _selectedMesh       = null;
                     _lastHoveredElement = GizmoHoverElement.None;
+                    _onSelectionChanged?.Invoke(null);
                     _renderer.SetActiveGizmoMesh(null);   // also resets hover in SceneRenderer
                     _controlHost.SetCursor(Cursors.Default);
                     _controlHost.Invalidate();

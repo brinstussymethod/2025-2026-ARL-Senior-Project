@@ -77,142 +77,54 @@
                            Margin="0,6,0,8"/>
                 <Border Style="{StaticResource CardBorderStyle}">
                     <UniformGrid Rows="1" Columns="2">
-
                         <!-- Left column -->
                         <StackPanel Margin="0,0,16,0">
-                            <Grid Margin="0,0,0,8">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                <Border Style="{StaticResource KbdBadgeStyle}">
-                                    <TextBlock Text="Enter" FontFamily="Cascadia Code, Consolas"
-                                               FontSize="11" Foreground="{DynamicResource TextBrush}"/>
-                                </Border>
-                                <TextBlock Grid.Column="1" Text="Start session"
-                                           FontSize="12.5" Foreground="{DynamicResource AccentBrush}"
-                                           VerticalAlignment="Center"/>
+                            <Grid Margin="0,0,0,8"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                <Border Style="{StaticResource KbdBadgeStyle}"><TextBlock Text="Ctrl+Z" FontFamily="Cascadia Code, Consolas" FontSize="11" Foreground="{DynamicResource TextBrush}"/></Border>
+                                <TextBlock Grid.Column="1" Text="Undo last action" FontSize="12.5" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center"/>
                             </Grid>
-                            <Grid Margin="0,0,0,8">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                <Border Style="{StaticResource KbdBadgeStyle}">
-                                    <TextBlock Text="Alt+O" FontFamily="Cascadia Code, Consolas"
-                                               FontSize="11" Foreground="{DynamicResource TextBrush}"/>
-                                </Border>
-                                <TextBlock Grid.Column="1" Text="Open project file"
-                                           FontSize="12.5" Foreground="{DynamicResource AccentBrush}"
-                                           VerticalAlignment="Center"/>
+                            <Grid Margin="0,0,0,8"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                <Border Style="{StaticResource KbdBadgeStyle}"><TextBlock Text="Ctrl+Y" FontFamily="Cascadia Code, Consolas" FontSize="11" Foreground="{DynamicResource TextBrush}"/></Border>
+                                <TextBlock Grid.Column="1" Text="Redo last action" FontSize="12.5" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center"/>
                             </Grid>
-                            <Grid Margin="0,0,0,8">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                <Border Style="{StaticResource KbdBadgeStyle}">
-                                    <TextBlock Text="Alt+S" FontFamily="Cascadia Code, Consolas"
-                                               FontSize="11" Foreground="{DynamicResource TextBrush}"/>
-                                </Border>
-                                <TextBlock Grid.Column="1" Text="Open settings"
-                                           FontSize="12.5" Foreground="{DynamicResource AccentBrush}"
-                                           VerticalAlignment="Center"/>
+                            <Grid Margin="0,0,0,8"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                <Border Style="{StaticResource KbdBadgeStyle}"><TextBlock Text="Esc" FontFamily="Cascadia Code, Consolas" FontSize="11" Foreground="{DynamicResource TextBrush}"/></Border>
+                                <TextBlock Grid.Column="1" Text="Deselect mesh / close dialog" FontSize="12.5" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center"/>
                             </Grid>
-                            <Grid Margin="0,0,0,8">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                <Border Style="{StaticResource KbdBadgeStyle}">
-                                    <TextBlock Text="Esc" FontFamily="Cascadia Code, Consolas"
-                                               FontSize="11" Foreground="{DynamicResource TextBrush}"/>
-                                </Border>
-                                <TextBlock Grid.Column="1" Text="Close dialog / exit view"
-                                           FontSize="12.5" Foreground="{DynamicResource AccentBrush}"
-                                           VerticalAlignment="Center"/>
+                            <Grid Margin="0,0,0,8"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                <Border Style="{StaticResource KbdBadgeStyle}"><TextBlock Text="Alt+O" FontFamily="Cascadia Code, Consolas" FontSize="11" Foreground="{DynamicResource TextBrush}"/></Border>
+                                <TextBlock Grid.Column="1" Text="Open project file" FontSize="12.5" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center"/>
                             </Grid>
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                <Border Style="{StaticResource KbdBadgeStyle}">
-                                    <TextBlock Text="Alt+F4" FontFamily="Cascadia Code, Consolas"
-                                               FontSize="11" Foreground="{DynamicResource TextBrush}"/>
-                                </Border>
-                                <TextBlock Grid.Column="1" Text="Close application"
-                                           FontSize="12.5" Foreground="{DynamicResource AccentBrush}"
-                                           VerticalAlignment="Center"/>
+                            <Grid Margin="0,0,0,8"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                <Border Style="{StaticResource KbdBadgeStyle}"><TextBlock Text="Alt+S" FontFamily="Cascadia Code, Consolas" FontSize="11" Foreground="{DynamicResource TextBrush}"/></Border>
+                                <TextBlock Grid.Column="1" Text="Open settings" FontSize="12.5" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center"/>
+                            </Grid>
+                            <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                <Border Style="{StaticResource KbdBadgeStyle}"><TextBlock Text="Alt+F4" FontFamily="Cascadia Code, Consolas" FontSize="11" Foreground="{DynamicResource TextBrush}"/></Border>
+                                <TextBlock Grid.Column="1" Text="Close application" FontSize="12.5" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center"/>
                             </Grid>
                         </StackPanel>
-
                         <!-- Right column -->
                         <StackPanel>
-                            <Grid Margin="0,0,0,8">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                <Border Style="{StaticResource KbdBadgeStyle}">
-                                    <TextBlock Text="W / S" FontFamily="Cascadia Code, Consolas"
-                                               FontSize="11" Foreground="{DynamicResource TextBrush}"/>
-                                </Border>
-                                <TextBlock Grid.Column="1" Text="Move forward / backward"
-                                           FontSize="12.5" Foreground="{DynamicResource AccentBrush}"
-                                           VerticalAlignment="Center"/>
+                            <Grid Margin="0,0,0,8"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                <Border Style="{StaticResource KbdBadgeStyle}"><TextBlock Text="W / S" FontFamily="Cascadia Code, Consolas" FontSize="11" Foreground="{DynamicResource TextBrush}"/></Border>
+                                <TextBlock Grid.Column="1" Text="Move camera forward / back" FontSize="12.5" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center"/>
                             </Grid>
-                            <Grid Margin="0,0,0,8">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                <Border Style="{StaticResource KbdBadgeStyle}">
-                                    <TextBlock Text="A / D" FontFamily="Cascadia Code, Consolas"
-                                               FontSize="11" Foreground="{DynamicResource TextBrush}"/>
-                                </Border>
-                                <TextBlock Grid.Column="1" Text="Move camera left / right"
-                                           FontSize="12.5" Foreground="{DynamicResource AccentBrush}"
-                                           VerticalAlignment="Center"/>
+                            <Grid Margin="0,0,0,8"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                <Border Style="{StaticResource KbdBadgeStyle}"><TextBlock Text="A / D" FontFamily="Cascadia Code, Consolas" FontSize="11" Foreground="{DynamicResource TextBrush}"/></Border>
+                                <TextBlock Grid.Column="1" Text="Move camera left / right" FontSize="12.5" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center"/>
                             </Grid>
-                            <Grid Margin="0,0,0,8">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                <Border Style="{StaticResource KbdBadgeStyle}">
-                                    <TextBlock Text="Space" FontFamily="Cascadia Code, Consolas"
-                                               FontSize="11" Foreground="{DynamicResource TextBrush}"/>
-                                </Border>
-                                <TextBlock Grid.Column="1" Text="Move camera up"
-                                           FontSize="12.5" Foreground="{DynamicResource AccentBrush}"
-                                           VerticalAlignment="Center"/>
+                            <Grid Margin="0,0,0,8"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                <Border Style="{StaticResource KbdBadgeStyle}"><TextBlock Text="Space" FontFamily="Cascadia Code, Consolas" FontSize="11" Foreground="{DynamicResource TextBrush}"/></Border>
+                                <TextBlock Grid.Column="1" Text="Move camera up" FontSize="12.5" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center"/>
                             </Grid>
-                            <Grid Margin="0,0,0,8">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                <Border Style="{StaticResource KbdBadgeStyle}">
-                                    <TextBlock Text="L-Shift" FontFamily="Cascadia Code, Consolas"
-                                               FontSize="11" Foreground="{DynamicResource TextBrush}"/>
-                                </Border>
-                                <TextBlock Grid.Column="1" Text="Move camera down"
-                                           FontSize="12.5" Foreground="{DynamicResource AccentBrush}"
-                                           VerticalAlignment="Center"/>
+                            <Grid Margin="0,0,0,8"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                <Border Style="{StaticResource KbdBadgeStyle}"><TextBlock Text="L-Shift" FontFamily="Cascadia Code, Consolas" FontSize="11" Foreground="{DynamicResource TextBrush}"/></Border>
+                                <TextBlock Grid.Column="1" Text="Move camera down" FontSize="12.5" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center"/>
                             </Grid>
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                <Border Style="{StaticResource KbdBadgeStyle}">
-                                    <TextBlock Text="Q / E" FontFamily="Cascadia Code, Consolas"
-                                               FontSize="11" Foreground="{DynamicResource TextBrush}"/>
-                                </Border>
-                                <TextBlock Grid.Column="1" Text="Roll camera left / right"
-                                           FontSize="12.5" Foreground="{DynamicResource AccentBrush}"
-                                           VerticalAlignment="Center"/>
+                            <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                <Border Style="{StaticResource KbdBadgeStyle}"><TextBlock Text="Q / E" FontFamily="Cascadia Code, Consolas" FontSize="11" Foreground="{DynamicResource TextBrush}"/></Border>
+                                <TextBlock Grid.Column="1" Text="Roll camera left / right" FontSize="12.5" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center"/>
                             </Grid>
                         </StackPanel>
                     </UniformGrid>
@@ -275,6 +187,68 @@
                             <TextBlock Grid.Column="1" Text="Hold + drag — pan camera"
                                        FontSize="12.5" Foreground="{DynamicResource AccentBrush}"
                                        VerticalAlignment="Center"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- Toolbar Modes -->
+                <TextBlock Text="TOOLBAR MODES"
+                           Style="{StaticResource SectionLabelStyle}"
+                           Margin="0,6,0,8"/>
+                <Border Style="{StaticResource CardBorderStyle}">
+                    <StackPanel>
+                        <Grid Margin="0,0,0,7"><Grid.ColumnDefinitions><ColumnDefinition Width="110"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                            <Border Style="{StaticResource KbdBadgeStyle}" MinWidth="90"><TextBlock Text="⊙ Select" FontFamily="Cascadia Code, Consolas" FontSize="11" Foreground="{DynamicResource TextBrush}"/></Border>
+                            <TextBlock Grid.Column="1" Text="Left-click a mesh to select it" FontSize="12.5" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center"/>
+                        </Grid>
+                        <Grid Margin="0,0,0,7"><Grid.ColumnDefinitions><ColumnDefinition Width="110"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                            <Border Style="{StaticResource KbdBadgeStyle}" MinWidth="90"><TextBlock Text="✦ Move" FontFamily="Cascadia Code, Consolas" FontSize="11" Foreground="{DynamicResource TextBrush}"/></Border>
+                            <TextBlock Grid.Column="1" Text="Drag axis arrows to translate, or drag body for free XZ move" FontSize="12.5" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" TextWrapping="Wrap"/>
+                        </Grid>
+                        <Grid Margin="0,0,0,7"><Grid.ColumnDefinitions><ColumnDefinition Width="110"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                            <Border Style="{StaticResource KbdBadgeStyle}" MinWidth="90"><TextBlock Text="↺ Rotate" FontFamily="Cascadia Code, Consolas" FontSize="11" Foreground="{DynamicResource TextBrush}"/></Border>
+                            <TextBlock Grid.Column="1" Text="Drag a colored ring to rotate on that axis, or drag the mesh body to spin freely" FontSize="12.5" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" TextWrapping="Wrap"/>
+                        </Grid>
+                        <Grid Margin="0,0,0,7"><Grid.ColumnDefinitions><ColumnDefinition Width="110"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                            <Border Style="{StaticResource KbdBadgeStyle}" MinWidth="90"><TextBlock Text="⦿ Gimbal" FontFamily="Cascadia Code, Consolas" FontSize="11" Foreground="{DynamicResource TextBrush}"/></Border>
+                            <TextBlock Grid.Column="1" Text="Combined mode — drag rings to rotate, drag arrows to translate, drag body for free move" FontSize="12.5" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" TextWrapping="Wrap"/>
+                        </Grid>
+                        <Grid Margin="0,0,0,7"><Grid.ColumnDefinitions><ColumnDefinition Width="110"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                            <Border Style="{StaticResource KbdBadgeStyle}" MinWidth="90"><TextBlock Text="✕ Delete" FontFamily="Cascadia Code, Consolas" FontSize="11" Foreground="{DynamicResource TextBrush}"/></Border>
+                            <TextBlock Grid.Column="1" Text="Click a mesh to remove it from the scene (undoable)" FontSize="12.5" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" TextWrapping="Wrap"/>
+                        </Grid>
+                        <Grid Margin="0,0,0,7"><Grid.ColumnDefinitions><ColumnDefinition Width="110"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                            <Border Style="{StaticResource KbdBadgeStyle}" MinWidth="90"><TextBlock Text="✕ Deselect" FontFamily="Cascadia Code, Consolas" FontSize="11" Foreground="{DynamicResource TextBrush}"/></Border>
+                            <TextBlock Grid.Column="1" Text="Clear the current selection and hide the gizmo. Also triggered by pressing Esc." FontSize="12.5" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" TextWrapping="Wrap"/>
+                        </Grid>
+                        <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="110"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                            <Border Style="{StaticResource KbdBadgeStyle}" MinWidth="90"><TextBlock Text="⌂ Snap Back" FontFamily="Cascadia Code, Consolas" FontSize="11" Foreground="{DynamicResource TextBrush}"/></Border>
+                            <TextBlock Grid.Column="1" Text="Resets the selected mesh to its original import position and rotation (undoable)" FontSize="12.5" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" TextWrapping="Wrap"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- Tools Panel Features -->
+                <TextBlock Text="TOOLS PANEL"
+                           Style="{StaticResource SectionLabelStyle}"
+                           Margin="0,6,0,8"/>
+                <Border Style="{StaticResource CardBorderStyle}">
+                    <StackPanel>
+                        <Grid Margin="0,0,0,7"><Grid.ColumnDefinitions><ColumnDefinition Width="160"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                            <Border Style="{StaticResource KbdBadgeStyle}" MinWidth="140"><TextBlock Text="Scale &amp; Information" FontFamily="Cascadia Code, Consolas" FontSize="11" Foreground="{DynamicResource TextBrush}"/></Border>
+                            <TextBlock Grid.Column="1" Text="Click to expand — shows mesh name, vertex count, dimensions and XYZ position in your chosen unit (m, cm, mm, in, ft, mi), plus Scale and Move By controls" FontSize="12.5" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" TextWrapping="Wrap"/>
+                        </Grid>
+                        <Grid Margin="0,0,0,7"><Grid.ColumnDefinitions><ColumnDefinition Width="160"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                            <Border Style="{StaticResource KbdBadgeStyle}" MinWidth="140"><TextBlock Text="Precise Rotate" FontFamily="Cascadia Code, Consolas" FontSize="11" Foreground="{DynamicResource TextBrush}"/></Border>
+                            <TextBlock Grid.Column="1" Text="Type exact degrees for X, Y and Z axes and click Apply Rotation. Supports negative values. Fully undoable." FontSize="12.5" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" TextWrapping="Wrap"/>
+                        </Grid>
+                        <Grid Margin="0,0,0,7"><Grid.ColumnDefinitions><ColumnDefinition Width="160"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                            <Border Style="{StaticResource KbdBadgeStyle}" MinWidth="140"><TextBlock Text="Replace Mesh" FontFamily="Cascadia Code, Consolas" FontSize="11" Foreground="{DynamicResource TextBrush}"/></Border>
+                            <TextBlock Grid.Column="1" Text="Replaces the selected mesh with a bounding Cylinder, Cube/Prism, or Wedge of the same dimensions" FontSize="12.5" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" TextWrapping="Wrap"/>
+                        </Grid>
+                        <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="160"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                            <Border Style="{StaticResource KbdBadgeStyle}" MinWidth="140"><TextBlock Text="Small Mesh Threshold" FontFamily="Cascadia Code, Consolas" FontSize="11" Foreground="{DynamicResource TextBrush}"/></Border>
+                            <TextBlock Grid.Column="1" Text="Slider that hides meshes below a size percentage. Drag left to show all, right to filter out small parts. Does not delete meshes." FontSize="12.5" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center" TextWrapping="Wrap"/>
                         </Grid>
                     </StackPanel>
                 </Border>
