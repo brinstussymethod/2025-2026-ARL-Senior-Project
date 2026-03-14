@@ -30,6 +30,8 @@ namespace UnBox3D.Rendering
         void Translate(Vector3 delta);
         /// <summary>Returns the mesh center in render/GPU coordinate space (computed from the vertex buffer).</summary>
         Vector3 GetRenderCenter();
+        /// <summary>Returns the mesh center in render/GPU coordinate space at the time of initial load.</summary>
+        Vector3 GetInitialCenter();
         /// <summary>Returns the half-extents radius of the mesh in render space (largest dimension / 2).</summary>
         float GetRenderRadius();
         #endregion
@@ -55,6 +57,7 @@ namespace UnBox3D.Rendering
         private Quaternion _transform = Quaternion.Identity;
         private int _ebo;
         private int[] _indices;
+        private Vector3 _initialCenter;
         #endregion
 
         #region Constructor
@@ -91,6 +94,9 @@ namespace UnBox3D.Rendering
                     _vertices[index + 2] = assimpMesh.Vertices[i].Y;
                 }
             }
+
+            // Record initial render-space center for snap-to-origin feature
+            _initialCenter = GetRenderCenter();
 
             // Populate indices
             _indices = assimpMesh.GetIndices();
@@ -211,6 +217,8 @@ namespace UnBox3D.Rendering
             }
             return (min + max) * 0.5f;
         }
+
+        public Vector3 GetInitialCenter() => _initialCenter;
 
         public float GetRenderRadius()
         {

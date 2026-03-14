@@ -18,8 +18,9 @@ namespace UnBox3D.Controls.States
     /// </summary>
     public class MoveState : IState
     {
-        private const float ArrowPx    = 28f;   // hit radius for arrow shafts (px)
-        private const float RingLinePx = 14f;   // not used but reserved
+        private const float ArrowPx            = 28f;   // hit radius for arrow shafts (px)
+        private const float RingLinePx         = 14f;   // not used but reserved
+        private const float SnapThresholdRatio  = 0.15f; // snap fires within 15% of mesh radius
 
         private readonly IGLControlHost  _controlHost;
         private readonly ISceneManager   _sceneManager;
@@ -37,6 +38,8 @@ namespace UnBox3D.Controls.States
         private Point   _lastClientPos;
         private Vector3 _totalMovement;
         private float   _worldScale;
+        private bool    _snapped = false;
+        private Vector2 _snapAccumPx;             // accumulated mouse delta while holding the snap
         private GizmoHoverElement  _lastHoveredElement = GizmoHoverElement.None;
 
         public MoveState(
@@ -75,6 +78,8 @@ namespace UnBox3D.Controls.States
             _lastClientPos = new Point(e.X, e.Y);
             _totalMovement = Vector3.Zero;
             _dragAxis      = DragAxis.None;
+            _snapped       = false;
+            _snapAccumPx   = Vector2.Zero;
 
             // 1. If a mesh is already selected, try arrow hit-test first.
             if (_selectedMesh != null)
@@ -181,6 +186,25 @@ namespace UnBox3D.Controls.States
                 return;
             }
 
+            // Sticky snap zone: absorb mouse movement until the accumulated pixel displacement,
+            // converted to world units, would actually move the mesh outside the snap zone.
+            // This guarantees TrySnapToInitial won't immediately re-trigger after release.
+            if (_snapped)
+            {
+                _snapAccumPx += new Vector2(pxX, pxY);
+                _lastClientPos = new Point(e.X, e.Y);
+
+                float snapThreshold = _selectedMesh.GetRenderRadius() * SnapThresholdRatio;
+                if (_snapAccumPx.Length * _worldScale <= snapThreshold)
+                    return;
+
+                // The accumulated movement would clear the snap zone — release.
+                _snapped = false;
+                pxX = _snapAccumPx.X;
+                pxY = _snapAccumPx.Y;
+                _snapAccumPx = Vector2.Zero;
+            }
+
             switch (_dragAxis)
             {
                 // render X = world X, render Y = world Z, render Z = world Y  (Y/Z vertex swap)
@@ -189,6 +213,8 @@ namespace UnBox3D.Controls.States
                 case DragAxis.Z:    ApplyAxisMove(Vector3.UnitZ, Vector3.UnitY, pxX, pxY); break;
                 case DragAxis.Free: ApplyFreeMove(pxX, pxY);                               break;
             }
+
+            TrySnapToInitial();
 
             // Keep arrows centred on the moving mesh.
             _renderer.SetActiveGizmoMesh(_selectedMesh);
@@ -301,6 +327,34 @@ namespace UnBox3D.Controls.States
         {
             float camDist = _camera.Position.Length;
             return Math.Max(camDist * 0.002f, 0.001f);
+        }
+
+        /// <summary>
+        /// When the mesh center is within <see cref="SnapThresholdRatio"/> × radius of its
+        /// initial loaded position, snaps it exactly back and sets <see cref="_snapped"/>.
+        /// While snapped, <see cref="OnMouseMove"/> absorbs input until the accumulated pixel
+        /// displacement converts to enough world-space movement to clear the snap zone.
+        /// </summary>
+        private void TrySnapToInitial()
+        {
+            if (_selectedMesh == null || _snapped) return;
+
+            Vector3 current    = _selectedMesh.GetRenderCenter();
+            Vector3 initial    = _selectedMesh.GetInitialCenter();
+            Vector3 diffRender = initial - current;
+
+            float snapThreshold = _selectedMesh.GetRenderRadius() * SnapThresholdRatio;
+
+            if (diffRender.Length > 0.0001f && diffRender.Length < snapThreshold)
+            {
+                // diffRender is render-space (renderX=worldX, renderY=worldZ, renderZ=worldY).
+                // Translate() expects world-space deltas, so swap Y/Z.
+                var worldDelta = new Vector3(diffRender.X, diffRender.Z, diffRender.Y);
+                _selectedMesh.Translate(worldDelta);
+                _totalMovement += worldDelta;
+                _snapped     = true;
+                _snapAccumPx = Vector2.Zero;
+            }
         }
     }
 }
