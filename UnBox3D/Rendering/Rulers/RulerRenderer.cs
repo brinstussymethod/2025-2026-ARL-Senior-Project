@@ -10,9 +10,9 @@ namespace UnBox3D.Rendering.Rulers
     ///   • Base disc  — small flat circle on the ground
     ///   • Stem line  — vertical line from base to cap
     ///   • Cap disc   — small flat circle at the top (reference plane)
+    ///   • Arrow shaft + cone — black up-arrow handle for resizing
     ///
     /// Geometry is in render space (renderX=worldX, renderY=worldZ, renderZ=worldY).
-    /// "Up" in world = +render Z direction — same convention as the rest of the app.
     /// All geometry is rebuilt whenever <see cref="BuildOrRebuild"/> is called.
     /// </summary>
     public sealed class RulerRenderer : IDisposable
@@ -22,10 +22,17 @@ namespace UnBox3D.Rendering.Rulers
         private const float BaseDiscR  = 0.08f; // base disc radius as fraction of ruler height
         private const float CapDiscR   = 0.06f;
         private const float MinDiscR   = 0.04f; // absolute min disc radius (for short rulers)
+        private const int   ConeSegs    = 8;
+        private const float ArrowOffset = 0.20f; // arrow starts this far above cap
+        private const float ArrowLen    = 0.35f; // arrow shaft length in world units
+        private const float ConeLen     = 0.12f;
+        private const float ConeR       = 0.05f;
 
         // ── Colors ─────────────────────────────────────────────────────────
         private static readonly Vector4 ColNormal   = new(0.25f, 0.25f, 0.25f, 0.90f);
         private static readonly Vector4 ColSelected = new(0.00f, 0.80f, 0.62f, 1.00f);
+        private static readonly Vector4 ColArrow    = new(0.00f, 0.00f, 0.00f, 1.00f);
+        private static readonly Vector4 ColArrowSel = new(0.00f, 0.60f, 0.46f, 1.00f);
 
         // ── Per-ruler GPU data ──────────────────────────────────────────────
         private readonly Dictionary<Guid, RulerGpuData> _gpuData = new();
@@ -55,6 +62,9 @@ namespace UnBox3D.Rendering.Rulers
             var   baseR = new Vector3(rx, 0f, rz);
             var   capR  = new Vector3(rx, h,  rz);
 
+            var arrowBase = capR + new Vector3(0f, ArrowOffset, 0f);
+            var arrowTip  = arrowBase + new Vector3(0f, ArrowLen, 0f);
+
             var data = new RulerGpuData
             {
                 VaoBase  = Upload(BuildDisc(baseR, br), out int vboBase),
@@ -63,9 +73,16 @@ namespace UnBox3D.Rendering.Rulers
                 VboStem  = vboStem,
                 VaoCap   = Upload(BuildDisc(capR,  cr), out int vboCap),
                 VboCap   = vboCap,
-                VertCountBase  = DiscSegs + 2,
-                VertCountShaft = 2,
-                BaseRender     = baseR,
+                VaoShaft = Upload(BuildLine(arrowBase, arrowTip), out int vboShaft),
+                VboShaft = vboShaft,
+                VaoCone  = Upload(BuildCone(arrowTip, ConeLen, ConeR), out int vboCone),
+                VboCone  = vboCone,
+                VertCountBase   = DiscSegs + 2,
+                VertCountShaft  = 2,
+                VertCountCone   = ConeSegs * 3,
+                BaseRender      = baseR,
+                ArrowBaseRender = arrowBase,
+                ArrowTipRender  = arrowTip,
             };
 
             _gpuData[ruler.Id] = data;
@@ -92,6 +109,7 @@ namespace UnBox3D.Rendering.Rulers
 
                 bool sel  = ruler.IsSelected;
                 var  body = sel ? ColSelected : ColNormal;
+                var  arrow = sel ? ColArrowSel : ColArrow;
 
                 // Base disc
                 DrawVAO(d.VaoBase, d.VertCountBase,  PrimitiveType.TriangleFan, body, shader);
@@ -105,11 +123,32 @@ namespace UnBox3D.Rendering.Rulers
                 // Cap disc
                 DrawVAO(d.VaoCap,  d.VertCountBase,  PrimitiveType.TriangleFan, body, shader);
                 DrawVAO(d.VaoCap,  d.VertCountBase,  PrimitiveType.LineLoop,    body, shader);
+
+                // Arrow shaft
+                GL.LineWidth(4f);
+                DrawVAO(d.VaoShaft, d.VertCountShaft, PrimitiveType.Lines,       arrow, shader);
+                GL.LineWidth(1f);
+
+                // Arrowhead cone
+                DrawVAO(d.VaoCone,  d.VertCountCone,  PrimitiveType.Triangles,   arrow, shader);
             }
 
             GL.Disable(EnableCap.Blend);
             GL.Enable(EnableCap.DepthTest);
             GL.BindVertexArray(0);
+        }
+
+        /// <summary>Returns the arrow shaft endpoints (render space) for hit-testing.</summary>
+        public bool TryGetArrowLine(Guid id, out Vector3 arrowBase, out Vector3 arrowTip)
+        {
+            if (_gpuData.TryGetValue(id, out var d))
+            {
+                arrowBase = d.ArrowBaseRender;
+                arrowTip  = d.ArrowTipRender;
+                return true;
+            }
+            arrowBase = arrowTip = Vector3.Zero;
+            return false;
         }
 
         /// <summary>Returns the base disc centre (render space) for hit-testing.</summary>
@@ -146,6 +185,25 @@ namespace UnBox3D.Rendering.Rulers
 
         private static float[] BuildLine(Vector3 a, Vector3 b)
             => new[] { a.X, a.Y, a.Z, b.X, b.Y, b.Z };
+
+        /// <summary>Cone (Triangles) pointing upward (+render Y). Tip at <paramref name="tip"/>.</summary>
+        private static float[] BuildCone(Vector3 tip, float len, float baseR)
+        {
+            float[] verts = new float[ConeSegs * 9];
+            var bc = tip - new Vector3(0f, len, 0f); // base centre is len below tip in Y
+            for (int i = 0; i < ConeSegs; i++)
+            {
+                float a0 = 2f * MathF.PI * i       / ConeSegs;
+                float a1 = 2f * MathF.PI * (i + 1) / ConeSegs;
+                var p0 = bc + new Vector3(baseR * MathF.Cos(a0), 0f, baseR * MathF.Sin(a0));
+                var p1 = bc + new Vector3(baseR * MathF.Cos(a1), 0f, baseR * MathF.Sin(a1));
+                int idx = i * 9;
+                verts[idx]   = tip.X; verts[idx+1] = tip.Y; verts[idx+2] = tip.Z;
+                verts[idx+3] = p0.X;  verts[idx+4] = p0.Y;  verts[idx+5] = p0.Z;
+                verts[idx+6] = p1.X;  verts[idx+7] = p1.Y;  verts[idx+8] = p1.Z;
+            }
+            return verts;
+        }
 
         // ── Upload / draw helpers ──────────────────────────────────────────
 
@@ -186,9 +244,14 @@ namespace UnBox3D.Rendering.Rulers
             public int VaoBase,  VboBase;
             public int VaoStem,  VboStem;
             public int VaoCap,   VboCap;
+            public int VaoShaft, VboShaft;
+            public int VaoCone,  VboCone;
             public int VertCountBase;
             public int VertCountShaft;
+            public int VertCountCone;
             public Vector3 BaseRender;
+            public Vector3 ArrowBaseRender;
+            public Vector3 ArrowTipRender;
 
             public void Dispose()
             {
@@ -200,7 +263,10 @@ namespace UnBox3D.Rendering.Rulers
                 Del(VaoBase, VboBase);
                 Del(VaoStem, VboStem);
                 Del(VaoCap,  VboCap);
-                VaoBase = VboBase = VaoStem = VboStem = VaoCap = VboCap = 0;
+                Del(VaoShaft, VboShaft);
+                Del(VaoCone,  VboCone);
+                VaoBase = VboBase = VaoStem = VboStem = VaoCap = VboCap
+                        = VaoShaft = VboShaft = VaoCone = VboCone = 0;
             }
         }
     }

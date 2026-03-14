@@ -11,12 +11,15 @@ namespace UnBox3D.Controls.States
 {
     /// <summary>
     /// Ruler mode state machine.
-    /// Left-click ground → place a new ruler. Left-click base disc → select and drag along ground.
+    /// Left-click ground      → place. 
+    /// Left-click base disc   → select and drag along ground.
+    /// Left-click arrow shaft → drag to resize height.
     /// </summary>
     public class RulerState : IState
     {
         // ── Constants ──────────────────────────────────────────────────────
-        private const float BaseHitPx = 20f;
+        private const float ArrowHitPx = 28f;
+        private const float BaseHitPx  = 20f;
 
         // ── Dependencies ───────────────────────────────────────────────────
         private readonly IGLControlHost  _controlHost;
@@ -27,12 +30,18 @@ namespace UnBox3D.Controls.States
         private readonly RulerRenderer   _rulerRenderer;
 
         // ── Drag state ─────────────────────────────────────────────────────
-        private enum Phase { Idle, MovingBase }
+        private enum Phase { Idle, DraggingHeight, MovingBase }
         private Phase        _phase         = Phase.Idle;
         private RulerObject? _activeRuler;
         private Point        _lastClientPos;
+        private float        _dragStartHeight;
         private Vector3      _dragStartBase;
         private Vector3      _dragOffset;
+
+        // Height-drag absolute-reference fields (captured once at drag start)
+        private Vector2 _dragStartScreenDir;
+        private float   _dragStartScreenLen;
+        private float   _dragStartMouseAligned;
 
         public RulerState(
             IGLControlHost  controlHost,
@@ -57,6 +66,41 @@ namespace UnBox3D.Controls.States
             if (e.Button != MouseButtons.Left) return;
 
             _lastClientPos = new Point(e.X, e.Y);
+
+            // Hit-test arrow shafts
+            foreach (var ruler in _rulerManager.GetRulers())
+            {
+                if (!_rulerRenderer.TryGetArrowLine(ruler.Id, out var arrowBase, out var arrowTip))
+                    continue;
+
+                if (NearScreenLine(e.X, e.Y, arrowBase, arrowTip, ArrowHitPx))
+                {
+                    Select(ruler);
+                    _phase           = Phase.DraggingHeight;
+                    _dragStartHeight = ruler.HeightWorld;
+
+                    // Capture screen-space axis direction and mouse alignment once at drag start.
+                    // ApplyHeightDrag uses these constants to avoid per-frame accumulation.
+                    float rx = ruler.BasePosition.X, rz = ruler.BasePosition.Z;
+                    var   s0 = ProjectToScreen(new Vector3(rx, 0f, rz));
+                    var   s1 = ProjectToScreen(new Vector3(rx, 1f, rz));
+                    _dragStartScreenLen = 0f;
+                    if (s0 != null && s1 != null)
+                    {
+                        Vector2 sv = s1.Value - s0.Value;
+                        _dragStartScreenLen = sv.Length;
+                        if (_dragStartScreenLen > 0.5f)
+                        {
+                            _dragStartScreenDir    = sv / _dragStartScreenLen;
+                            _dragStartMouseAligned = (float)e.X * _dragStartScreenDir.X
+                                                   + (float)e.Y * _dragStartScreenDir.Y;
+                        }
+                    }
+
+                    _controlHost.SetCursor(Cursors.SizeNS);
+                    return;
+                }
+            }
 
             // Hit-test base discs
             foreach (var ruler in _rulerManager.GetRulers())
@@ -108,13 +152,19 @@ namespace UnBox3D.Controls.States
 
             _lastClientPos = new Point(e.X, e.Y);
 
-            if (_phase == Phase.MovingBase) ApplyBaseMove();
+            if (_phase == Phase.DraggingHeight) ApplyHeightDrag();
+            else if (_phase == Phase.MovingBase) ApplyBaseMove();
 
             _controlHost.Invalidate();
         }
 
         public void OnMouseUp(MouseEventArgs e)
         {
+            if (_phase == Phase.DraggingHeight && _activeRuler != null)
+                if (_activeRuler.HeightWorld != _dragStartHeight)
+                    _commandHistory.PushCommand(new SetRulerHeightCommand(
+                        _activeRuler, _rulerRenderer, _dragStartHeight, _activeRuler.HeightWorld));
+
             if (_phase == Phase.MovingBase && _activeRuler != null)
                 if (_activeRuler.BasePosition != _dragStartBase)
                     _commandHistory.PushCommand(new MoveRulerCommand(
@@ -122,6 +172,24 @@ namespace UnBox3D.Controls.States
 
             _phase = Phase.Idle;
             _controlHost.SetCursor(Cursors.Default);
+        }
+
+        // ── Height drag ────────────────────────────────────────────────────
+
+        private void ApplyHeightDrag()
+        {
+            if (_activeRuler == null || _dragStartScreenLen < 0.5f) return;
+
+            // Absolute mouse position approach — avoids per-frame accumulation.
+            // _dragStartScreenDir / _dragStartScreenLen / _dragStartMouseAligned are captured
+            // once in OnMouseDown and remain constant, making sensitivity uniform throughout.
+            float currentAligned = (float)_lastClientPos.X * _dragStartScreenDir.X
+                                 + (float)_lastClientPos.Y * _dragStartScreenDir.Y;
+            float totalDelta = currentAligned - _dragStartMouseAligned;
+            float newHeight  = Math.Max(0.05f, _dragStartHeight + totalDelta / _dragStartScreenLen);
+
+            _activeRuler.HeightWorld = newHeight;
+            _rulerRenderer.BuildOrRebuild(_activeRuler);
         }
 
         // ── Base move ──────────────────────────────────────────────────────
@@ -147,6 +215,12 @@ namespace UnBox3D.Controls.States
         {
             foreach (var ruler in _rulerManager.GetRulers())
             {
+                if (_rulerRenderer.TryGetArrowLine(ruler.Id, out var ab, out var at)
+                    && NearScreenLine(mx, my, ab, at, ArrowHitPx))
+                {
+                    _controlHost.SetCursor(Cursors.SizeNS);
+                    return;
+                }
                 if (_rulerRenderer.TryGetBaseCenter(ruler.Id, out var bc)
                     && NearScreen(mx, my, bc, BaseHitPx))
                 {
@@ -188,6 +262,23 @@ namespace UnBox3D.Controls.States
             var sp = ProjectToScreen(renderPos);
             if (sp == null) return false;
             float dx = mx - sp.Value.X, dy = my - sp.Value.Y;
+            return dx * dx + dy * dy <= threshPx * threshPx;
+        }
+
+        private bool NearScreenLine(int mx, int my, Vector3 renderA, Vector3 renderB, float threshPx)
+        {
+            var sa = ProjectToScreen(renderA);
+            var sb = ProjectToScreen(renderB);
+            if (sa == null || sb == null) return false;
+
+            Vector2 a  = sa.Value, b = sb.Value, ab = b - a;
+            float lenSq = ab.LengthSquared;
+            float t = lenSq > 0.001f
+                ? Math.Clamp(Vector2.Dot(new Vector2(mx - a.X, my - a.Y), ab) / lenSq, 0f, 1f)
+                : 0f;
+
+            Vector2 closest = a + ab * t;
+            float dx = mx - closest.X, dy = my - closest.Y;
             return dx * dx + dy * dy <= threshPx * threshPx;
         }
 
