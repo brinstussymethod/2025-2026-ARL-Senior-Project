@@ -39,8 +39,9 @@ namespace UnBox3D.ViewModels
         private readonly ModelExporter _modelExporter;
         private readonly ICommandHistory _commandHistory;
         private readonly IRenderer _renderer;
-        private readonly IRulerManager  _rulerManager;
-        private readonly RulerRenderer  _rulerRenderer;
+        private readonly IRulerManager       _rulerManager;
+        private readonly RulerRenderer       _rulerRenderer;
+        private readonly RulerOverlayManager _rulerOverlayManager;
         private string? _importedFilePath; // Global filepath that should be referenced when simplifying
         private List<IAppMesh>? _latestImportedModel; // This is so we can keep track of the original model when playing around with small mesh thresholds.
         private IAppMesh? _lastSelectedMesh; // Keep track of the previously selected mesh so we can remove its highlight
@@ -122,7 +123,8 @@ namespace UnBox3D.ViewModels
             IFileSystem fileSystem, BlenderIntegration blenderIntegration,
             IBlenderInstaller blenderInstaller, ModelExporter modelExporter,
             MouseController mouseController, IGLControlHost glControlHost, ICamera camera, ICommandHistory commandHistory,
-            IRenderer renderer, IRulerManager rulerManager, RulerRenderer rulerRenderer)
+            IRenderer renderer, IRulerManager rulerManager, RulerRenderer rulerRenderer,
+            RulerOverlayManager rulerOverlayManager)
         {
             _logger = logger;
             _settingsManager = settingsManager;
@@ -137,8 +139,9 @@ namespace UnBox3D.ViewModels
             _camera = camera;
             _commandHistory = commandHistory;
             _renderer = renderer;
-            _rulerManager  = rulerManager;
-            _rulerRenderer = rulerRenderer;
+            _rulerManager        = rulerManager;
+            _rulerRenderer       = rulerRenderer;
+            _rulerOverlayManager = rulerOverlayManager;
             // setup selection highlight colors
             LoadColors();
         }
@@ -1401,6 +1404,8 @@ namespace UnBox3D.ViewModels
             _mouseController.SetState(state);
             _glControlHost.Invalidate();
         }
+
+        public RulerOverlayManager RulerOverlayManager => _rulerOverlayManager;
 
         #endregion
 

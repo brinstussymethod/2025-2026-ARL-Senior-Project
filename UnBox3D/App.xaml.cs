@@ -120,6 +120,8 @@ namespace UnBox3D
             // Ruler system
             services.AddSingleton<IRulerManager, RulerManager>();
             services.AddSingleton<RulerRenderer>();
+            services.AddSingleton<RulerOverlayManager>();
+            services.AddSingleton<IScaleSettings, ScaleSettings>();
 
             // GLControlHost is the WinForms GL surface bridge. It now receives the unified DI Camera.
             // IMPORTANT: host no longer owns/creates its own Camera/Mouse/Ray; that was the source of duplicates.
@@ -190,9 +192,10 @@ namespace UnBox3D
                 var host     = provider.GetRequiredService<IGLControlHost>();
                 var history  = provider.GetRequiredService<ICommandHistory>();
                 var renderer = provider.GetRequiredService<IRenderer>();
-                var rulerMgr = provider.GetRequiredService<IRulerManager>();
-                var rulerRdr = provider.GetRequiredService<RulerRenderer>();
-                return new MainViewModel(logger, settings, scene, fs, blender, installer, exporter, mouse, host, camera, history, renderer, rulerMgr, rulerRdr);
+                var rulerMgr     = provider.GetRequiredService<IRulerManager>();
+                var rulerRdr     = provider.GetRequiredService<RulerRenderer>();
+                var rulerOverlay = provider.GetRequiredService<RulerOverlayManager>();
+                return new MainViewModel(logger, settings, scene, fs, blender, installer, exporter, mouse, host, camera, history, renderer, rulerMgr, rulerRdr, rulerOverlay);
             });
 
             services.AddSingleton<BlenderIntegration>();

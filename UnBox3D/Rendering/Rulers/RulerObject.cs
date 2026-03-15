@@ -2,7 +2,10 @@ using OpenTK.Mathematics;
 
 namespace UnBox3D.Rendering.Rulers
 {
-    /// <summary>Data model for a single ruler placed in the scene.</summary>
+    /// <summary>
+    /// Data model for a single ruler placed in the scene.
+    /// All real-world display values are derived from HeightWorld + IScaleSettings — no per-ruler unit or scale.
+    /// </summary>
     public class RulerObject
     {
         public Guid    Id           { get; } = Guid.NewGuid();
