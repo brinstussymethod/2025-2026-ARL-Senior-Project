@@ -1407,6 +1407,12 @@ namespace UnBox3D.ViewModels
 
         public RulerOverlayManager RulerOverlayManager => _rulerOverlayManager;
 
+        public void RulerDeleteKey()
+        {
+            if (_mouseController.GetState() is RulerState rs)
+                rs.OnDeleteKey();
+        }
+
         #endregion
 
         /// <summary>

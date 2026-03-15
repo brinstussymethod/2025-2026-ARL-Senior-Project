@@ -243,6 +243,16 @@ namespace UnBox3D.Controls.States
             _activeRuler     = ruler;
         }
 
+        public void OnDeleteKey()
+        {
+            if (_activeRuler == null) return;
+            var cmd = new DeleteRulerCommand(_rulerManager, _activeRuler, _rulerRenderer);
+            _commandHistory.PushCommand(cmd);
+            cmd.Execute();
+            _activeRuler = null;
+            _controlHost.Invalidate();
+        }
+
         // ── Ground ray-hit ─────────────────────────────────────────────────
 
         /// <summary>
