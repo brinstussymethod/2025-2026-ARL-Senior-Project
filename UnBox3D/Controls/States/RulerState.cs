@@ -141,7 +141,9 @@ namespace UnBox3D.Controls.States
             };
 
             _rulerRenderer.BuildOrRebuild(newRuler);
-            _rulerManager.AddRuler(newRuler);
+            var placeCmd = new PlaceRulerCommand(_rulerManager, newRuler);
+            _commandHistory.PushCommand(placeCmd);
+            placeCmd.Execute();
             Select(newRuler);
             _controlHost.Invalidate();
         }
