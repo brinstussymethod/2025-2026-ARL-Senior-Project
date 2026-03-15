@@ -68,6 +68,10 @@ namespace UnBox3D.Views
                 Key.Y, ModifierKeys.Control);
             InputBindings.Add(undoGesture);
             InputBindings.Add(redoGesture);
+            var deleteRulerGesture = new KeyBinding(
+                new RelayCommandAdapter(() => VM?.RulerDeleteKey()),
+                Key.Delete, ModifierKeys.None);
+            InputBindings.Add(deleteRulerGesture);
         }
 
         public void Initialize(IGLControlHost controlHost, ILogger logger, IBlenderInstaller blenderInstaller)

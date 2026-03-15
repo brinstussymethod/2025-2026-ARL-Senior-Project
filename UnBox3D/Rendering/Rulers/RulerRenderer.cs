@@ -163,6 +163,12 @@ namespace UnBox3D.Rendering.Rulers
             return false;
         }
 
+        /// <summary>Frees GPU resources for a ruler that has been removed from the scene.</summary>
+        public void Remove(Guid id)
+        {
+            if (_gpuData.Remove(id, out var d)) d.Dispose();
+        }
+
         // ── Geometry builders ──────────────────────────────────────────────
 
         /// <summary>
