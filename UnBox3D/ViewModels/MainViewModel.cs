@@ -1663,6 +1663,10 @@ namespace UnBox3D.ViewModels
                     OnPropertyChanged(nameof(FormattedPreviewDims));
                 }
             };
+
+            // Replace the bare DI-registered DefaultState (no callbacks) with a properly
+            // wired one so deselection works from the very first interaction.
+            SetSelectMode();
         }
 
         #endregion
@@ -1674,7 +1678,8 @@ namespace UnBox3D.ViewModels
         {
             ActiveMode = "Select";
             _renderer.SetActiveGizmoMesh(null);
-            var state = new DefaultState(_sceneManager, _glControlHost, _camera, new RayCaster(_glControlHost, _camera));
+            var state = new DefaultState(_sceneManager, _glControlHost, _camera, new RayCaster(_glControlHost, _camera),
+                _renderer, NotifyStateSelectionChanged);
             _mouseController.SetState(state);
         }
 
@@ -1731,12 +1736,9 @@ namespace UnBox3D.ViewModels
             // If a mesh is already selected in the scene, show the gimbal rings immediately
             // without making the user click again.
             if (SelectedMesh != null)
-            {
                 state.SetSelectedMesh(SelectedMesh);
-                _glControlHost.Invalidate();
-            }
-
-            _renderer.SetGizmoMode(GizmoMode.Full);
+            else
+                _renderer.SetActiveGizmoMesh(null);
             _mouseController.SetState(state);
         }
 

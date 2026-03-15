@@ -95,6 +95,7 @@ namespace UnBox3D.Controls.States
         {
             _selectedMesh = mesh;
             _renderer.SetActiveGizmoMesh(mesh);
+            _renderer.SetGizmoMode(GizmoMode.Full);
             _worldScale   = WorldScaleFromCamera();
         }
 
@@ -150,6 +151,7 @@ namespace UnBox3D.Controls.States
                 _selectedMesh = clickedMesh;
                 _onSelectionChanged?.Invoke(_selectedMesh);
                 _renderer.SetActiveGizmoMesh(_selectedMesh);
+                _renderer.SetGizmoMode(GizmoMode.Full);
                 _dragMode     = GimbalDragMode.FreeDrag;
                 _worldScale   = WorldScaleFromCamera();
                 ApplyCursor(_dragMode);
