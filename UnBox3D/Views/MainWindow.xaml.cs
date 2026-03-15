@@ -5,10 +5,12 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Media.Animation;
 using UnBox3D.Controls;
 using UnBox3D.Models;
@@ -27,6 +29,27 @@ namespace UnBox3D.Views
         private IGLControlHost? _controlHost;
         private ILogger? _logger;
         private string? _pendingOpenPath;
+        private Window? _rulerOverlayWindow;
+        private Canvas? _rulerOverlayCanvas;
+
+        // ── Overlay HWND passthrough ────────────────────────────────────────
+        // WS_EX_TRANSPARENT makes Win32 skip this window for mouse hit-testing so
+        // scroll-to-zoom and clicks reach the GL viewport even over label pixels.
+        [DllImport("user32.dll")] private static extern int GetWindowLong(IntPtr hwnd, int nIndex);
+        [DllImport("user32.dll")] private static extern int SetWindowLong(IntPtr hwnd, int nIndex, int dwNewLong);
+        private const int GWL_EXSTYLE      = -20;
+        private const int WS_EX_TRANSPARENT = 0x00000020;
+
+        private void SetOverlayPassthrough(bool passthrough)
+        {
+            if (_rulerOverlayWindow == null) return;
+            var hwnd  = new WindowInteropHelper(_rulerOverlayWindow).Handle;
+            if (hwnd == IntPtr.Zero) return;
+            int style = GetWindowLong(hwnd, GWL_EXSTYLE);
+            style = passthrough ? (style |  WS_EX_TRANSPARENT)
+                                : (style & ~WS_EX_TRANSPARENT);
+            SetWindowLong(hwnd, GWL_EXSTYLE, style);
+        }
         // Set to true by BackToMainMenu_Click so MainWindow_Closed knows
         // NOT to dispose the singleton GLControlHost (it will be reused).
         private bool _returningToMenu = false;
@@ -68,6 +91,10 @@ namespace UnBox3D.Views
                 Key.Y, ModifierKeys.Control);
             InputBindings.Add(undoGesture);
             InputBindings.Add(redoGesture);
+            var deleteRulerGesture = new KeyBinding(
+                new RelayCommandAdapter(() => VM?.RulerDeleteKey()),
+                Key.Delete, ModifierKeys.None);
+            InputBindings.Add(deleteRulerGesture);
         }
 
         public void Initialize(IGLControlHost controlHost, ILogger logger, IBlenderInstaller blenderInstaller)
@@ -125,6 +152,54 @@ namespace UnBox3D.Views
                     var gl = openGLHost.Child;
                     gl.MouseDown += OpenGL_MouseDown;
                     _logger?.Info("GLControlHost successfully attached to WindowsFormsHost.");
+
+                    // Create a transparent overlay window for ruler labels.
+                    // Owner = this keeps it above the main window (and its WindowsFormsHost child)
+                    // without WS_EX_TOPMOST, so it doesn't float above other apps.
+                    _rulerOverlayCanvas = new Canvas { Background = System.Windows.Media.Brushes.Transparent };
+                    _rulerOverlayWindow = new Window
+                    {
+                        AllowsTransparency = true,
+                        WindowStyle        = WindowStyle.None,
+                        Background         = System.Windows.Media.Brushes.Transparent,
+                        ShowInTaskbar      = false,
+                        Topmost            = false,
+                        IsHitTestVisible   = true,
+                        Owner              = this,
+                        Content            = _rulerOverlayCanvas,
+                    };
+
+                    var rulerOverlay = App.Services.GetRequiredService<UnBox3D.Rendering.Rulers.RulerOverlayManager>();
+                    rulerOverlay.Attach(
+                        _rulerOverlayCanvas,
+                        App.Services.GetRequiredService<UnBox3D.Rendering.ICamera>(),
+                        _controlHost,
+                        App.Services.GetRequiredService<UnBox3D.Utils.IScaleSettings>(),
+                        App.Services.GetRequiredService<UnBox3D.Rendering.Rulers.IRulerManager>(),
+                        App.Services.GetRequiredService<UnBox3D.Models.ICommandHistory>());
+
+                    // When the ruler tool is inactive, make the overlay HWND fully transparent
+                    // to mouse messages so scroll-to-zoom and clicks pass through label pixels
+                    // to the GL viewport. WS_EX_TRANSPARENT does this at the Win32 level.
+                    // The window HWND is available after Show(), so we set initial state there.
+                    rulerOverlay.InRulerModeChanged += active => SetOverlayPassthrough(!active);
+
+                    _rulerOverlayCanvas.Width  = ViewportGrid.ActualWidth;
+                    _rulerOverlayCanvas.Height = ViewportGrid.ActualHeight;
+                    _rulerOverlayWindow.Show();
+                    // Apply initial passthrough state (app starts in Select mode, not Ruler mode).
+                    SetOverlayPassthrough(!rulerOverlay.InRulerMode);
+                    UpdateRulerOverlayPosition();
+
+                    ViewportGrid.SizeChanged += (_, e) =>
+                    {
+                        _rulerOverlayCanvas.Width  = e.NewSize.Width;
+                        _rulerOverlayCanvas.Height = e.NewSize.Height;
+                        UpdateRulerOverlayPosition();
+                    };
+                    this.LocationChanged += (_, _) => UpdateRulerOverlayPosition();
+                    this.SizeChanged     += (_, _) => UpdateRulerOverlayPosition();
+
                     StartUpdateLoop();
                 }
                 else
@@ -273,6 +348,11 @@ namespace UnBox3D.Views
             try { if (openGLHost?.Child != null) openGLHost.Child.MouseDown -= OpenGL_MouseDown; }
             catch { }
 
+            // Close the ruler overlay window (it's owned by this window, but close explicitly
+            // to avoid stale references when returning to main menu and reopening).
+            _rulerOverlayWindow?.Close();
+            _rulerOverlayWindow = null;
+
             if (_returningToMenu)
             {
                 // The GLControlHost is a DI singleton — a new MainWindow will reuse it.
@@ -301,8 +381,32 @@ namespace UnBox3D.Views
             while (IsLoaded)
             {
                 _controlHost?.Render();
+                // Reposition ruler labels every frame. During drag, RulerState.OnMouseMove
+                // also calls UpdateAll so the label tracks the ruler without lag.
+                VM?.RulerOverlayManager?.UpdateAll(
+                    App.Services.GetRequiredService<UnBox3D.Rendering.Rulers.IRulerManager>().GetRulers());
                 await Task.Delay(16);
             }
+        }
+
+        /// <summary>
+        /// Repositions the ruler overlay window to exactly cover the GL viewport.
+        /// Uses PointToScreen + DPI transform for correct multi-monitor support.
+        /// </summary>
+        private void UpdateRulerOverlayPosition()
+        {
+            if (_rulerOverlayWindow == null || !_rulerOverlayWindow.IsVisible || !IsLoaded) return;
+            var pt = ViewportGrid.PointToScreen(new System.Windows.Point(0, 0));
+
+            // PointToScreen returns device pixels; WPF Window.Left/Top expect DIPs.
+            var source = PresentationSource.FromVisual(this);
+            double dpiX = source?.CompositionTarget?.TransformFromDevice.M11 ?? 1.0;
+            double dpiY = source?.CompositionTarget?.TransformFromDevice.M22 ?? 1.0;
+
+            _rulerOverlayWindow.Left   = pt.X * dpiX;
+            _rulerOverlayWindow.Top    = pt.Y * dpiY;
+            _rulerOverlayWindow.Width  = ViewportGrid.ActualWidth;
+            _rulerOverlayWindow.Height = ViewportGrid.ActualHeight;
         }
 
         public void OpenFromPath(string path)

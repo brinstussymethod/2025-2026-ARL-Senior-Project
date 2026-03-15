@@ -11,6 +11,7 @@ using System.Windows;
 using UnBox3D.Commands;
 using UnBox3D.Controls;
 using UnBox3D.Controls.States;
+using UnBox3D.Rendering.Rulers;
 using UnBox3D.Models;
 using UnBox3D.Rendering;
 using UnBox3D.Rendering.OpenGL;
@@ -38,6 +39,9 @@ namespace UnBox3D.ViewModels
         private readonly ModelExporter _modelExporter;
         private readonly ICommandHistory _commandHistory;
         private readonly IRenderer _renderer;
+        private readonly IRulerManager       _rulerManager;
+        private readonly RulerRenderer       _rulerRenderer;
+        private readonly RulerOverlayManager _rulerOverlayManager;
         private string? _importedFilePath; // Global filepath that should be referenced when simplifying
         private List<IAppMesh>? _latestImportedModel; // This is so we can keep track of the original model when playing around with small mesh thresholds.
         private IAppMesh? _lastSelectedMesh; // Keep track of the previously selected mesh so we can remove its highlight
@@ -119,7 +123,8 @@ namespace UnBox3D.ViewModels
             IFileSystem fileSystem, BlenderIntegration blenderIntegration,
             IBlenderInstaller blenderInstaller, ModelExporter modelExporter,
             MouseController mouseController, IGLControlHost glControlHost, ICamera camera, ICommandHistory commandHistory,
-            IRenderer renderer)
+            IRenderer renderer, IRulerManager rulerManager, RulerRenderer rulerRenderer,
+            RulerOverlayManager rulerOverlayManager)
         {
             _logger = logger;
             _settingsManager = settingsManager;
@@ -134,6 +139,9 @@ namespace UnBox3D.ViewModels
             _camera = camera;
             _commandHistory = commandHistory;
             _renderer = renderer;
+            _rulerManager        = rulerManager;
+            _rulerRenderer       = rulerRenderer;
+            _rulerOverlayManager = rulerOverlayManager;
             // setup selection highlight colors
             LoadColors();
         }
@@ -1168,7 +1176,7 @@ namespace UnBox3D.ViewModels
         /// while the state machine owns mesh interaction.
         /// </summary>
         public bool IsTransformModeActive =>
-            _mouseController.GetState() is MoveState or RotateState or GimbalState;
+            _mouseController.GetState() is MoveState or RotateState or GimbalState or RulerState;
 
         /// <summary>
         /// Points the active gizmo at the currently selected mesh, or hides it when nothing is selected.
@@ -1323,6 +1331,7 @@ namespace UnBox3D.ViewModels
         private void SetSelectMode()
         {
             ActiveMode = "Select";
+            SetRulerActive(false);
             _renderer.SetActiveGizmoMesh(null);
             var state = new DefaultState(_sceneManager, _glControlHost, _camera, new RayCaster(_glControlHost, _camera));
             _mouseController.SetState(state);
@@ -1332,6 +1341,7 @@ namespace UnBox3D.ViewModels
         private void SetDeleteMode()
         {
             ActiveMode = "Delete";
+            SetRulerActive(false);
             _renderer.SetActiveGizmoMesh(null);
             var state = new DeleteState(_glControlHost, _sceneManager, _camera, new RayCaster(_glControlHost, _camera), _commandHistory);
             _mouseController.SetState(state);
@@ -1341,6 +1351,7 @@ namespace UnBox3D.ViewModels
         private void SetMoveMode()
         {
             ActiveMode = "Move";
+            SetRulerActive(false);
             var state = new MoveState(_glControlHost, _sceneManager, _camera, new RayCaster(_glControlHost, _camera), _commandHistory, _renderer);
             // If a mesh is already selected, show arrows immediately — no need to click again.
             if (SelectedMesh != null)
@@ -1354,6 +1365,7 @@ namespace UnBox3D.ViewModels
         private void SetRotateMode()
         {
             ActiveMode = "Rotate";
+            SetRulerActive(false);
             var state = new RotateState(_settingsManager, _sceneManager, _glControlHost, _camera, new RayCaster(_glControlHost, _camera), _commandHistory, _renderer);
             // If a mesh is already selected, show rings immediately — no need to click again.
             if (SelectedMesh != null)
@@ -1367,6 +1379,7 @@ namespace UnBox3D.ViewModels
         private void SetGimbalMode()
         {
             ActiveMode = "Gimbal";
+            SetRulerActive(false);
             var state = new GimbalState(_glControlHost, _sceneManager, _camera, new RayCaster(_glControlHost, _camera), _commandHistory, _renderer);
 
             // If a mesh is already selected in the scene, show the gimbal rings immediately
@@ -1379,6 +1392,40 @@ namespace UnBox3D.ViewModels
 
             _renderer.SetGizmoMode(GizmoMode.Full);
             _mouseController.SetState(state);
+        }
+
+        [RelayCommand]
+        private void SetRulerMode()
+        {
+            ActiveMode = "Ruler";
+            _renderer.SetActiveGizmoMesh(null);
+            _renderer.SetGizmoMode(GizmoMode.None);
+            var state = new RulerState(
+                _glControlHost, _camera, new RayCaster(_glControlHost, _camera),
+                _commandHistory, _rulerManager, _rulerRenderer, _rulerOverlayManager);
+            _mouseController.SetState(state);
+            SetRulerActive(true);
+        }
+
+        /// <summary>
+        /// Activates or deactivates the ruler overlay.
+        /// When inactive, GL geometry and WPF labels are faded to 25 % opacity and
+        /// label edit-mode is blocked.
+        /// </summary>
+        private void SetRulerActive(bool active)
+        {
+            _rulerRenderer.InRulerMode      = active;
+            _rulerOverlayManager.InRulerMode = active;
+            // Force an immediate GL repaint so the opacity change is visible right away.
+            _glControlHost.Invalidate();
+        }
+
+        public RulerOverlayManager RulerOverlayManager => _rulerOverlayManager;
+
+        public void RulerDeleteKey()
+        {
+            if (_mouseController.GetState() is RulerState rs)
+                rs.OnDeleteKey();
         }
 
         #endregion
