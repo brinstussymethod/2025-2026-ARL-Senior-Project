@@ -1331,6 +1331,7 @@ namespace UnBox3D.ViewModels
         private void SetSelectMode()
         {
             ActiveMode = "Select";
+            SetRulerActive(false);
             _renderer.SetActiveGizmoMesh(null);
             var state = new DefaultState(_sceneManager, _glControlHost, _camera, new RayCaster(_glControlHost, _camera));
             _mouseController.SetState(state);
@@ -1340,6 +1341,7 @@ namespace UnBox3D.ViewModels
         private void SetDeleteMode()
         {
             ActiveMode = "Delete";
+            SetRulerActive(false);
             _renderer.SetActiveGizmoMesh(null);
             var state = new DeleteState(_glControlHost, _sceneManager, _camera, new RayCaster(_glControlHost, _camera), _commandHistory);
             _mouseController.SetState(state);
@@ -1349,6 +1351,7 @@ namespace UnBox3D.ViewModels
         private void SetMoveMode()
         {
             ActiveMode = "Move";
+            SetRulerActive(false);
             var state = new MoveState(_glControlHost, _sceneManager, _camera, new RayCaster(_glControlHost, _camera), _commandHistory, _renderer);
             // If a mesh is already selected, show arrows immediately — no need to click again.
             if (SelectedMesh != null)
@@ -1362,6 +1365,7 @@ namespace UnBox3D.ViewModels
         private void SetRotateMode()
         {
             ActiveMode = "Rotate";
+            SetRulerActive(false);
             var state = new RotateState(_settingsManager, _sceneManager, _glControlHost, _camera, new RayCaster(_glControlHost, _camera), _commandHistory, _renderer);
             // If a mesh is already selected, show rings immediately — no need to click again.
             if (SelectedMesh != null)
@@ -1375,6 +1379,7 @@ namespace UnBox3D.ViewModels
         private void SetGimbalMode()
         {
             ActiveMode = "Gimbal";
+            SetRulerActive(false);
             var state = new GimbalState(_glControlHost, _sceneManager, _camera, new RayCaster(_glControlHost, _camera), _commandHistory, _renderer);
 
             // If a mesh is already selected in the scene, show the gimbal rings immediately
@@ -1399,6 +1404,19 @@ namespace UnBox3D.ViewModels
                 _glControlHost, _camera, new RayCaster(_glControlHost, _camera),
                 _commandHistory, _rulerManager, _rulerRenderer, _rulerOverlayManager);
             _mouseController.SetState(state);
+            SetRulerActive(true);
+        }
+
+        /// <summary>
+        /// Activates or deactivates the ruler overlay.
+        /// When inactive, GL geometry and WPF labels are faded to 25 % opacity and
+        /// label edit-mode is blocked.
+        /// </summary>
+        private void SetRulerActive(bool active)
+        {
+            _rulerRenderer.InRulerMode      = active;
+            _rulerOverlayManager.InRulerMode = active;
+            // Force an immediate GL repaint so the opacity change is visible right away.
             _glControlHost.Invalidate();
         }
 

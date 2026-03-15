@@ -5,6 +5,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -30,6 +31,25 @@ namespace UnBox3D.Views
         private string? _pendingOpenPath;
         private Window? _rulerOverlayWindow;
         private Canvas? _rulerOverlayCanvas;
+
+        // ── Overlay HWND passthrough ────────────────────────────────────────
+        // WS_EX_TRANSPARENT makes Win32 skip this window for mouse hit-testing so
+        // scroll-to-zoom and clicks reach the GL viewport even over label pixels.
+        [DllImport("user32.dll")] private static extern int GetWindowLong(IntPtr hwnd, int nIndex);
+        [DllImport("user32.dll")] private static extern int SetWindowLong(IntPtr hwnd, int nIndex, int dwNewLong);
+        private const int GWL_EXSTYLE      = -20;
+        private const int WS_EX_TRANSPARENT = 0x00000020;
+
+        private void SetOverlayPassthrough(bool passthrough)
+        {
+            if (_rulerOverlayWindow == null) return;
+            var hwnd  = new WindowInteropHelper(_rulerOverlayWindow).Handle;
+            if (hwnd == IntPtr.Zero) return;
+            int style = GetWindowLong(hwnd, GWL_EXSTYLE);
+            style = passthrough ? (style |  WS_EX_TRANSPARENT)
+                                : (style & ~WS_EX_TRANSPARENT);
+            SetWindowLong(hwnd, GWL_EXSTYLE, style);
+        }
         // Set to true by BackToMainMenu_Click so MainWindow_Closed knows
         // NOT to dispose the singleton GLControlHost (it will be reused).
         private bool _returningToMenu = false;
@@ -158,9 +178,17 @@ namespace UnBox3D.Views
                         App.Services.GetRequiredService<UnBox3D.Rendering.Rulers.IRulerManager>(),
                         App.Services.GetRequiredService<UnBox3D.Models.ICommandHistory>());
 
+                    // When the ruler tool is inactive, make the overlay HWND fully transparent
+                    // to mouse messages so scroll-to-zoom and clicks pass through label pixels
+                    // to the GL viewport. WS_EX_TRANSPARENT does this at the Win32 level.
+                    // The window HWND is available after Show(), so we set initial state there.
+                    rulerOverlay.InRulerModeChanged += active => SetOverlayPassthrough(!active);
+
                     _rulerOverlayCanvas.Width  = ViewportGrid.ActualWidth;
                     _rulerOverlayCanvas.Height = ViewportGrid.ActualHeight;
                     _rulerOverlayWindow.Show();
+                    // Apply initial passthrough state (app starts in Select mode, not Ruler mode).
+                    SetOverlayPassthrough(!rulerOverlay.InRulerMode);
                     UpdateRulerOverlayPosition();
 
                     ViewportGrid.SizeChanged += (_, e) =>
