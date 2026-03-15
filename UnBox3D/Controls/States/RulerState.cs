@@ -164,6 +164,9 @@ namespace UnBox3D.Controls.States
             if (_phase == Phase.DraggingHeight) ApplyHeightDrag();
             else if (_phase == Phase.MovingBase) ApplyBaseMove();
 
+            // Reposition the WPF label immediately (not waiting for the next 16ms timer tick)
+            // so it tracks the ruler geometry with no perceptible lag during drag.
+            _overlayManager.UpdateAll(_rulerManager.GetRulers());
             _controlHost.Invalidate();
         }
 

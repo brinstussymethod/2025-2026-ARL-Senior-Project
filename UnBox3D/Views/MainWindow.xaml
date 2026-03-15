@@ -646,15 +646,5 @@
     </Popup>
 
 
-    <!-- Ruler Label Popup — own HWND so labels render above WindowsFormsHost -->
-    <Popup x:Name="RulerLabelPopup"
-           AllowsTransparency="True"
-           StaysOpen="True"
-           IsOpen="False"
-           PopupAnimation="None"
-           Placement="Relative">
-        <Canvas x:Name="RulerOverlayCanvas" Background="Transparent"/>
-    </Popup>
-
     </Grid>
 </Window>

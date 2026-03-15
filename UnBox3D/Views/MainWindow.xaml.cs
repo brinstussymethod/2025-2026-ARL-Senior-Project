@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Media.Animation;
 using UnBox3D.Controls;
 using UnBox3D.Models;
@@ -27,6 +28,8 @@ namespace UnBox3D.Views
         private IGLControlHost? _controlHost;
         private ILogger? _logger;
         private string? _pendingOpenPath;
+        private Window? _rulerOverlayWindow;
+        private Canvas? _rulerOverlayCanvas;
         // Set to true by BackToMainMenu_Click so MainWindow_Closed knows
         // NOT to dispose the singleton GLControlHost (it will be reused).
         private bool _returningToMenu = false;
@@ -130,34 +133,44 @@ namespace UnBox3D.Views
                     gl.MouseDown += OpenGL_MouseDown;
                     _logger?.Info("GLControlHost successfully attached to WindowsFormsHost.");
 
-                    // Wire the ruler overlay canvas so labels can be positioned over the GL viewport
+                    // Create a transparent overlay window for ruler labels.
+                    // Owner = this keeps it above the main window (and its WindowsFormsHost child)
+                    // without WS_EX_TOPMOST, so it doesn't float above other apps.
+                    _rulerOverlayCanvas = new Canvas { Background = System.Windows.Media.Brushes.Transparent };
+                    _rulerOverlayWindow = new Window
+                    {
+                        AllowsTransparency = true,
+                        WindowStyle        = WindowStyle.None,
+                        Background         = System.Windows.Media.Brushes.Transparent,
+                        ShowInTaskbar      = false,
+                        Topmost            = false,
+                        IsHitTestVisible   = true,
+                        Owner              = this,
+                        Content            = _rulerOverlayCanvas,
+                    };
+
                     var rulerOverlay = App.Services.GetRequiredService<UnBox3D.Rendering.Rulers.RulerOverlayManager>();
                     rulerOverlay.Attach(
-                        RulerOverlayCanvas,
+                        _rulerOverlayCanvas,
                         App.Services.GetRequiredService<UnBox3D.Rendering.ICamera>(),
                         _controlHost,
                         App.Services.GetRequiredService<UnBox3D.Utils.IScaleSettings>(),
                         App.Services.GetRequiredService<UnBox3D.Rendering.Rulers.IRulerManager>(),
                         App.Services.GetRequiredService<UnBox3D.Models.ICommandHistory>());
 
-                    // Position ruler label popup over the GL viewport.
-                    // Placement="Absolute" + PointToScreen gives correct multi-monitor support:
-                    // Placement="Relative" constrains the Popup to its origin monitor, so
-                    // dragging the window across monitor boundaries leaves the popup behind.
-                    RulerLabelPopup.Placement = System.Windows.Controls.Primitives.PlacementMode.Absolute;
-                    RulerOverlayCanvas.Width  = ViewportGrid.ActualWidth;
-                    RulerOverlayCanvas.Height = ViewportGrid.ActualHeight;
-                    RulerLabelPopup.IsOpen = true;
-                    UpdateRulerPopupPosition();
+                    _rulerOverlayCanvas.Width  = ViewportGrid.ActualWidth;
+                    _rulerOverlayCanvas.Height = ViewportGrid.ActualHeight;
+                    _rulerOverlayWindow.Show();
+                    UpdateRulerOverlayPosition();
 
                     ViewportGrid.SizeChanged += (_, e) =>
                     {
-                        RulerOverlayCanvas.Width  = e.NewSize.Width;
-                        RulerOverlayCanvas.Height = e.NewSize.Height;
-                        UpdateRulerPopupPosition();
+                        _rulerOverlayCanvas.Width  = e.NewSize.Width;
+                        _rulerOverlayCanvas.Height = e.NewSize.Height;
+                        UpdateRulerOverlayPosition();
                     };
-                    this.LocationChanged += (_, _) => UpdateRulerPopupPosition();
-                    this.SizeChanged     += (_, _) => UpdateRulerPopupPosition();
+                    this.LocationChanged += (_, _) => UpdateRulerOverlayPosition();
+                    this.SizeChanged     += (_, _) => UpdateRulerOverlayPosition();
 
                     StartUpdateLoop();
                 }
@@ -307,6 +320,11 @@ namespace UnBox3D.Views
             try { if (openGLHost?.Child != null) openGLHost.Child.MouseDown -= OpenGL_MouseDown; }
             catch { }
 
+            // Close the ruler overlay window (it's owned by this window, but close explicitly
+            // to avoid stale references when returning to main menu and reopening).
+            _rulerOverlayWindow?.Close();
+            _rulerOverlayWindow = null;
+
             if (_returningToMenu)
             {
                 // The GLControlHost is a DI singleton — a new MainWindow will reuse it.
@@ -335,7 +353,8 @@ namespace UnBox3D.Views
             while (IsLoaded)
             {
                 _controlHost?.Render();
-                // Update ruler overlay labels every frame (repositions them over the 3D ruler geometry)
+                // Reposition ruler labels every frame. During drag, RulerState.OnMouseMove
+                // also calls UpdateAll so the label tracks the ruler without lag.
                 VM?.RulerOverlayManager?.UpdateAll(
                     App.Services.GetRequiredService<UnBox3D.Rendering.Rulers.IRulerManager>().GetRulers());
                 await Task.Delay(16);
@@ -343,16 +362,23 @@ namespace UnBox3D.Views
         }
 
         /// <summary>
-        /// Repositions the ruler label Popup to exactly cover the GL viewport.
-        /// Must use Placement="Absolute" + PointToScreen for correct multi-monitor behaviour —
-        /// Placement="Relative" would constrain the Popup to its origin monitor.
+        /// Repositions the ruler overlay window to exactly cover the GL viewport.
+        /// Uses PointToScreen + DPI transform for correct multi-monitor support.
         /// </summary>
-        private void UpdateRulerPopupPosition()
+        private void UpdateRulerOverlayPosition()
         {
-            if (!RulerLabelPopup.IsOpen || !IsLoaded) return;
+            if (_rulerOverlayWindow == null || !_rulerOverlayWindow.IsVisible || !IsLoaded) return;
             var pt = ViewportGrid.PointToScreen(new System.Windows.Point(0, 0));
-            RulerLabelPopup.HorizontalOffset = pt.X;
-            RulerLabelPopup.VerticalOffset   = pt.Y;
+
+            // PointToScreen returns device pixels; WPF Window.Left/Top expect DIPs.
+            var source = PresentationSource.FromVisual(this);
+            double dpiX = source?.CompositionTarget?.TransformFromDevice.M11 ?? 1.0;
+            double dpiY = source?.CompositionTarget?.TransformFromDevice.M22 ?? 1.0;
+
+            _rulerOverlayWindow.Left   = pt.X * dpiX;
+            _rulerOverlayWindow.Top    = pt.Y * dpiY;
+            _rulerOverlayWindow.Width  = ViewportGrid.ActualWidth;
+            _rulerOverlayWindow.Height = ViewportGrid.ActualHeight;
         }
 
         public void OpenFromPath(string path)
