@@ -38,6 +38,12 @@ namespace UnBox3D.Rendering.Rulers
         private readonly Dictionary<Guid, RulerGpuData> _gpuData = new();
         private bool _disposed;
 
+        /// <summary>
+        /// When false, rulers are drawn at reduced opacity to indicate the tool is inactive.
+        /// Set to true only while Ruler mode is the active input state.
+        /// </summary>
+        public bool InRulerMode { get; set; } = true;
+
         // ── Public API ─────────────────────────────────────────────────────
 
         /// <summary>
@@ -103,13 +109,20 @@ namespace UnBox3D.Rendering.Rulers
             GL.Enable(EnableCap.Blend);
             GL.BlendFunc(BlendingFactor.SrcAlpha, BlendingFactor.OneMinusSrcAlpha);
 
+            // When not in ruler mode, fade all geometry to 25% opacity so it reads as inactive.
+            float alpha = InRulerMode ? 1f : 0.25f;
+
             foreach (var ruler in rulers)
             {
                 if (!_gpuData.TryGetValue(ruler.Id, out var d)) continue;
 
                 bool sel  = ruler.IsSelected;
-                var  body = sel ? ColSelected : ColNormal;
+                var  body  = sel ? ColSelected : ColNormal;
                 var  arrow = sel ? ColArrowSel : ColArrow;
+
+                // Scale alpha component for inactive-mode fade
+                body  = new Vector4(body.X,  body.Y,  body.Z,  body.W  * alpha);
+                arrow = new Vector4(arrow.X, arrow.Y, arrow.Z, arrow.W * alpha);
 
                 // Base disc
                 DrawVAO(d.VaoBase, d.VertCountBase,  PrimitiveType.TriangleFan, body, shader);
@@ -124,13 +137,14 @@ namespace UnBox3D.Rendering.Rulers
                 DrawVAO(d.VaoCap,  d.VertCountBase,  PrimitiveType.TriangleFan, body, shader);
                 DrawVAO(d.VaoCap,  d.VertCountBase,  PrimitiveType.LineLoop,    body, shader);
 
-                // Arrow shaft
-                GL.LineWidth(4f);
-                DrawVAO(d.VaoShaft, d.VertCountShaft, PrimitiveType.Lines,       arrow, shader);
-                GL.LineWidth(1f);
-
-                // Arrowhead cone
-                DrawVAO(d.VaoCone,  d.VertCountCone,  PrimitiveType.Triangles,   arrow, shader);
+                // Arrow shaft + cone — only shown in Ruler mode (ghost rulers have no handle)
+                if (InRulerMode)
+                {
+                    GL.LineWidth(4f);
+                    DrawVAO(d.VaoShaft, d.VertCountShaft, PrimitiveType.Lines,     arrow, shader);
+                    GL.LineWidth(1f);
+                    DrawVAO(d.VaoCone,  d.VertCountCone,  PrimitiveType.Triangles, arrow, shader);
+                }
             }
 
             GL.Disable(EnableCap.Blend);

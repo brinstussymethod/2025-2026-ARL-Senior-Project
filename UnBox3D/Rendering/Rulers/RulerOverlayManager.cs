@@ -39,6 +39,35 @@ namespace UnBox3D.Rendering.Rulers
         private readonly Dictionary<Guid, Border>     _labels  = new();
         private readonly Dictionary<Guid, StackPanel> _editPanels = new();
 
+        /// <summary>
+        /// When false, labels are drawn at reduced opacity, edit-mode is blocked, and
+        /// the overlay canvas becomes hit-test invisible so scroll/click events pass
+        /// straight through to the GL viewport underneath.
+        /// </summary>
+        private bool _inRulerMode = true;
+        public bool InRulerMode
+        {
+            get => _inRulerMode;
+            set
+            {
+                _inRulerMode = value;
+                // Disable WPF hit-testing on the canvas subtree.
+                if (_canvas != null)
+                    _canvas.IsHitTestVisible = value;
+                // Notify the host window so it can toggle WS_EX_TRANSPARENT on the overlay
+                // HWND — required because non-transparent label pixels absorb OS mouse messages
+                // even when WPF hit-testing is disabled.
+                InRulerModeChanged?.Invoke(value);
+            }
+        }
+
+        /// <summary>
+        /// Fires whenever <see cref="InRulerMode"/> changes.
+        /// Argument is the new value (true = ruler active, false = ghost/passthrough).
+        /// MainWindow wires this to set/clear WS_EX_TRANSPARENT on the overlay window.
+        /// </summary>
+        public event Action<bool>? InRulerModeChanged;
+
         // ── Setup ──────────────────────────────────────────────────────────
 
         public void Attach(Canvas canvas, ICamera camera, IGLControlHost host,
@@ -98,6 +127,7 @@ namespace UnBox3D.Rendering.Rulers
                 }
 
                 label.Visibility = Visibility.Visible;
+                label.Opacity    = InRulerMode ? 1.0 : 0.25;
                 label.Measure(new WpfSize(double.PositiveInfinity, double.PositiveInfinity));
                 double w = Math.Max(label.DesiredSize.Width,  80);
                 double h2 = Math.Max(label.DesiredSize.Height, 24);
@@ -183,6 +213,7 @@ namespace UnBox3D.Rendering.Rulers
 
         private void OpenEditMode(RulerObject ruler, Border border)
         {
+            if (!InRulerMode) return;                       // edit blocked when tool is inactive
             if (_editPanels.ContainsKey(ruler.Id)) return; // already open
 
             double currentDisplay = ComputeDisplay(ruler);
