@@ -1400,7 +1400,7 @@ namespace UnBox3D.ViewModels
             _renderer.SetGizmoMode(GizmoMode.None);
             var state = new RulerState(
                 _glControlHost, _camera, new RayCaster(_glControlHost, _camera),
-                _commandHistory, _rulerManager, _rulerRenderer);
+                _commandHistory, _rulerManager, _rulerRenderer, _rulerOverlayManager);
             _mouseController.SetState(state);
             _glControlHost.Invalidate();
         }

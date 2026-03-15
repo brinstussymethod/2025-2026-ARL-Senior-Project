@@ -22,12 +22,13 @@ namespace UnBox3D.Controls.States
         private const float BaseHitPx  = 20f;
 
         // ── Dependencies ───────────────────────────────────────────────────
-        private readonly IGLControlHost  _controlHost;
-        private readonly ICamera         _camera;
-        private readonly IRayCaster      _rayCaster;
-        private readonly ICommandHistory _commandHistory;
-        private readonly IRulerManager   _rulerManager;
-        private readonly RulerRenderer   _rulerRenderer;
+        private readonly IGLControlHost      _controlHost;
+        private readonly ICamera             _camera;
+        private readonly IRayCaster          _rayCaster;
+        private readonly ICommandHistory     _commandHistory;
+        private readonly IRulerManager       _rulerManager;
+        private readonly RulerRenderer       _rulerRenderer;
+        private readonly RulerOverlayManager _overlayManager;
 
         // ── Drag state ─────────────────────────────────────────────────────
         private enum Phase { Idle, DraggingHeight, MovingBase }
@@ -44,12 +45,13 @@ namespace UnBox3D.Controls.States
         private float   _dragStartMouseAligned;
 
         public RulerState(
-            IGLControlHost  controlHost,
-            ICamera         camera,
-            IRayCaster      rayCaster,
-            ICommandHistory commandHistory,
-            IRulerManager   rulerManager,
-            RulerRenderer   rulerRenderer)
+            IGLControlHost      controlHost,
+            ICamera             camera,
+            IRayCaster          rayCaster,
+            ICommandHistory     commandHistory,
+            IRulerManager       rulerManager,
+            RulerRenderer       rulerRenderer,
+            RulerOverlayManager overlayManager)
         {
             _controlHost    = controlHost    ?? throw new ArgumentNullException(nameof(controlHost));
             _camera         = camera         ?? throw new ArgumentNullException(nameof(camera));
@@ -57,6 +59,7 @@ namespace UnBox3D.Controls.States
             _commandHistory = commandHistory ?? throw new ArgumentNullException(nameof(commandHistory));
             _rulerManager   = rulerManager   ?? throw new ArgumentNullException(nameof(rulerManager));
             _rulerRenderer  = rulerRenderer  ?? throw new ArgumentNullException(nameof(rulerRenderer));
+            _overlayManager = overlayManager ?? throw new ArgumentNullException(nameof(overlayManager));
         }
 
         // ── IState ─────────────────────────────────────────────────────────
@@ -64,6 +67,10 @@ namespace UnBox3D.Controls.States
         public void OnMouseDown(MouseEventArgs e)
         {
             if (e.Button != MouseButtons.Left) return;
+
+            // Any GL-viewport click steals Win32 focus from the WPF Popup HWND, so
+            // IsKeyboardFocusWithinChanged won't fire. Close any open label edits explicitly.
+            _overlayManager.CancelAllEdits();
 
             _lastClientPos = new Point(e.X, e.Y);
 

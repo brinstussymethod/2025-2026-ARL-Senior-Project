@@ -161,6 +161,24 @@ namespace UnBox3D.Rendering.Rulers
             _editPanels.Remove(id);
         }
 
+        /// <summary>
+        /// Cancels any open inline edit panels immediately.
+        /// Call this whenever a GL-viewport click steals Win32 focus (e.g. ruler placement),
+        /// because WPF's IsKeyboardFocusWithinChanged does not fire across the WinForms HWND boundary.
+        /// </summary>
+        public void CancelAllEdits()
+        {
+            // Snapshot the pairs because CancelEdit mutates _editPanels
+            foreach (var (id, _) in _editPanels.ToList())
+            {
+                if (_labels.TryGetValue(id, out var border) && _rulerManager != null)
+                {
+                    var ruler = _rulerManager.GetById(id);
+                    if (ruler != null) CancelEdit(ruler, border);
+                }
+            }
+        }
+
         // ── Inline edit ────────────────────────────────────────────────────
 
         private void OpenEditMode(RulerObject ruler, Border border)
@@ -232,6 +250,16 @@ namespace UnBox3D.Rendering.Rulers
                 currentUnit       = newUnit;
                 currentDisplay    = newVal;
                 valueBox.Text     = newVal.ToString("F2", CultureInfo.InvariantCulture);
+            };
+
+            // Cancel when focus leaves the entire edit panel (e.g. user clicks elsewhere).
+            // IsKeyboardFocusWithinChanged fires on the panel rather than the TextBox so that
+            // clicking the ComboBox (which briefly steals focus from the TextBox) does not
+            // prematurely cancel.
+            editPanel.IsKeyboardFocusWithinChanged += (_, e) =>
+            {
+                if (!(bool)e.NewValue && _editPanels.ContainsKey(ruler.Id))
+                    CancelEdit(ruler, border);
             };
 
             // Focus first, then select-all at Input priority so WPF doesn't clear the selection
