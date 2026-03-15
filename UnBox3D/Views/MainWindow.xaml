@@ -454,7 +454,9 @@
                           ShowsPreview="True" Cursor="SizeWE"/>
 
             <!-- ── Viewport ── -->
-            <WindowsFormsHost Grid.Column="2" Name="openGLHost"/>
+            <Grid x:Name="ViewportGrid" Grid.Column="2">
+                <WindowsFormsHost Name="openGLHost"/>
+            </Grid>
 
             <!-- Splitter -->
             <GridSplitter Grid.Column="3"
@@ -641,6 +643,17 @@
                            TextWrapping="Wrap" MaxWidth="380"/>
             </StackPanel>
         </Border>
+    </Popup>
+
+
+    <!-- Ruler Label Popup — own HWND so labels render above WindowsFormsHost -->
+    <Popup x:Name="RulerLabelPopup"
+           AllowsTransparency="True"
+           StaysOpen="True"
+           IsOpen="False"
+           PopupAnimation="None"
+           Placement="Relative">
+        <Canvas x:Name="RulerOverlayCanvas" Background="Transparent"/>
     </Popup>
 
     </Grid>
