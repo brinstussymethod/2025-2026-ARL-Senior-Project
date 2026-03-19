@@ -2,6 +2,7 @@
 import sys
 import pathlib
 import os
+import bmesh
 
 '''
 -------------------Important Notes-------------------
@@ -11,8 +12,8 @@ import os
 -paper model addon has LEGACY and EXTENSION--they are distinct addons. 
  Download from internet = bl_ext.blender_org.export_paper_model (extension)
 -extension is newer, legacy packs islands less nicely
--In background mode (--background), Blender does not save preference changes,
- so the addon is never persisted as "enabled" between runs.
+-In background mode, Blender does not save preference changes, so the addon
+ is never persisted as "enabled" between runs.
 -package_install already enables an addon in the current session--enabling again
  throws an error
 '''
@@ -39,38 +40,42 @@ def clear_scene():
     
 
 def install_and_enable_addon(addon_name: str):
-    full_module_name = f"bl_ext.user_default.{addon_name}"
+    full_module_name = f"bl_ext.blender_org.{addon_name}"
 
-    if full_module_name in bpy.context.preferences.addons:
-        print(f"Addon '{full_module_name}' already enabled.")
-        return
-
-    # Install if not present
-    addon_path = os.path.join(bpy.utils.user_resource('SCRIPTS'), "addons", addon_name)
-    if not os.path.exists(addon_path):
+    # Install if not present, else enable
+    extension_path = os.path.join(
+    bpy.utils.user_resource('EXTENSIONS'),
+    "blender_org",  # not "user_default" — we confirmed it's blender_org
+    addon_name
+    )
+    if not os.path.exists(extension_path):
         print(f"Addon '{addon_name}' not installed. Installing...")
         bpy.ops.extensions.package_install(repo_index=0, pkg_id=addon_name)
-
-    try:
+    else:
+        print(f"Addon '{addon_name}' already installed, enabling...")
         bpy.ops.preferences.addon_enable(module=full_module_name)
-        print(f"Addon '{full_module_name}' enabled.")
-    except Exception as e:
-        print(f"Failed to enable addon '{full_module_name}': {e}")
 
 
 def import_model(filepath: pathlib.Path):
     if filepath.exists():
         bpy.ops.wm.obj_import(filepath=str(filepath))
-
         print(f"Model loaded and transformed: {filepath}")
     else:
         print(f"Model file not found: {filepath}")
 
-
-def unfold(output_path: pathlib.Path):
-    val = get_command_line_args()
-    obj = bpy.context.object #might delete 
+def cleanup():
+    obj = bpy.context.selected_objects[0]
+    bpy.context.view_layer.objects.active = obj
     obj.rotation_euler = (0, 0, 0)
+    bpy.ops.object.mode_set(mode='EDIT')
+    bm = bmesh.from_edit_mesh(obj.data)
+    bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=0.0001)
+    bmesh.ops.triangulate(bm, faces=bm.faces)
+    bmesh.update_edit_mesh(obj.data)
+    bpy.ops.object.mode_set(mode='OBJECT')
+
+
+def unfold(output_path: pathlib.Path, val: dict):
 
     '''
     Parameters
@@ -101,7 +106,6 @@ def unfold(output_path: pathlib.Path):
     units are in METERS! 8x4ft = 1.2x2.4m
     '''
 
-
     '''Context of Blender'''
     pm = bpy.context.scene.paper_model
 
@@ -112,51 +116,45 @@ def unfold(output_path: pathlib.Path):
     pm.scale = 1
 
     '''Export'''
-
     filename = val['fn']
     export_file = str(output_path / filename)
-
-    doc_width = val['dw']
-    doc_height = val['dh']
-    ext = val['ext']
 
     bpy.ops.export_mesh.paper_model(
         "EXEC_DEFAULT",
         filepath=export_file,
         page_size_preset='USER',
-        output_size_x=doc_width,
-        output_size_y=doc_height,
+        output_size_x=val['dw'],
+        output_size_y=val['dh'],
         output_margin=0, # set to 0 since export team will handle the margins on the svg
         do_create_stickers=False,
         do_create_numbers=False,
-        file_format=ext,
+        file_format=val['ext'],
         scale=1
     )
-
     print(f"Exporting unfolded model to: {export_file}")
     
 
 def main():
     paths = get_command_line_args()
     
-    clear_scene()
+    clear_scene() # technically not needed since every run is fresh, but we keep for now
+
+    # 1) Install or enable
     addon_name = "export_paper_model"
     install_and_enable_addon(addon_name)
-    if addon_name in bpy.context.preferences.addons:
-        bpy.ops.preferences.addon_enable(module=addon_name)
-    else:
-        print(f"Failed to install or enable addon '{addon_name}'. Exiting.")
-        return
 
-    # Use the output directory passed from the host app (C#) via --output_model.
-    output_path = paths["output_model"]
+    # 2) Import model
+    # NOTE: this might not be unfolding the modified file--just the imported one. Needs testing.
+    output_path = paths["output_model"] # Use the output directory passed from the host app via --output_model.
     output_path.mkdir(parents=True, exist_ok=True)
-    
     import_model(paths['input_model'])
+
+    # 3) Cleanup: this is small changes to prevent crashes in edge cases
+    cleanup()
     
-    unfold(output_path)
+    # 4) Unfold
+    unfold(output_path, paths)
 
 
 if __name__ == "__main__":
     main()
-
