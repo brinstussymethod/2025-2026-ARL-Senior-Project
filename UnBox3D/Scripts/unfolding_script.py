@@ -42,6 +42,10 @@ def clear_scene():
 def install_and_enable_addon(addon_name: str):
     full_module_name = f"bl_ext.blender_org.{addon_name}"
 
+    # Disable legacy version if it's loaded to avoid conflicts
+    if "io_export_paper_model" in bpy.context.preferences.addons:
+        bpy.ops.preferences.addon_disable(module="io_export_paper_model")
+
     # Install if not present, else enable
     extension_path = os.path.join(
     bpy.utils.user_resource('EXTENSIONS'),
@@ -51,9 +55,12 @@ def install_and_enable_addon(addon_name: str):
     if not os.path.exists(extension_path):
         print(f"Addon '{addon_name}' not installed. Installing...")
         bpy.ops.extensions.package_install(repo_index=0, pkg_id=addon_name)
-    else:
-        print(f"Addon '{addon_name}' already installed, enabling...")
+    elif full_module_name not in bpy.context.preferences.addons:
+        # Only enable if not already active — avoids double-registration
+        print(f"Enabling '{addon_name}'...")
         bpy.ops.preferences.addon_enable(module=full_module_name)
+    else:
+        print(f"Addon '{addon_name}' already active, skipping enable.")
 
 
 def import_model(filepath: pathlib.Path):
@@ -137,7 +144,7 @@ def unfold(output_path: pathlib.Path, val: dict):
 def main():
     paths = get_command_line_args()
     
-    clear_scene() # technically not needed since every run is fresh, but we keep for now
+    clear_scene() # might not be needed since every run is fresh, but we keep for now
 
     # 1) Install or enable
     addon_name = "export_paper_model"
@@ -154,6 +161,14 @@ def main():
     
     # 4) Unfold
     unfold(output_path, paths)
+
+    # 5) Check if the size is empty and also where it went (debug)
+    export_file = output_path / paths['fn']
+    size = os.path.getsize(export_file)
+    print(f"Output directory: {output_path}")
+    print(f"Output file: {export_file} ({size} bytes)")
+    if size == 0:
+        raise RuntimeError("Export produced empty file!")
 
 
 if __name__ == "__main__":

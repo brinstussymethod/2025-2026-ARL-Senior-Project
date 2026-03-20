@@ -451,7 +451,10 @@ namespace UnBox3D.ViewModels
 
                 if (format == "SVG")
                 {
-                    string[] svgFiles = Directory.GetFiles(outputDirectory, $"{newFileName}*.svg");
+                    string[] svgFiles = Directory.GetFiles(outputDirectory, "*.svg")
+                        .Where(f => Path.GetFileName(f).StartsWith($"{newFileName}_panel_page"))
+                        .OrderBy(f => f)
+                        .ToArray();
                     int fileCount = svgFiles.Length;
 
                     for (int i = 0; i < fileCount; i++)
