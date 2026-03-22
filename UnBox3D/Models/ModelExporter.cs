@@ -27,7 +27,8 @@ namespace UnBox3D.Models
 
                 if (string.IsNullOrWhiteSpace(exportDir) || !Directory.Exists(exportDir))
                 {
-                    exportDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Export");
+                    string unfoldDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Unfold3D");
+                    exportDir = Path.Combine(unfoldDir, "Export");
                     Directory.CreateDirectory(exportDir);
                 }
 
@@ -86,7 +87,8 @@ namespace UnBox3D.Models
 
                 if (string.IsNullOrWhiteSpace(exportDir) || !Directory.Exists(exportDir))
                 {
-                    exportDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Export");
+                    string unfoldDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Unfold3D");
+                    exportDir = Path.Combine(unfoldDir, "Export");
                     Directory.CreateDirectory(exportDir);
                 }
 

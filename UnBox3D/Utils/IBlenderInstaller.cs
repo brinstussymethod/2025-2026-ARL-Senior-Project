@@ -34,11 +34,12 @@ namespace UnBox3D.Utils
             _fileSystem = fileSystem;
 
             string baseDir = AppDomain.CurrentDomain.BaseDirectory;
-            BlenderFolder = _fileSystem.CombinePaths(baseDir, "Blender");
-            BlenderExecutable = _fileSystem.CombinePaths(BlenderFolder, $"blender-{BlenderRevision}-windows-x64", "blender.exe");
+            string appDataDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Unfold3D");
+            BlenderFolder = Path.Combine(appDataDir, "Blender");
+            BlenderExecutable = Path.Combine(BlenderFolder, $"blender-{BlenderRevision}-windows-x64", "blender.exe");
             ProgramFilesBlenderExecutable = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles)
                     , "Blender Foundation", $"blender-{BlenderRevision}", "blender.exe"); // this will be updated if found
-            BlenderZipPath = _fileSystem.CombinePaths(baseDir, "blender.zip");
+            BlenderZipPath = Path.Combine(appDataDir, "blender.zip");
 
             FindAndSetBlender();
         }
