@@ -133,8 +133,6 @@ def unfold(output_path: pathlib.Path, val: dict):
         output_size_x=val['dw'],
         output_size_y=val['dh'],
         output_margin=0, # set to 0 since export team will handle the margins on the svg
-        do_create_stickers=False,
-        do_create_numbers=False,
         file_format=val['ext'],
         scale=1
     )
