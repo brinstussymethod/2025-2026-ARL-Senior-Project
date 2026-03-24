@@ -116,8 +116,8 @@ def unfold(output_path: pathlib.Path, val: dict):
     '''Context of Blender'''
     pm = bpy.context.scene.paper_model
 
-    pm.output_size_x = val['dw']
-    pm.output_size_y = val['dh']
+    pm.output_size_x=1
+    pm.output_size_y=1
     pm.use_auto_scale = False
     pm.limit_by_page = False
     pm.scale = 1
@@ -133,6 +133,8 @@ def unfold(output_path: pathlib.Path, val: dict):
         output_size_x=val['dw'],
         output_size_y=val['dh'],
         output_margin=0, # set to 0 since export team will handle the margins on the svg
+        do_create_stickers=False,
+        do_create_numbers=False,
         file_format=val['ext'],
         scale=1
     )
@@ -140,15 +142,7 @@ def unfold(output_path: pathlib.Path, val: dict):
     
 
 def main():
-    #paths = get_command_line_args()
-    paths = {
-        "input_model": pathlib.Path.home() / "Downloads" / "NotDiscarded" / "test.obj",
-        "output_model": pathlib.Path.home() / "Downloads" / "NotDiscarded",
-        "fn": "output",
-        "dw": 80.0,
-        "dh": 80.0,
-        "ext": "SVG"
-    } # hardcoded during testing
+    paths = get_command_line_args()
     
     clear_scene() # might not be needed since every run is fresh, but we keep for now
 
@@ -169,7 +163,7 @@ def main():
     unfold(output_path, paths)
 
     # 5) Check if the size is empty and also where it went (debug)
-    export_file = output_path / (paths['fn'] + "." + paths['ext'].lower())
+    export_file = output_path / paths['fn']
     size = os.path.getsize(export_file)
     print(f"Output directory: {output_path}")
     print(f"Output file: {export_file} ({size} bytes)")

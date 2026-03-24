@@ -184,8 +184,7 @@ namespace UnBox3D.ViewModels
         // Reference _importedFilePath if you want access to the ImportedModels directory.
         private string EnsureImportDirectory(string filePath)
         {
-            string unfoldDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Unfold3D");
-            string importDirectory = Path.Combine(unfoldDir, "ImportedModels");
+            string importDirectory = _fileSystem.CombinePaths(AppDomain.CurrentDomain.BaseDirectory, "ImportedModels");
 
             if (!_fileSystem.DoesDirectoryExists(importDirectory))
             {
@@ -369,8 +368,7 @@ namespace UnBox3D.ViewModels
                 string format = ext == ".pdf" ? "PDF" : "SVG";
 
                 string baseDir = AppDomain.CurrentDomain.BaseDirectory;
-                string unfoldDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Unfold3D");
-                string outputDirectory = Path.Combine(unfoldDir, "UnfoldedOutputs");
+                string outputDirectory = _fileSystem.CombinePaths(baseDir, "UnfoldedOutputs");
                 string scriptPath = _fileSystem.CombinePaths(baseDir, "Scripts", "unfolding_script.py");
 
                 if (!_fileSystem.DoesDirectoryExists(outputDirectory))
@@ -453,14 +451,12 @@ namespace UnBox3D.ViewModels
 
                 if (format == "SVG")
                 {
-                    _logger.Info($"Format is SVG. newFileName={newFileName}, outputDirectory={outputDirectory}");
                     string[] svgFiles = Directory.GetFiles(outputDirectory, "*.svg")
                         .Where(f => Path.GetFileName(f).StartsWith($"{newFileName}_panel_page"))
                         .OrderBy(f => f)
                         .ToArray();
                     int fileCount = svgFiles.Length;
 
-                    _logger.Info($"We are now processing for {fileCount} files...");
                     for (int i = 0; i < fileCount; i++)
                     {
                         string source = svgFiles[i];
@@ -476,7 +472,6 @@ namespace UnBox3D.ViewModels
                 }
                 else if (format == "PDF")
                 {
-                    _logger.Info($"Format is PDF. newFileName={newFileName}, outputDirectory={outputDirectory}");
                     string pdfFile = Path.Combine(outputDirectory, $"{newFileName}.pdf");
 
                     string[] svgFiles = Directory.GetFiles(outputDirectory, $"{newFileName}_panel_page*.svg");
@@ -485,7 +480,6 @@ namespace UnBox3D.ViewModels
                     var pdf = new PdfDocument();
                     bool allSuccessful = true;
 
-                    _logger.Info($"We are now processing for {fileCount} files...");
                     for (int i = 0; i < fileCount; i++)
                     {
                         string svgFile = svgFiles[i];

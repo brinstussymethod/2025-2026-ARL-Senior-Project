@@ -65,15 +65,13 @@ namespace UnBox3D.Utils
             try
             {
                 process.Start();
-                Debug.WriteLine("Started Blender process with PID: " + process.Id);
-                Debug.WriteLine("Arguments: " + process.StartInfo.Arguments);
 
                 // Set a timeout for waiting for Blender to finish
                 if (!process.WaitForExit(30000))
                 {
                     errorMessage = "Process took too long to respond. Terminating...";
                     _logger.Warn(errorMessage);
-                    //ForceTerminateBlender();
+                    ForceTerminateBlender();
                     return false;
                 }
 
@@ -107,7 +105,7 @@ namespace UnBox3D.Utils
             {
                 errorMessage = ex.Message;
                 _logger.Error("Error occurred while running Blender: " + errorMessage);
-                //ForceTerminateBlender();
+                ForceTerminateBlender();
                 return false;
             }
         }
