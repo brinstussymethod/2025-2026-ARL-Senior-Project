@@ -1,8 +1,8 @@
-﻿import bpy
+﻿import bpy # pyright: ignore[reportMissingImports]
 import sys
 import pathlib
 import os
-import bmesh
+import bmesh # pyright: ignore[reportMissingImports]
 
 '''
 -------------------Important Notes-------------------
@@ -83,35 +83,7 @@ def cleanup():
 
 
 def unfold(output_path: pathlib.Path, val: dict):
-
-    '''
-    Parameters
-
-    bpy.ops.export_mesh.paper_model(
-    filepath="", filename="", directory="", 
-    page_size_preset='A4', output_size_x=0.21, output_size_y=0.297, output_margin=0.005, output_type='NONE', 
-    do_create_stickers=True, do_create_numbers=True, sticker_width=0.005, angle_epsilon=0.00872665, 
-    output_dpi=90, bake_samples=64, file_format='PDF', image_packing='ISLAND_EMBED', scale=1, 
-    do_create_uvmap=False, ui_expanded_document=True, ui_expanded_style=False, 
-    style={"name":"", "outer_color":(0, 0, 0, 1), "outer_style":'SOLID', 
-    "line_width":0.0001, "outer_width":3, "use_outbg":True, "outbg_color":(1, 1, 1, 1), "outbg_width":5, 
-    "convex_color":(0, 0, 0, 1), "convex_style":'DASH', "convex_width":2, "concave_color":(0, 0, 0, 1), 
-    "concave_style":'DASHDOT', "concave_width":2, "freestyle_color":(0, 0, 0, 1), "freestyle_style":'SOLID', 
-    "freestyle_width":2, "use_inbg":True, "inbg_color":(1, 1, 1, 1), "inbg_width":2, 
-    "sticker_color":(0.9, 0.9, 0.9, 1), "text_color":(0, 0, 0, 1)})
-
-    -tabs and numbers display whether edge numbers and sticky tabs should appear
-    -ext takes on SVG and PDF formats
-    -output_size_x IS NOT the same as output_size_x for exporting
-    its really weird, but the first output_size_x,output_size_y dictates the island limits in the 
-    context of Blender and the second dictates the documents exported dimenions
-    -scale seems to matter in the context of Blender and when exporting
-    -page_size_preset seems irrelevant when exporting as its overrided when modifying the documents dimenions
-    -use_auto_scale is in the context of Blender
-    -limit_by_page is in the context of Blender
-    
-    units are in METERS! 8x4ft = 1.2x2.4m
-    '''
+    # NOTE: units are in METERS! 8x4ft = 1.2x2.4m
 
     '''Context of Blender'''
     pm = bpy.context.scene.paper_model
