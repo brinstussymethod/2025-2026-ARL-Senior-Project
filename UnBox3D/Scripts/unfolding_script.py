@@ -83,13 +83,12 @@ def cleanup():
 
 
 def unfold(output_path: pathlib.Path, val: dict):
-    # NOTE: units are in METERS! 8x4ft = 1.2x2.4m
+    # NOTE: doc_width and doc_height are in METERS (passed from .NET as meters)
+    # Blender's paper model addon expects meters for output_size_x/y
 
     '''Context of Blender'''
     pm = bpy.context.scene.paper_model
 
-    pm.output_size_x=1
-    pm.output_size_y=1
     pm.use_auto_scale = False
     pm.limit_by_page = False
     pm.scale = 1
