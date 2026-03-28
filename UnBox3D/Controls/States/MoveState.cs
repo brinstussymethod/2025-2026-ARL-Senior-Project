@@ -21,12 +21,13 @@ namespace UnBox3D.Controls.States
         private const float ArrowPx    = 28f;   // hit radius for arrow shafts (px)
         private const float RingLinePx = 14f;   // not used but reserved
 
-        private readonly IGLControlHost  _controlHost;
-        private readonly ISceneManager   _sceneManager;
-        private readonly ICamera         _camera;
-        private readonly IRayCaster      _rayCaster;
-        private readonly ICommandHistory _commandHistory;
-        private readonly IRenderer       _renderer;
+        private readonly IGLControlHost   _controlHost;
+        private readonly ISceneManager    _sceneManager;
+        private readonly ICamera          _camera;
+        private readonly IRayCaster       _rayCaster;
+        private readonly ICommandHistory  _commandHistory;
+        private readonly IRenderer        _renderer;
+        private readonly Action<IAppMesh?>? _onSelectionChanged;
 
         private IAppMesh? _selectedMesh;
 
@@ -40,19 +41,21 @@ namespace UnBox3D.Controls.States
         private GizmoHoverElement  _lastHoveredElement = GizmoHoverElement.None;
 
         public MoveState(
-            IGLControlHost  controlHost,
-            ISceneManager   sceneManager,
-            ICamera         camera,
-            IRayCaster      rayCaster,
-            ICommandHistory commandHistory,
-            IRenderer       renderer)
+            IGLControlHost   controlHost,
+            ISceneManager    sceneManager,
+            ICamera          camera,
+            IRayCaster       rayCaster,
+            ICommandHistory  commandHistory,
+            IRenderer        renderer,
+            Action<IAppMesh?>? onSelectionChanged = null)
         {
-            _controlHost    = controlHost    ?? throw new ArgumentNullException(nameof(controlHost));
-            _sceneManager   = sceneManager   ?? throw new ArgumentNullException(nameof(sceneManager));
-            _camera         = camera         ?? throw new ArgumentNullException(nameof(camera));
-            _rayCaster      = rayCaster      ?? throw new ArgumentNullException(nameof(rayCaster));
-            _commandHistory = commandHistory ?? throw new ArgumentNullException(nameof(commandHistory));
-            _renderer       = renderer       ?? throw new ArgumentNullException(nameof(renderer));
+            _controlHost         = controlHost    ?? throw new ArgumentNullException(nameof(controlHost));
+            _sceneManager        = sceneManager   ?? throw new ArgumentNullException(nameof(sceneManager));
+            _camera              = camera         ?? throw new ArgumentNullException(nameof(camera));
+            _rayCaster           = rayCaster      ?? throw new ArgumentNullException(nameof(rayCaster));
+            _commandHistory      = commandHistory ?? throw new ArgumentNullException(nameof(commandHistory));
+            _renderer            = renderer       ?? throw new ArgumentNullException(nameof(renderer));
+            _onSelectionChanged  = onSelectionChanged;
         }
 
         /// <summary>
@@ -117,6 +120,7 @@ namespace UnBox3D.Controls.States
                 }
 
                 _selectedMesh = clickedMesh;
+                _onSelectionChanged?.Invoke(_selectedMesh);
                 _renderer.SetActiveGizmoMesh(_selectedMesh);
                 _renderer.SetGizmoMode(GizmoMode.ArrowsOnly);
                 _dragAxis     = DragAxis.Free;
@@ -134,6 +138,7 @@ namespace UnBox3D.Controls.States
                 {
                     _selectedMesh       = null;
                     _lastHoveredElement = GizmoHoverElement.None;
+                    _onSelectionChanged?.Invoke(null);
                     _renderer.SetActiveGizmoMesh(null);   // also resets hover in SceneRenderer
                     _controlHost.SetCursor(Cursors.Default);
                     _controlHost.Invalidate();

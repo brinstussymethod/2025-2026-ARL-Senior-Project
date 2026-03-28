@@ -17,13 +17,18 @@ namespace UnBox3D.Controls.States
         private readonly IGLControlHost _glControlHost;
         private readonly ICamera _camera;
         private readonly IRayCaster _rayCaster;
+        private readonly IRenderer? _renderer;
+        private readonly Action<IAppMesh?>? _onSelectionChanged;
 
-        public DefaultState ( ISceneManager sceneManager, IGLControlHost glControlHost, ICamera camera, IRayCaster rayCaster)
+        public DefaultState(ISceneManager sceneManager, IGLControlHost glControlHost, ICamera camera, IRayCaster rayCaster,
+            IRenderer? renderer = null, Action<IAppMesh?>? onSelectionChanged = null)
         {
             _sceneManager = sceneManager;
             _glControlHost = glControlHost;
             _rayCaster = rayCaster;
             _camera = camera;
+            _renderer = renderer;
+            _onSelectionChanged = onSelectionChanged;
         }
 
         public void OnMouseDown(MouseEventArgs e)
@@ -35,9 +40,14 @@ namespace UnBox3D.Controls.States
             // Check for intersection with the model
             if (_rayCaster.RayIntersectsMesh(_sceneManager.GetMeshes(), rayOrigin, rayWorld, out float distance, out IAppMesh selectedMesh))
             {
-                //sceneRenderer.ChangeMeshColor(clickedMesh, meshHighlightColor);
-                //sceneManager.SimplifyMesh(selectedMesh);
                 _glControlHost.Invalidate(); // Re-render
+            }
+            else
+            {
+                // Click missed all meshes — clear selection.
+                _onSelectionChanged?.Invoke(null);
+                _renderer?.SetActiveGizmoMesh(null);
+                _glControlHost.Invalidate();
             }
         }
 

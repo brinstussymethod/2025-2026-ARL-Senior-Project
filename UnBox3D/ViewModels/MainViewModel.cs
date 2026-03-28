@@ -50,9 +50,6 @@ namespace UnBox3D.ViewModels
         private IAppMesh? selectedMesh;
 
         [ObservableProperty]
-        private bool hierarchyVisible = true;
-
-        [ObservableProperty]
         private float pageWidth = 25.0f;
 
         [ObservableProperty]
@@ -595,12 +592,6 @@ namespace UnBox3D.ViewModels
         }
 
         [RelayCommand]
-        private void ToggleHierarchy()
-        {
-            HierarchyVisible = !HierarchyVisible;
-        }
-
-        [RelayCommand]
         private static async Task About()
         {
             await ShowWpfMessageBoxAsync("UnBox3D - A 3D Model Viewer", "About", MessageBoxButton.OK, MessageBoxImage.Information);
@@ -687,6 +678,343 @@ namespace UnBox3D.ViewModels
             var summaryToRemove = Meshes.FirstOrDefault(ms => ms.SourceMesh == mesh);
             if (summaryToRemove != null)
                 Meshes.Remove(summaryToRemove);
+        }
+
+        // ── Deselect ───────────────────────────────────────────────────────────
+
+        [RelayCommand]
+        private void Deselect()
+        {
+            SelectedMeshSummary = null;
+            _renderer.SetActiveGizmoMesh(null);
+            _glControlHost.Render();
+        }
+
+        // ── Snap Back ──────────────────────────────────────────────────────────
+
+        [RelayCommand]
+        private void SnapBackMesh(IAppMesh mesh)
+        {
+            if (mesh == null) return;
+
+            var cmd = new SnapBackCommand(mesh);
+            _commandHistory.PushCommand(cmd);
+            cmd.Execute();
+
+            _renderer.SetActiveGizmoMesh(mesh);
+            _glControlHost.Render();
+            ToastService.Show($"'{mesh.Name}' snapped to original position.");
+        }
+
+        [RelayCommand]
+        private void SnapBackSelected()
+        {
+            if (SelectedMesh != null)
+                SnapBackMesh(SelectedMesh);
+            else
+                ToastService.Show("Select a mesh first.", isError: false);
+        }
+
+        // ── Precise Rotate ────────────────────────────────────────────────
+
+        [ObservableProperty] private string preciseRotateX = "0";
+        [ObservableProperty] private string preciseRotateY = "0";
+        [ObservableProperty] private string preciseRotateZ = "0";
+
+        [RelayCommand]
+        private void ApplyPreciseRotate()
+        {
+            if (SelectedMesh == null)
+            {
+                ToastService.Show("Select a mesh first.", isError: false);
+                return;
+            }
+
+            float x = float.TryParse(PreciseRotateX, System.Globalization.NumberStyles.Float,
+                           System.Globalization.CultureInfo.InvariantCulture, out float fx) ? fx : 0f;
+            float y = float.TryParse(PreciseRotateY, System.Globalization.NumberStyles.Float,
+                           System.Globalization.CultureInfo.InvariantCulture, out float fy) ? fy : 0f;
+            float z = float.TryParse(PreciseRotateZ, System.Globalization.NumberStyles.Float,
+                           System.Globalization.CultureInfo.InvariantCulture, out float fz) ? fz : 0f;
+
+            if (x == 0f && y == 0f && z == 0f)
+            {
+                ToastService.Show("All angles are 0 — nothing to rotate.", isError: false);
+                return;
+            }
+
+            // qZ * qY * qX applies X first, then Y, then Z
+            var qx = Quaternion.FromAxisAngle(Vector3.UnitX, MathHelper.DegreesToRadians(x));
+            var qy = Quaternion.FromAxisAngle(Vector3.UnitY, MathHelper.DegreesToRadians(y));
+            var qz = Quaternion.FromAxisAngle(Vector3.UnitZ, MathHelper.DegreesToRadians(z));
+            var combined = qz * qy * qx;
+            combined.Normalize();
+
+            var cmd = new PreciseRotateCommand(SelectedMesh, combined);
+            _commandHistory.PushCommand(cmd);
+            cmd.Execute();
+
+            _renderer.SetActiveGizmoMesh(SelectedMesh);
+            _glControlHost.Render();
+
+            var parts = new System.Text.StringBuilder();
+            if (x != 0f) parts.Append($"X:{x}° ");
+            if (y != 0f) parts.Append($"Y:{y}° ");
+            if (z != 0f) parts.Append($"Z:{z}°");
+            ToastService.Show($"Rotated '{SelectedMesh.Name}' by {parts.ToString().Trim()}");
+        }
+
+        // ── Mesh Info ────────────────────────────────────────────────
+
+        [ObservableProperty] private string selectedMeshInfoName = "";
+        [ObservableProperty] private string selectedMeshInfoVerts = "";
+        [ObservableProperty] private string selectedMeshInfoDims = "";
+
+        private void RefreshMeshInfo(IAppMesh? mesh)
+        {
+            if (mesh == null)
+            {
+                SelectedMeshInfoName  = "";
+                SelectedMeshInfoVerts = "";
+                SelectedMeshInfoDims  = "";
+                return;
+            }
+
+            SelectedMeshInfoName  = mesh.Name;
+            SelectedMeshInfoVerts = $"{mesh.VertexCount:N0} vertices";
+
+            try
+            {
+                Vector3 dim = _sceneManager.GetMeshDimensions(mesh.GetG4Mesh());
+                SelectedMeshInfoDims = $"W {dim.X:F2}   H {dim.Y:F2}   D {dim.Z:F2}";
+            }
+            catch
+            {
+                SelectedMeshInfoDims = "";
+            }
+        }
+
+        // ── Precise Move ───────────────────────────────────────────────
+
+        [ObservableProperty] private string preciseMoveX = "0";
+        [ObservableProperty] private string preciseMoveY = "0";
+        [ObservableProperty] private string preciseMoveZ = "0";
+
+        [RelayCommand]
+        private void ApplyPreciseMove()
+        {
+            if (SelectedMesh == null)
+            {
+                ToastService.Show("Select a mesh first.", isError: false);
+                return;
+            }
+
+            float x = float.TryParse(PreciseMoveX, System.Globalization.NumberStyles.Float,
+                           System.Globalization.CultureInfo.InvariantCulture, out float fx) ? fx : 0f;
+            float y = float.TryParse(PreciseMoveY, System.Globalization.NumberStyles.Float,
+                           System.Globalization.CultureInfo.InvariantCulture, out float fy) ? fy : 0f;
+            float z = float.TryParse(PreciseMoveZ, System.Globalization.NumberStyles.Float,
+                           System.Globalization.CultureInfo.InvariantCulture, out float fz) ? fz : 0f;
+
+            if (x == 0f && y == 0f && z == 0f)
+            {
+                ToastService.Show("All offsets are 0 — nothing to move.", isError: false);
+                return;
+            }
+
+            var delta = new Vector3(x, y, z);
+            var cmd   = new PreciseMoveCommand(SelectedMesh, delta);
+            _commandHistory.PushCommand(cmd);
+            cmd.Execute();
+
+            _renderer.SetActiveGizmoMesh(SelectedMesh);
+            _glControlHost.Render();
+            RefreshMeshInfo(SelectedMesh);
+            OnPropertyChanged(nameof(FormattedCoords));
+            OnPropertyChanged(nameof(FormattedDims));
+
+            var parts = new System.Text.StringBuilder();
+            if (x != 0f) parts.Append($"X:{x:+0.##;-0.##} ");
+            if (y != 0f) parts.Append($"Y:{y:+0.##;-0.##} ");
+            if (z != 0f) parts.Append($"Z:{z:+0.##;-0.##}");
+            ToastService.Show($"Moved '{SelectedMesh.Name}' by {parts.ToString().Trim()}");
+        }
+
+        // ── Scale ──────────────────────────────────────────────────────────────
+
+        [ObservableProperty] private string scaleValue = "1";
+        [ObservableProperty] private bool scaleAxisX = true;
+        [ObservableProperty] private bool scaleAxisY = true;
+        [ObservableProperty] private bool scaleAxisZ = true;
+
+        public string ScalePreviewDims
+        {
+            get
+            {
+                if (SelectedMesh == null) return "";
+
+                if (!float.TryParse(ScaleValue, System.Globalization.NumberStyles.Float,
+                        System.Globalization.CultureInfo.InvariantCulture, out float factor)
+                    || factor <= 0f)
+                    return "invalid factor";
+
+                try
+                {
+                    Vector3 dim = _sceneManager.GetMeshDimensions(SelectedMesh.GetG4Mesh());
+                    float nx = dim.X * (ScaleAxisX ? factor : 1f);
+                    float ny = dim.Y * (ScaleAxisY ? factor : 1f);
+                    float nz = dim.Z * (ScaleAxisZ ? factor : 1f);
+                    return $"W {nx:F2}   H {ny:F2}   D {nz:F2}";
+                }
+                catch { return ""; }
+            }
+        }
+
+        // Partial callbacks — fired by the MVVM source generator when the backing fields change.
+        partial void OnScaleValueChanged(string value)   { OnPropertyChanged(nameof(ScalePreviewDims)); OnPropertyChanged(nameof(FormattedPreviewDims)); }
+        partial void OnScaleAxisXChanged(bool value)     { OnPropertyChanged(nameof(ScalePreviewDims)); OnPropertyChanged(nameof(FormattedPreviewDims)); }
+        partial void OnScaleAxisYChanged(bool value)     { OnPropertyChanged(nameof(ScalePreviewDims)); OnPropertyChanged(nameof(FormattedPreviewDims)); }
+        partial void OnScaleAxisZChanged(bool value)     { OnPropertyChanged(nameof(ScalePreviewDims)); OnPropertyChanged(nameof(FormattedPreviewDims)); }
+
+        [RelayCommand]
+        private void ApplyScale()
+        {
+            if (SelectedMesh == null)
+            {
+                ToastService.Show("Select a mesh first.", isError: false);
+                return;
+            }
+
+            if (!float.TryParse(ScaleValue, System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture, out float factor)
+                || factor <= 0f)
+            {
+                ToastService.Show("Enter a positive scale factor (e.g. 2 or 0.5).", isError: true);
+                return;
+            }
+
+            if (!ScaleAxisX && !ScaleAxisY && !ScaleAxisZ)
+            {
+                ToastService.Show("Enable at least one axis to scale.", isError: false);
+                return;
+            }
+
+            var scaleFactors = new Vector3(
+                ScaleAxisX ? factor : 1f,
+                ScaleAxisY ? factor : 1f,
+                ScaleAxisZ ? factor : 1f);
+
+            var cmd = new ScaleCommand(SelectedMesh, scaleFactors);
+            _commandHistory.PushCommand(cmd);
+            cmd.Execute();
+
+            _renderer.SetActiveGizmoMesh(SelectedMesh);
+            _glControlHost.Render();
+            RefreshMeshInfo(SelectedMesh);
+            OnPropertyChanged(nameof(FormattedDims));
+            OnPropertyChanged(nameof(FormattedCoords));
+
+            var axes = (ScaleAxisX ? "X" : "") + (ScaleAxisY ? "Y" : "") + (ScaleAxisZ ? "Z" : "");
+            ToastService.Show($"Scaled '{SelectedMesh.Name}' ×{factor} on {axes}");
+        }
+
+        // ── Unit System + Scale & Info Panel ───────────────────────────────────────
+
+        [ObservableProperty] private string selectedUnit = "Meters";
+        [ObservableProperty] private bool isScaleInfoPanelOpen = false;
+
+        public static string[] UnitOptions { get; } =
+            { "Meters", "Centimeters", "Millimeters", "Inches", "Feet", "Miles" };
+
+        private static float GetUnitFactor(string unit) => unit switch
+        {
+            "Centimeters" => 100f,
+            "Millimeters" => 1000f,
+            "Inches"      => 39.3701f,
+            "Feet"        => 3.28084f,
+            "Miles"       => 0.000621371f,
+            _             => 1f
+        };
+
+        private static string GetUnitAbbrev(string unit) => unit switch
+        {
+            "Centimeters" => "cm",
+            "Millimeters" => "mm",
+            "Inches"      => "in",
+            "Feet"        => "ft",
+            "Miles"       => "mi",
+            _             => "m"
+        };
+
+        public string FormattedDims
+        {
+            get
+            {
+                if (SelectedMesh == null) return "";
+                try
+                {
+                    float f = GetUnitFactor(SelectedUnit);
+                    string u = GetUnitAbbrev(SelectedUnit);
+                    Vector3 dim = _sceneManager.GetMeshDimensions(SelectedMesh.GetG4Mesh());
+                    return $"W {dim.X * f:F2}{u}   H {dim.Y * f:F2}{u}   D {dim.Z * f:F2}{u}";
+                }
+                catch { return ""; }
+            }
+        }
+
+        public string FormattedCoords
+        {
+            get
+            {
+                if (SelectedMesh == null) return "";
+                try
+                {
+                    float f = GetUnitFactor(SelectedUnit);
+                    string u = GetUnitAbbrev(SelectedUnit);
+                    // render X = world X, render Y = world Z, render Z = world Y
+                    Vector3 c = SelectedMesh.GetRenderCenter();
+                    return $"X {c.X * f:F2}{u}   Y {c.Z * f:F2}{u}   Z {c.Y * f:F2}{u}";
+                }
+                catch { return ""; }
+            }
+        }
+
+        public string FormattedPreviewDims
+        {
+            get
+            {
+                if (SelectedMesh == null) return "";
+                if (!float.TryParse(ScaleValue, System.Globalization.NumberStyles.Float,
+                        System.Globalization.CultureInfo.InvariantCulture, out float factor)
+                    || factor <= 0f)
+                    return "invalid factor";
+                try
+                {
+                    float f = GetUnitFactor(SelectedUnit);
+                    string u = GetUnitAbbrev(SelectedUnit);
+                    Vector3 dim = _sceneManager.GetMeshDimensions(SelectedMesh.GetG4Mesh());
+                    float nx = dim.X * (ScaleAxisX ? factor : 1f) * f;
+                    float ny = dim.Y * (ScaleAxisY ? factor : 1f) * f;
+                    float nz = dim.Z * (ScaleAxisZ ? factor : 1f) * f;
+                    return $"W {nx:F2}{u}   H {ny:F2}{u}   D {nz:F2}{u}";
+                }
+                catch { return ""; }
+            }
+        }
+
+        // Recompute all formatted properties when the unit changes.
+        partial void OnSelectedUnitChanged(string value)
+        {
+            OnPropertyChanged(nameof(FormattedDims));
+            OnPropertyChanged(nameof(FormattedCoords));
+            OnPropertyChanged(nameof(FormattedPreviewDims));
+        }
+
+        [RelayCommand]
+        private void ToggleScaleInfoPanel()
+        {
+            if (SelectedMesh == null) return;
+            IsScaleInfoPanelOpen = !IsScaleInfoPanelOpen;
         }
 
 
@@ -1158,15 +1486,29 @@ namespace UnBox3D.ViewModels
             //    This ensures panel-driven selection updates the gizmo just like a viewport click.
             RetargetGizmoToSelectedMesh();
 
-            // 5) Ask the GL view to repaint so the color change shows immediately.
+            // 5) Notify dependents that require a mesh selection (e.g. Replace buttons in the UI).
+            OnPropertyChanged(nameof(HasSelectedMesh));
+
+            // 6) Refresh the info card and all formatted measurement properties.
+            RefreshMeshInfo(value);
+            OnPropertyChanged(nameof(ScalePreviewDims));
+            OnPropertyChanged(nameof(FormattedDims));
+            OnPropertyChanged(nameof(FormattedCoords));
+            OnPropertyChanged(nameof(FormattedPreviewDims));
+
+            // 7) Close the info panel when the selection is cleared.
+            if (value == null) IsScaleInfoPanelOpen = false;
+
+            // 8) Ask the GL view to repaint so the color change shows immediately.
             _glControlHost.Render();
         }
 
         /// <summary>
-        /// True while Move, Rotate, or Gimbal mode is the active mouse state.
-        /// Used by the MainWindow viewport click handler to avoid updating SelectedMesh
-        /// while the state machine owns mesh interaction.
+        /// True when a mesh is currently selected.  Used to enable / disable
+        /// UI controls that require a selection (Replace, Snap Back, etc.).
         /// </summary>
+        public bool HasSelectedMesh => SelectedMesh != null;
+
         public bool IsTransformModeActive =>
             _mouseController.GetState() is MoveState or RotateState or GimbalState;
 
@@ -1312,7 +1654,19 @@ namespace UnBox3D.ViewModels
             {
                 UndoActionCommand.NotifyCanExecuteChanged();
                 RedoActionCommand.NotifyCanExecuteChanged();
+
+                if (SelectedMesh != null)
+                {
+                    RefreshMeshInfo(SelectedMesh);
+                    OnPropertyChanged(nameof(FormattedCoords));
+                    OnPropertyChanged(nameof(FormattedDims));
+                    OnPropertyChanged(nameof(FormattedPreviewDims));
+                }
             };
+
+            // Replace the bare DI-registered DefaultState (no callbacks) with a properly
+            // wired one so deselection works from the very first interaction.
+            SetSelectMode();
         }
 
         #endregion
@@ -1324,7 +1678,8 @@ namespace UnBox3D.ViewModels
         {
             ActiveMode = "Select";
             _renderer.SetActiveGizmoMesh(null);
-            var state = new DefaultState(_sceneManager, _glControlHost, _camera, new RayCaster(_glControlHost, _camera));
+            var state = new DefaultState(_sceneManager, _glControlHost, _camera, new RayCaster(_glControlHost, _camera),
+                _renderer, NotifyStateSelectionChanged);
             _mouseController.SetState(state);
         }
 
@@ -1341,7 +1696,10 @@ namespace UnBox3D.ViewModels
         private void SetMoveMode()
         {
             ActiveMode = "Move";
-            var state = new MoveState(_glControlHost, _sceneManager, _camera, new RayCaster(_glControlHost, _camera), _commandHistory, _renderer);
+            var state = new MoveState(
+                _glControlHost, _sceneManager, _camera,
+                new RayCaster(_glControlHost, _camera), _commandHistory, _renderer,
+                onSelectionChanged: NotifyStateSelectionChanged);
             // If a mesh is already selected, show arrows immediately — no need to click again.
             if (SelectedMesh != null)
                 state.SetSelectedMesh(SelectedMesh);
@@ -1354,7 +1712,10 @@ namespace UnBox3D.ViewModels
         private void SetRotateMode()
         {
             ActiveMode = "Rotate";
-            var state = new RotateState(_settingsManager, _sceneManager, _glControlHost, _camera, new RayCaster(_glControlHost, _camera), _commandHistory, _renderer);
+            var state = new RotateState(
+                _settingsManager, _sceneManager, _glControlHost, _camera,
+                new RayCaster(_glControlHost, _camera), _commandHistory, _renderer,
+                onSelectionChanged: NotifyStateSelectionChanged);
             // If a mesh is already selected, show rings immediately — no need to click again.
             if (SelectedMesh != null)
                 state.SetSelectedMesh(SelectedMesh);
@@ -1367,26 +1728,40 @@ namespace UnBox3D.ViewModels
         private void SetGimbalMode()
         {
             ActiveMode = "Gimbal";
-            var state = new GimbalState(_glControlHost, _sceneManager, _camera, new RayCaster(_glControlHost, _camera), _commandHistory, _renderer);
+            var state = new GimbalState(
+                _glControlHost, _sceneManager, _camera,
+                new RayCaster(_glControlHost, _camera), _commandHistory, _renderer,
+                onSelectionChanged: NotifyStateSelectionChanged);
 
             // If a mesh is already selected in the scene, show the gimbal rings immediately
             // without making the user click again.
             if (SelectedMesh != null)
-            {
                 state.SetSelectedMesh(SelectedMesh);
-                _glControlHost.Invalidate();
-            }
-
-            _renderer.SetGizmoMode(GizmoMode.Full);
+            else
+                _renderer.SetActiveGizmoMesh(null);
             _mouseController.SetState(state);
+        }
+
+        private void NotifyStateSelectionChanged(IAppMesh? mesh)
+        {
+            // Invoked from WinForms mouse thread — marshal to UI thread.
+            System.Windows.Application.Current.Dispatcher.Invoke(() =>
+            {
+                if (mesh == null)
+                {
+                    SelectedMeshSummary = null;
+                }
+                else
+                {
+                    var summary = Meshes.FirstOrDefault(ms => ReferenceEquals(ms.SourceMesh, mesh));
+                    if (summary != null)
+                        SelectedMeshSummary = summary;
+                }
+            });
         }
 
         #endregion
 
-        /// <summary>
-        /// Rebuilds the Meshes observable collection from the current scene.
-        /// Called after undo/redo so the hierarchy stays in sync.
-        /// </summary>
         private void RefreshMeshesCollection()
         {
             Meshes.Clear();
@@ -1402,16 +1777,24 @@ namespace UnBox3D.ViewModels
                 return;
             }
 
+            // Remember which mesh was selected so we can restore it after the rebuild.
+            var previouslySelected = SelectedMesh;
+
             _sceneManager.RemoveSmallMeshes(_latestImportedModel, SmallMeshThreshold);
             Meshes.Clear();
 
-            var importedMeshes = _sceneManager.GetMeshes();
-
-            foreach (var mesh in importedMeshes)
-            {
+            foreach (var mesh in _sceneManager.GetMeshes())
                 Meshes.Add(new MeshSummary(mesh));
-            }
 
+            // Restore the selection if the mesh survived the threshold filter.
+            if (previouslySelected != null)
+            {
+                var restoredSummary = Meshes.FirstOrDefault(ms => ReferenceEquals(ms.SourceMesh, previouslySelected));
+                if (restoredSummary != null)
+                    SelectedMeshSummary = restoredSummary;
+                else
+                    SelectedMeshSummary = null;
+            }
         }
     }
 }
