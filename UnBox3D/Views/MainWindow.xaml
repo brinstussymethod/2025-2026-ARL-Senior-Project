@@ -179,6 +179,28 @@
                     </StackPanel>
                 </Button>
 
+                <!-- Ruler -->
+                <Button ToolTip="Ruler — click ground to place, drag arrow to resize, click label to define scale"
+                        Command="{Binding SetRulerModeCommand}">
+                    <Button.Style>
+                        <Style TargetType="Button" BasedOn="{StaticResource ToolbarButtonStyle}">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding ActiveMode}" Value="Ruler">
+                                    <Setter Property="Background"  Value="{DynamicResource CardBrush}"/>
+                                    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                                    <Setter Property="FontWeight"  Value="SemiBold"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#x22A2;" FontSize="14" Margin="0,0,5,0"
+                                   Foreground="{DynamicResource AccentBrush}"
+                                   VerticalAlignment="Center"/>
+                        <TextBlock Text="Ruler" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+
                 <!-- Delete -->
                 <Button ToolTip="Delete — click a mesh to remove it"
                         Command="{Binding SetDeleteModeCommand}">
@@ -473,7 +495,9 @@
                           ShowsPreview="True" Cursor="SizeWE"/>
 
             <!-- ── Viewport ── -->
-            <WindowsFormsHost Grid.Column="2" Name="openGLHost"/>
+            <Grid x:Name="ViewportGrid" Grid.Column="2">
+                <WindowsFormsHost Name="openGLHost"/>
+            </Grid>
 
             <!-- Splitter -->
             <GridSplitter Grid.Column="3"
@@ -945,6 +969,7 @@
             </StackPanel>
         </Border>
     </Popup>
+
 
     </Grid>
 </Window>
