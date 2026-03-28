@@ -39,8 +39,7 @@
         <MenuItem Header="Redo" Command="{Binding RedoActionCommand}" InputGestureText="Ctrl+Y" Style="{StaticResource SubMenuItemStyle}"/>
         </MenuItem>
         <MenuItem Header="View">
-        <MenuItem Header="Reset View"       Command="{Binding ResetViewCommand}"           Style="{StaticResource SubMenuItemStyle}"/>
-        <MenuItem Header="Toggle Hierarchy" Command="{Binding ToggleHierarchyCommand}"     Style="{StaticResource SubMenuItemStyle}"/>
+        <MenuItem Header="Reset View" Command="{Binding ResetViewCommand}" Style="{StaticResource SubMenuItemStyle}"/>
         </MenuItem>
         <MenuItem Header="Tools">
         <MenuItem Header="Replace Scene with Bounding Boxes" Command="{Binding ReplaceSceneWithBoundingBoxesCommand}" Style="{StaticResource SubMenuItemStyle}"/>
@@ -228,15 +227,33 @@
                 <Border Width="1" Height="22" Background="{DynamicResource BorderBrushLight}"
                         Margin="6,0" VerticalAlignment="Center"/>
 
-                <!-- Hierarchy toggle -->
-                <Button ToolTip="Toggle mesh hierarchy  (View → Toggle Hierarchy)"
-                        Command="{Binding ToggleHierarchyCommand}"
+                <!-- Deselect -->
+                <Button ToolTip="Deselect the current mesh and hide the gizmo"
+                        Command="{Binding DeselectCommand}"
+                        IsEnabled="{Binding HasSelectedMesh}"
                         Style="{StaticResource ToolbarButtonStyle}">
                     <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="&#x2630;" FontSize="13" Margin="0,0,5,0"
+                        <TextBlock Text="&#x2715;" FontSize="13" Margin="0,0,5,0"
                                    Foreground="{DynamicResource AccentBrush}"
                                    VerticalAlignment="Center"/>
-                        <TextBlock Text="Hierarchy" VerticalAlignment="Center"/>
+                        <TextBlock Text="Deselect" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+
+                <!-- Divider -->
+                <Border Width="1" Height="22" Background="{DynamicResource BorderBrushLight}"
+                        Margin="6,0" VerticalAlignment="Center"/>
+
+                <!-- Snap Back (toolbar shortcut for selected mesh) -->
+                <Button ToolTip="Snap selected mesh back to its original import position"
+                        Command="{Binding SnapBackSelectedCommand}"
+                        IsEnabled="{Binding HasSelectedMesh}"
+                        Style="{StaticResource ToolbarButtonStyle}">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#x2302;" FontSize="14" Margin="0,0,5,0"
+                                   Foreground="{DynamicResource AccentBrush}"
+                                   VerticalAlignment="Center"/>
+                        <TextBlock Text="Snap Back" VerticalAlignment="Center"/>
                     </StackPanel>
                 </Button>
 
@@ -428,16 +445,40 @@
                                     </StackPanel>
                                     <!-- Action buttons -->
                                     <StackPanel Orientation="Horizontal" Margin="0,0,0,2">
-                                        <Button Content="Export"
-                                                FontSize="11" Padding="8,3"
+                                        <Button FontSize="11" Padding="8,3"
                                                 Command="{Binding DataContext.ExportMeshCommand, RelativeSource={RelativeSource AncestorType=TreeView}}"
-                                                CommandParameter="{Binding SourceMesh}"/>
-                                        <Button Content="Delete"
-                                                FontSize="11" Padding="8,3"
+                                                CommandParameter="{Binding SourceMesh}"
+                                                ToolTip="Export this mesh as OBJ">
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="&#x2197;" FontSize="11" Margin="0,0,4,0"
+                                                           Foreground="{DynamicResource AccentBrush}"
+                                                           VerticalAlignment="Center"/>
+                                                <TextBlock Text="Export" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Button>
+                                        <Button FontSize="11" Padding="8,3" Margin="5,0,0,0"
+                                                ToolTip="Snap this mesh back to where it was when imported"
+                                                Command="{Binding DataContext.SnapBackMeshCommand, RelativeSource={RelativeSource AncestorType=TreeView}}"
+                                                CommandParameter="{Binding SourceMesh}">
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="&#x2302;" FontSize="11" Margin="0,0,3,0"
+                                                           Foreground="{DynamicResource AccentBrush}"
+                                                           VerticalAlignment="Center"/>
+                                                <TextBlock Text="Snap Back" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Button>
+                                        <Button FontSize="11" Padding="8,3"
                                                 Margin="5,0,0,0"
                                                 Style="{StaticResource DangerButtonStyle}"
                                                 Command="{Binding DataContext.DeleteMeshCommand, RelativeSource={RelativeSource AncestorType=TreeView}}"
-                                                CommandParameter="{Binding SourceMesh}"/>
+                                                CommandParameter="{Binding SourceMesh}"
+                                                ToolTip="Delete this mesh from the scene">
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="&#x2715;" FontSize="11" Margin="0,0,4,0"
+                                                           VerticalAlignment="Center"/>
+                                                <TextBlock Text="Delete" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Button>
                                     </StackPanel>
                                 </StackPanel>
                             </DataTemplate>
@@ -497,6 +538,284 @@
                                   Padding="12,10,12,10">
                         <StackPanel>
 
+                            <!-- ══ Scale & Information toggle button ══ -->
+                            <Button HorizontalAlignment="Stretch"
+                                    IsEnabled="{Binding HasSelectedMesh}"
+                                    Command="{Binding ToggleScaleInfoPanelCommand}"
+                                    ToolTip="View mesh info, position, and scale options"
+                                    Margin="0,0,0,4">
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                    <TextBlock FontSize="10" Margin="0,0,7,0" VerticalAlignment="Center"
+                                               Foreground="{DynamicResource AccentBrush}">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Text" Value="▶"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsScaleInfoPanelOpen}" Value="True">
+                                                        <Setter Property="Text" Value="▼"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                    <TextBlock Text="Scale &amp; Information" FontWeight="SemiBold"
+                                               VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+
+                            <!-- Animated expandable panel -->
+                            <Border ClipToBounds="True" Margin="0,0,0,14">
+                                <Border.Style>
+                                    <Style TargetType="Border">
+                                        <Setter Property="MaxHeight" Value="0"/>
+                                        <Setter Property="Opacity"   Value="0"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsScaleInfoPanelOpen}" Value="True">
+                                                <DataTrigger.EnterActions>
+                                                    <BeginStoryboard>
+                                                        <Storyboard>
+                                                            <DoubleAnimation Storyboard.TargetProperty="MaxHeight"
+                                                                             To="1200" Duration="0:0:0.35">
+                                                                <DoubleAnimation.EasingFunction>
+                                                                    <CubicEase EasingMode="EaseOut"/>
+                                                                </DoubleAnimation.EasingFunction>
+                                                            </DoubleAnimation>
+                                                            <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                                             To="1" Duration="0:0:0.28"/>
+                                                        </Storyboard>
+                                                    </BeginStoryboard>
+                                                </DataTrigger.EnterActions>
+                                                <DataTrigger.ExitActions>
+                                                    <BeginStoryboard>
+                                                        <Storyboard>
+                                                            <DoubleAnimation Storyboard.TargetProperty="MaxHeight"
+                                                                             To="0" Duration="0:0:0.25">
+                                                                <DoubleAnimation.EasingFunction>
+                                                                    <CubicEase EasingMode="EaseIn"/>
+                                                                </DoubleAnimation.EasingFunction>
+                                                            </DoubleAnimation>
+                                                            <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                                                                             To="0" Duration="0:0:0.2"/>
+                                                        </Storyboard>
+                                                    </BeginStoryboard>
+                                                </DataTrigger.ExitActions>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Border.Style>
+
+                                <Border Background="{DynamicResource CardBrush}"
+                                        BorderBrush="{DynamicResource HighlightBrush}"
+                                        BorderThickness="1" CornerRadius="6"
+                                        Padding="10,10">
+                                    <StackPanel>
+
+                                        <!-- Mesh name + vertex count -->
+                                        <TextBlock Text="{Binding SelectedMeshInfoName}"
+                                                   FontSize="12" FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource TextBrush}"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   Margin="0,0,0,2"/>
+                                        <TextBlock Text="{Binding SelectedMeshInfoVerts}"
+                                                   FontSize="10.5"
+                                                   Foreground="{DynamicResource AccentBrush}"
+                                                   Margin="0,0,0,8"/>
+
+                                        <!-- Unit selector -->
+                                        <TextBlock Text="DISPLAY UNIT"
+                                                   FontSize="9" FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource AccentBrush}"
+                                                   Margin="0,0,0,4"/>
+                                        <ComboBox ItemsSource="{x:Static viewmodels:MainViewModel.UnitOptions}"
+                                                  SelectedItem="{Binding SelectedUnit, Mode=TwoWay}"
+                                                  Margin="0,0,0,10"/>
+
+                                        <!-- Divider -->
+                                        <Border Height="1" Background="{DynamicResource BorderBrushLight}" Margin="0,0,0,8"/>
+
+                                        <!-- Dimensions -->
+                                        <TextBlock Text="DIMENSIONS"
+                                                   FontSize="9" FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource AccentBrush}"
+                                                   Margin="0,0,0,3"/>
+                                        <TextBlock Text="{Binding FormattedDims}"
+                                                   FontFamily="Cascadia Code, Consolas"
+                                                   FontSize="10.5"
+                                                   Foreground="{DynamicResource HighlightBrush}"
+                                                   Margin="0,0,0,8"/>
+
+                                        <!-- Position -->
+                                        <TextBlock Text="POSITION"
+                                                   FontSize="9" FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource AccentBrush}"
+                                                   Margin="0,0,0,3"/>
+                                        <TextBlock Text="{Binding FormattedCoords}"
+                                                   FontFamily="Cascadia Code, Consolas"
+                                                   FontSize="10.5"
+                                                   Foreground="{DynamicResource HighlightBrush}"
+                                                   Margin="0,0,0,8"/>
+
+                                        <!-- Divider -->
+                                        <Border Height="1" Background="{DynamicResource BorderBrushLight}" Margin="0,0,0,8"/>
+
+                                        <!-- Scale ───────────────────────────────────────── -->
+                                        <TextBlock Text="SCALE"
+                                                   FontSize="9" FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource AccentBrush}"
+                                                   Margin="0,0,0,5"/>
+
+                                        <!-- Axis toggles -->
+                                        <TextBlock Text="AXES"
+                                                   FontSize="9" FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource AccentBrush}"
+                                                   Margin="0,0,0,4"/>
+                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                            <ToggleButton IsChecked="{Binding ScaleAxisX, Mode=TwoWay}"
+                                                          Width="40" Height="28" Margin="0,0,6,0"
+                                                          ToolTip="Include X axis in scale">
+                                                <TextBlock Text="X" FontWeight="SemiBold" Foreground="#EF4444"/>
+                                            </ToggleButton>
+                                            <ToggleButton IsChecked="{Binding ScaleAxisY, Mode=TwoWay}"
+                                                          Width="40" Height="28" Margin="0,0,6,0"
+                                                          ToolTip="Include Y axis in scale">
+                                                <TextBlock Text="Y" FontWeight="SemiBold" Foreground="#22C55E"/>
+                                            </ToggleButton>
+                                            <ToggleButton IsChecked="{Binding ScaleAxisZ, Mode=TwoWay}"
+                                                          Width="40" Height="28"
+                                                          ToolTip="Include Z axis in scale">
+                                                <TextBlock Text="Z" FontWeight="SemiBold" Foreground="#3B82F6"/>
+                                            </ToggleButton>
+                                        </StackPanel>
+
+                                        <!-- Factor -->
+                                        <TextBlock Text="FACTOR"
+                                                   FontSize="9" FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource AccentBrush}"
+                                                   Margin="0,0,0,4"/>
+                                        <TextBox Text="{Binding ScaleValue, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                 PreviewTextInput="AngleTextBox_PreviewTextInput"
+                                                 PreviewKeyDown="NumericTextBox_PreviewKeyDown"
+                                                 ToolTip="Scale multiplier (e.g. 2 = double, 0.5 = halve)"
+                                                 Margin="0,0,0,8"/>
+
+                                        <!-- Current size in selected unit -->
+                                        <TextBlock Text="CURRENT SIZE"
+                                                   FontSize="9" FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource AccentBrush}"
+                                                   Margin="0,0,0,3"/>
+                                        <TextBlock Text="{Binding FormattedDims}"
+                                                   FontFamily="Cascadia Code, Consolas"
+                                                   FontSize="10.5"
+                                                   Foreground="{DynamicResource HighlightBrush}"
+                                                   Margin="0,0,0,8"/>
+
+                                        <!-- After scale preview -->
+                                        <TextBlock Text="AFTER SCALE"
+                                                   FontSize="9" FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource AccentBrush}"
+                                                   Margin="0,0,0,3"/>
+                                        <TextBlock Text="{Binding FormattedPreviewDims}"
+                                                   FontFamily="Cascadia Code, Consolas"
+                                                   FontSize="10.5"
+                                                   Foreground="#22C55E"
+                                                   Margin="0,0,0,10"/>
+
+                                        <Button Content="Apply Scale"
+                                                HorizontalAlignment="Stretch"
+                                                Command="{Binding ApplyScaleCommand}"
+                                                ToolTip="Scale the selected mesh on the toggled axes (undoable)"/>
+
+                                        <!-- Divider -->
+                                        <Border Height="1" Background="{DynamicResource BorderBrushLight}" Margin="0,10,0,8"/>
+
+                                        <!-- Precise Move ──────────────────────────── -->
+                                        <TextBlock Text="MOVE BY"
+                                                   FontSize="9" FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource AccentBrush}"
+                                                   Margin="0,0,0,5"/>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="X" FontSize="11" FontWeight="SemiBold"
+                                                       Foreground="#EF4444" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                                            <TextBox Grid.Column="1"
+                                                     Text="{Binding PreciseMoveX, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                     PreviewTextInput="AngleTextBox_PreviewTextInput"
+                                                     PreviewKeyDown="NumericTextBox_PreviewKeyDown"/>
+                                            <TextBlock Grid.Column="2" Text="Y" FontSize="11" FontWeight="SemiBold"
+                                                       Foreground="#22C55E" VerticalAlignment="Center" Margin="7,0,5,0"/>
+                                            <TextBox Grid.Column="3"
+                                                     Text="{Binding PreciseMoveY, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                     PreviewTextInput="AngleTextBox_PreviewTextInput"
+                                                     PreviewKeyDown="NumericTextBox_PreviewKeyDown"/>
+                                            <TextBlock Grid.Column="4" Text="Z" FontSize="11" FontWeight="SemiBold"
+                                                       Foreground="#3B82F6" VerticalAlignment="Center" Margin="7,0,5,0"/>
+                                            <TextBox Grid.Column="5"
+                                                     Text="{Binding PreciseMoveZ, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                     PreviewTextInput="AngleTextBox_PreviewTextInput"
+                                                     PreviewKeyDown="NumericTextBox_PreviewKeyDown"/>
+                                        </Grid>
+                                        <Button Content="Apply Move"
+                                                HorizontalAlignment="Stretch"
+                                                Command="{Binding ApplyPreciseMoveCommand}"
+                                                ToolTip="Translate the mesh by the typed XYZ delta (undoable)"
+                                                Margin="0,7,0,0"/>
+
+                                        <!-- Divider -->
+                                        <Border Height="1" Background="{DynamicResource BorderBrushLight}" Margin="0,10,0,8"/>
+
+                                        <!-- Precise Rotate ─────────────────────────── -->
+                                        <TextBlock Text="ROTATE BY"
+                                                   FontSize="9" FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource AccentBrush}"
+                                                   Margin="0,0,0,5"/>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="X" FontSize="11" FontWeight="SemiBold"
+                                                       Foreground="#EF4444" VerticalAlignment="Center" Margin="0,0,5,0"
+                                                       ToolTip="Degrees around X axis"/>
+                                            <TextBox Grid.Column="1"
+                                                     Text="{Binding PreciseRotateX, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                     PreviewTextInput="AngleTextBox_PreviewTextInput"
+                                                     PreviewKeyDown="NumericTextBox_PreviewKeyDown"/>
+                                            <TextBlock Grid.Column="2" Text="Y" FontSize="11" FontWeight="SemiBold"
+                                                       Foreground="#22C55E" VerticalAlignment="Center" Margin="7,0,5,0"
+                                                       ToolTip="Degrees around Y axis"/>
+                                            <TextBox Grid.Column="3"
+                                                     Text="{Binding PreciseRotateY, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                     PreviewTextInput="AngleTextBox_PreviewTextInput"
+                                                     PreviewKeyDown="NumericTextBox_PreviewKeyDown"/>
+                                            <TextBlock Grid.Column="4" Text="Z" FontSize="11" FontWeight="SemiBold"
+                                                       Foreground="#3B82F6" VerticalAlignment="Center" Margin="7,0,5,0"
+                                                       ToolTip="Degrees around Z axis"/>
+                                            <TextBox Grid.Column="5"
+                                                     Text="{Binding PreciseRotateZ, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                     PreviewTextInput="AngleTextBox_PreviewTextInput"
+                                                     PreviewKeyDown="NumericTextBox_PreviewKeyDown"/>
+                                        </Grid>
+                                        <Button Content="Apply Rotation"
+                                                HorizontalAlignment="Stretch"
+                                                Command="{Binding ApplyPreciseRotateCommand}"
+                                                ToolTip="Apply the typed rotation to the selected mesh (undoable)"
+                                                Margin="0,7,0,0"/>
+
+                                    </StackPanel>
+                                </Border>
+                            </Border>
+
                             <!-- Small Mesh Threshold -->
                             <TextBlock Text="SMALL MESH THRESHOLD"
                                        Style="{StaticResource SectionLabelStyle}"/>
@@ -551,7 +870,9 @@
                                        Style="{StaticResource SectionLabelStyle}"/>
                             <StackPanel Margin="0,0,0,16">
                                 <Button HorizontalAlignment="Stretch" Margin="0,0,0,6"
-                                        Command="{Binding ReplaceWithCylinderClickCommand}">
+                                        Command="{Binding ReplaceWithCylinderClickCommand}"
+                                        IsEnabled="{Binding HasSelectedMesh}"
+                                        ToolTip="Select a mesh first to replace it">
                                     <StackPanel Orientation="Horizontal">
                                         <TextBlock Text="&#x25D4;" FontSize="13" Margin="0,0,8,0"
                                                    Foreground="{DynamicResource HighlightBrush}"
@@ -560,7 +881,9 @@
                                     </StackPanel>
                                 </Button>
                                 <Button HorizontalAlignment="Stretch" Margin="0,0,0,6"
-                                        Command="{Binding ReplaceWithCubeClickCommand}">
+                                        Command="{Binding ReplaceWithCubeClickCommand}"
+                                        IsEnabled="{Binding HasSelectedMesh}"
+                                        ToolTip="Select a mesh first to replace it">
                                     <StackPanel Orientation="Horizontal">
                                         <TextBlock Text="&#x25A1;" FontSize="13" Margin="0,0,8,0"
                                                    Foreground="{DynamicResource HighlightBrush}"
@@ -569,7 +892,9 @@
                                     </StackPanel>
                                 </Button>
                                 <Button HorizontalAlignment="Stretch"
-                                        Command="{Binding ReplaceWithWedgeClickCommand}">
+                                        Command="{Binding ReplaceWithWedgeClickCommand}"
+                                        IsEnabled="{Binding HasSelectedMesh}"
+                                        ToolTip="Select a mesh first to replace it">
                                     <StackPanel Orientation="Horizontal">
                                         <TextBlock Text="&#x25B7;" FontSize="13" Margin="0,0,8,0"
                                                    Foreground="{DynamicResource HighlightBrush}"

@@ -1,4 +1,4 @@
-﻿using Assimp;
+using Assimp;
 using g4;
 using OpenTK.Graphics.OpenGL4;
 using OpenTK.Mathematics;
@@ -32,6 +32,10 @@ namespace UnBox3D.Rendering
         Vector3 GetRenderCenter();
         /// <summary>Returns the half-extents radius of the mesh in render space (largest dimension / 2).</summary>
         float GetRenderRadius();
+        Vector3 OriginalRenderCenter { get; }
+        void SnapToOrigin();
+        void SetTransform(Quaternion q);
+        void Scale(Vector3 scaleFactors);
         #endregion
 
         #region OpenGL Handles
@@ -55,6 +59,7 @@ namespace UnBox3D.Rendering
         private Quaternion _transform = Quaternion.Identity;
         private int _ebo;
         private int[] _indices;
+        private Vector3 _originalRenderCenter;
         #endregion
 
         #region Constructor
@@ -112,6 +117,9 @@ namespace UnBox3D.Rendering
             }
 
             SetupMesh();
+
+            // Capture the home position AFTER the vertex buffer is ready.
+            _originalRenderCenter = GetRenderCenter();
         }
         #endregion
 
@@ -186,6 +194,8 @@ namespace UnBox3D.Rendering
         public float[] Vertices => _vertices;
         public int GetVAO() => _vao;
         public int GetVBO() => _vertexBufferObject;
+
+        public Vector3 OriginalRenderCenter => _originalRenderCenter;
         #endregion
 
         #region Getters
@@ -233,6 +243,7 @@ namespace UnBox3D.Rendering
         public void SetName(string name) => _name = name;
         public void SetColor(Vector3 color) => _color = color;
         public void SetHighlighted(bool flag) => _highlighted = flag;
+        public void SetTransform(Quaternion q) { _transform = q; _transform.Normalize(); }
         #endregion
 
         #region Transformations
@@ -275,7 +286,52 @@ namespace UnBox3D.Rendering
             // 4. Re-upload updated buffer to the GPU.
             SetupMesh();
         }
+
+        public void SnapToOrigin()
+        {
+            _transform = Quaternion.Identity;
+            Vector3 renderDiff = _originalRenderCenter - GetRenderCenter();
+            // Render Y = world Z, render Z = world Y — swap when building the world-space delta.
+            Translate(new Vector3(renderDiff.X, renderDiff.Z, renderDiff.Y));
+        }
         #endregion
+
+        public void Scale(Vector3 scaleFactors)
+        {
+            Vector3 renderCenter = GetRenderCenter();
+            int stride = _assimpMesh.HasNormals ? 6 : 3;
+
+            for (int i = 0; i < _assimpMesh.VertexCount; i++)
+            {
+                int idx = i * stride;
+                _vertices[idx]     = renderCenter.X + (_vertices[idx]     - renderCenter.X) * scaleFactors.X;
+                _vertices[idx + 1] = renderCenter.Y + (_vertices[idx + 1] - renderCenter.Y) * scaleFactors.Y;
+                _vertices[idx + 2] = renderCenter.Z + (_vertices[idx + 2] - renderCenter.Z) * scaleFactors.Z;
+            }
+
+            // g4 world space: world X = render X, world Y = render Z, world Z = render Y
+            double cx = renderCenter.X, cy = renderCenter.Z, cz = renderCenter.Y;
+            for (int i = 0; i < _g4Mesh.VertexCount; i++)
+            {
+                var v = _g4Mesh.GetVertex(i);
+                _g4Mesh.SetVertex(i, new g4.Vector3d(
+                    cx + (v.x - cx) * scaleFactors.X,
+                    cy + (v.y - cy) * scaleFactors.Y,
+                    cz + (v.z - cz) * scaleFactors.Z));
+            }
+
+            float fcx = (float)cx, fcy = (float)cy, fcz = (float)cz;
+            for (int i = 0; i < _assimpMesh.VertexCount; i++)
+            {
+                var v = _assimpMesh.Vertices[i];
+                _assimpMesh.Vertices[i] = new Assimp.Vector3D(
+                    fcx + (v.X - fcx) * scaleFactors.X,
+                    fcy + (v.Y - fcy) * scaleFactors.Y,
+                    fcz + (v.Z - fcz) * scaleFactors.Z);
+            }
+
+            SetupMesh();
+        }
 
         #region MeshSimplification
 
