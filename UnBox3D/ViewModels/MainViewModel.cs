@@ -1131,7 +1131,7 @@ namespace UnBox3D.ViewModels
         private void ReplaceWithCylinderClick()
         {
             if (SelectedMesh != null)
-                ReplaceWithCylinderOption(SelectedMesh);
+                _ = ReplaceWithCylinderOption(SelectedMesh);
             else
                 ToastService.Show("Select a mesh first.", isError: false);
         }
@@ -1139,7 +1139,7 @@ namespace UnBox3D.ViewModels
         
 
         [RelayCommand]
-        private async void ReplaceWithCubeOption(IAppMesh mesh)
+        private async Task ReplaceWithCubeOption(IAppMesh mesh)
         {
             if (mesh == null) return;
 
@@ -1168,13 +1168,13 @@ namespace UnBox3D.ViewModels
         private void ReplaceWithCubeClick()
         {
             if (SelectedMesh != null)
-                ReplaceWithCubeOption(SelectedMesh);
+                _ = ReplaceWithCubeOption(SelectedMesh);
             else
                 ToastService.Show("Select a mesh first.", isError: false);
         }
 
         [RelayCommand]
-        private async void ReplaceWithWedgeOption(IAppMesh mesh)
+        private async Task ReplaceWithWedgeOption(IAppMesh mesh)
         {
             if (mesh == null) return;
 
@@ -1203,7 +1203,7 @@ namespace UnBox3D.ViewModels
         private void ReplaceWithWedgeClick()
         {
             if (SelectedMesh != null)
-                ReplaceWithWedgeOption(SelectedMesh);
+                _ = ReplaceWithWedgeOption(SelectedMesh);
             else
                 ToastService.Show("Select a mesh first.", isError: false);
         }
