@@ -10,7 +10,7 @@ using System.Drawing.Imaging;    // For ImageFormat
 // Margins don't work? It seems to crop out rather than provide that 2in buffer
 // Needs a proper buffer instead of translating/offsetting the view
 // OPTIMIZATION
-// Rotation and eliminating empty boxes are nice to implement but not urgent 
+// Rotation and eliminating empty boxes are nice to implement but not urgent
 */
 
 namespace UnBox3D.Utils
@@ -39,43 +39,38 @@ namespace UnBox3D.Utils
                 Debug.WriteLine($"Failed to delete {inputSvgPath}: {ex.Message}");
             }
 
-            float panelWidth = panelWidthMm * MmToPx;
-            float panelHeight = panelHeightMm * MmToPx;
-            float margin = marginMm * MmToPx;
+            // Blender's paper_model addon emits width/height/viewBox in millimetres.
+            // Stay in mm all the way through so the panel viewBox matches the source coordinate space.
+            float svgWidthMm = svgDocument.Width.Value;
+            float svgHeightMm = svgDocument.Height.Value;
 
-            float svgWidth = svgDocument.Width.Value * MmToPx;
-            float svgHeight = svgDocument.Height.Value * MmToPx;
-
-            int numPanelsX = (int)Math.Ceiling((svgWidth - 2 * margin) / panelWidth);
-            int numPanelsY = (int)Math.Ceiling((svgHeight - 2 * margin) / panelHeight);
+            int numPanelsX = (int)Math.Ceiling((svgWidthMm - 2 * marginMm) / panelWidthMm);
+            int numPanelsY = (int)Math.Ceiling((svgHeightMm - 2 * marginMm) / panelHeightMm);
 
             for (int x = 0; x < numPanelsX; x++)
             {
                 for (int y = 0; y < numPanelsY; y++)
                 {
-                    float xOffset = x * panelWidth + margin;
-                    float yOffset = y * panelHeight + margin;
+                    float xOffsetMm = x * panelWidthMm + marginMm;
+                    float yOffsetMm = y * panelHeightMm + marginMm;
 
                     SvgDocument panelDoc = new SvgDocument
                     {
-                        Width = new SvgUnit(panelWidth),
-                        Height = new SvgUnit(panelHeight)
+                        Width = new SvgUnit(SvgUnitType.Millimeter, panelWidthMm),
+                        Height = new SvgUnit(SvgUnitType.Millimeter, panelHeightMm),
+                        ViewBox = new SvgViewBox(xOffsetMm, yOffsetMm, panelWidthMm, panelHeightMm),
+                        Overflow = SvgOverflow.Hidden
                     };
 
                     foreach (SvgElement element in svgDocument.Children)
                     {
                         SvgElement clonedElement = (SvgElement)element.DeepCopy();
-                        clonedElement.Transforms = new SvgTransformCollection
-                        {
-                            new SvgScale(MmToPx),
-                            new SvgTranslate(-xOffset / MmToPx, -yOffset / MmToPx)
-                        };
                         panelDoc.Children.Add(clonedElement);
                     }
 
                     string outputFilePath = Path.Combine(outputDirectory, $"{filename}_panel_page{pageIndex}_{x}_{y}.svg");
                     panelDoc.Write(outputFilePath);
-                    Debug.WriteLine($"Exported panel to {outputFilePath} with x-offset: {xOffset}, y-offset: {yOffset}");
+                    Debug.WriteLine($"Exported panel to {outputFilePath} with x-offset: {xOffsetMm}mm, y-offset: {yOffsetMm}mm");
                 }
             }
         }

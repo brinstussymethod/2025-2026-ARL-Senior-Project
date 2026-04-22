@@ -53,6 +53,8 @@ namespace UnBox3D.ViewModels
         [ObservableProperty]
         private IAppMesh? selectedMesh;
 
+        // Page dimensions are in METERS — Blender's paper_model addon consumes
+        // output_size_x/y as meters, and SVGEditor receives the same value scaled to mm.
         [ObservableProperty]
         private float pageWidth = 25.0f;
 
@@ -383,6 +385,8 @@ namespace UnBox3D.ViewModels
 
                 CleanupUnfoldedFolder(outputDirectory);
 
+                // Blender-page dimensions in metres. Grows via the retry loop below when
+                // the unfolded net doesn't fit.
                 double incrementWidth = PageWidth;
                 double incrementHeight = PageHeight;
                 bool success = false;
@@ -409,7 +413,7 @@ namespace UnBox3D.ViewModels
                         {
                             incrementWidth++;
                             incrementHeight++;
-                            loadingWindow.UpdateStatus($"Retrying with new dimensions: {incrementWidth} x {incrementHeight}");
+                            loadingWindow.UpdateStatus($"Retrying with new dimensions: {incrementWidth:0.##}m x {incrementHeight:0.##}m");
                             await DispatcherHelper.DoEvents();
                         }
                         else
@@ -446,6 +450,8 @@ namespace UnBox3D.ViewModels
                     loadingWindow.UpdateProgress(50 + ((double)i / totalPanels * 30));
                     await DispatcherHelper.DoEvents();
 
+                    // SVGEditor works in millimetres (matches Blender's SVG output units):
+                    // PageWidth is metres, × 1000 = mm.
                     await Task.Run(() => SVGEditor.ExportSvgPanels(svgFile, outputDirectory, newFileName, i,
                         PageWidth * 1000f, PageHeight * 1000f));
                 }
