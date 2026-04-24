@@ -26,7 +26,7 @@ namespace UnBox3D.Utils
 
         public static void ExportSvgPanels(string inputSvgPath, string outputDirectory, string filename, int pageIndex, float panelWidthMm, float panelHeightMm, float marginMm = 0f)
         {
-            Debug.WriteLine($"panelWidthMM: {panelWidthMm} - panelHeightMM: {panelHeightMm}");
+            Debug.WriteLine($"panelWidthMM: {panelWidthMm} - panelHeightMM: {panelHeightMm} - marginMM: {marginMm}");
 
             Debug.WriteLine($"Processing Page: {pageIndex} - Filename: {inputSvgPath}");
             SvgDocument svgDocument = SvgDocument.Open(inputSvgPath);
@@ -57,8 +57,34 @@ namespace UnBox3D.Utils
                 netOriginYMm = 0f;
             }
 
-            int numPanelsX = (int)Math.Ceiling((netWidthMm - 2 * marginMm) / panelWidthMm);
-            int numPanelsY = (int)Math.Ceiling((netHeightMm - 2 * marginMm) / panelHeightMm);
+            // Whitespace semantics: marginMm is an empty (uncut) border on every side
+            // of the physical board. Content lives only in the inner usable rectangle
+            // (panelWidthMm - 2*marginMm) × (panelHeightMm - 2*marginMm), so the panel
+            // grid tiles the net by usable area, not by physical board size.
+            float usableWidthMm = panelWidthMm - 2 * marginMm;
+            float usableHeightMm = panelHeightMm - 2 * marginMm;
+
+            // Guard: margin too large leaves no room for content. Fall back to untiled
+            // instead of hitting a divide-by-zero or emitting infinite panels.
+            if (usableWidthMm <= 0f || usableHeightMm <= 0f)
+            {
+                string fallbackPath = Path.Combine(outputDirectory, $"{filename}_panel_page{pageIndex}_0_0.svg");
+                Debug.WriteLine($"Margin {marginMm}mm leaves no usable area on a {panelWidthMm}x{panelHeightMm}mm board. Falling back to untiled SVG at {fallbackPath}.");
+
+                try
+                {
+                    if (File.Exists(fallbackPath)) File.Delete(fallbackPath);
+                    File.Move(inputSvgPath, fallbackPath);
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Fallback copy failed: {ex.Message}");
+                }
+                return;
+            }
+
+            int numPanelsX = (int)Math.Ceiling(netWidthMm / usableWidthMm);
+            int numPanelsY = (int)Math.Ceiling(netHeightMm / usableHeightMm);
 
             // Soft cap — if the requested board size would explode into too many panels,
             // emit the source SVG untiled instead of silently writing thousands of files.
@@ -97,28 +123,52 @@ namespace UnBox3D.Utils
             {
                 for (int y = 0; y < numPanelsY; y++)
                 {
-                    // ViewBox is anchored at the content's origin so each panel shows a
-                    // real slice of the net rather than a slice of the empty page.
-                    float xOffsetMm = netOriginXMm + x * panelWidthMm + marginMm;
-                    float yOffsetMm = netOriginYMm + y * panelHeightMm + marginMm;
+                    // Artboard spans the physical board (panelWidthMm × panelHeightMm).
+                    // ViewBox is anchored so the usable region's top-left net coord
+                    // lands at artboard position (marginMm, marginMm), leaving an
+                    // empty marginMm band on every side.
+                    float usableOriginXMm = netOriginXMm + x * usableWidthMm;
+                    float usableOriginYMm = netOriginYMm + y * usableHeightMm;
+                    float viewBoxXMm = usableOriginXMm - marginMm;
+                    float viewBoxYMm = usableOriginYMm - marginMm;
 
                     SvgDocument panelDoc = new SvgDocument
                     {
                         Width = new SvgUnit(SvgUnitType.Millimeter, panelWidthMm),
                         Height = new SvgUnit(SvgUnitType.Millimeter, panelHeightMm),
-                        ViewBox = new SvgViewBox(xOffsetMm, yOffsetMm, panelWidthMm, panelHeightMm),
+                        ViewBox = new SvgViewBox(viewBoxXMm, viewBoxYMm, panelWidthMm, panelHeightMm),
                         Overflow = SvgOverflow.Hidden
                     };
 
+                    // ClipPath constrains rendered content to the inner usable rectangle.
+                    // Without this, features from neighbouring panels that fall inside
+                    // this panel's viewBox would render into the margin band and end up
+                    // as cuts on the physical board's edge area.
+                    string clipId = $"panelClip_{x}_{y}";
+                    var clipPath = new SvgClipPath { ID = clipId };
+                    clipPath.Children.Add(new SvgRectangle
+                    {
+                        X = new SvgUnit(SvgUnitType.User, usableOriginXMm),
+                        Y = new SvgUnit(SvgUnitType.User, usableOriginYMm),
+                        Width = new SvgUnit(SvgUnitType.User, usableWidthMm),
+                        Height = new SvgUnit(SvgUnitType.User, usableHeightMm)
+                    });
+                    var defs = new SvgDefinitionList();
+                    defs.Children.Add(clipPath);
+                    panelDoc.Children.Add(defs);
+
+                    var contentGroup = new SvgGroup();
+                    contentGroup.CustomAttributes["clip-path"] = $"url(#{clipId})";
                     foreach (SvgElement element in svgDocument.Children)
                     {
                         SvgElement clonedElement = (SvgElement)element.DeepCopy();
-                        panelDoc.Children.Add(clonedElement);
+                        contentGroup.Children.Add(clonedElement);
                     }
+                    panelDoc.Children.Add(contentGroup);
 
                     string outputFilePath = Path.Combine(outputDirectory, $"{filename}_panel_page{pageIndex}_{x}_{y}.svg");
                     panelDoc.Write(outputFilePath);
-                    Debug.WriteLine($"Exported panel to {outputFilePath} with x-offset: {xOffsetMm}mm, y-offset: {yOffsetMm}mm");
+                    Debug.WriteLine($"Exported panel to {outputFilePath}: viewBox=({viewBoxXMm:0.##}, {viewBoxYMm:0.##}, {panelWidthMm:0.##}, {panelHeightMm:0.##}) mm, usable=({usableOriginXMm:0.##}, {usableOriginYMm:0.##}, {usableWidthMm:0.##}, {usableHeightMm:0.##}) mm");
                 }
             }
         }

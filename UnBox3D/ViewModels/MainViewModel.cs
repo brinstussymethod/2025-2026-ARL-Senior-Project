@@ -63,6 +63,14 @@ namespace UnBox3D.ViewModels
         [ObservableProperty]
         private float pageHeight = 8.0f;
 
+        // Whitespace margin in metres on every side of each physical board.
+        // The inner (pageWidth - 2*margin) × (pageHeight - 2*margin) region is the
+        // usable cut area; the margin band around it is empty on the exported panel.
+        // Default 1 m for initial testing of the visible effect; realistic values
+        // are much smaller (centimetres).
+        [ObservableProperty]
+        private float panelMargin = 0.1f;
+
         [ObservableProperty]
         private float simplificationRatio = 50f; // represents percentage (10–100)
 
@@ -201,7 +209,7 @@ namespace UnBox3D.ViewModels
             }
 
             string destinationPath = _fileSystem.CombinePaths(importDirectory, Path.GetFileName(filePath));
-            
+
             try
             {
                 File.Copy(filePath, destinationPath, overwrite: true);
@@ -453,9 +461,9 @@ namespace UnBox3D.ViewModels
                     await DispatcherHelper.DoEvents();
 
                     // SVGEditor works in millimetres (matches Blender's SVG output units):
-                    // PageWidth is metres, × 1000 = mm.
+                    // PageWidth / PageHeight / PanelMargin are metres, × 1000 = mm.
                     await Task.Run(() => SVGEditor.ExportSvgPanels(svgFile, outputDirectory, newFileName, i,
-                        PageWidth * 1000f, PageHeight * 1000f));
+                        PageWidth * 1000f, PageHeight * 1000f, PanelMargin * 1000f));
                 }
 
                 loadingWindow.UpdateStatus("Exporting final files...");
@@ -1144,7 +1152,7 @@ namespace UnBox3D.ViewModels
                 ToastService.Show("Select a mesh first.", isError: false);
         }
 
-        
+
 
         [RelayCommand]
         private async Task ReplaceWithCubeOption(IAppMesh mesh)
