@@ -19,6 +19,11 @@ namespace UnBox3D.Utils
     {
         private const float MmToPx = 3.779527f;
 
+        // Safety cap — refuse to emit more than this many panels from a single export.
+        // Guards against tiny board sizes entered against a huge unfolded net
+        // (e.g. 50 mm boards against a 7 m net => ~20k files).
+        private const int MaxPanels = 64;
+
         public static void ExportSvgPanels(string inputSvgPath, string outputDirectory, string filename, int pageIndex, float panelWidthMm, float panelHeightMm, float marginMm = 0f)
         {
             Debug.WriteLine($"panelWidthMM: {panelWidthMm} - panelHeightMM: {panelHeightMm}");
@@ -26,6 +31,55 @@ namespace UnBox3D.Utils
             Debug.WriteLine($"Processing Page: {pageIndex} - Filename: {inputSvgPath}");
             SvgDocument svgDocument = SvgDocument.Open(inputSvgPath);
 
+            // Blender's paper_model addon emits width/height/viewBox in millimetres.
+            // Stay in mm all the way through so the panel viewBox matches the source coordinate space.
+            //
+            // We tile the drawn content's bounding box rather than the Blender page itself.
+            // The page grows via the retry loop in MainViewModel until the net fits, so it
+            // almost always contains empty whitespace around the net — tiling the page
+            // directly produced sliver panels over that whitespace.
+            var contentBounds = ComputeContentBounds(svgDocument);
+            float netWidthMm, netHeightMm, netOriginXMm, netOriginYMm;
+            if (contentBounds.Width > 0 && contentBounds.Height > 0)
+            {
+                netWidthMm = contentBounds.Width;
+                netHeightMm = contentBounds.Height;
+                netOriginXMm = contentBounds.X;
+                netOriginYMm = contentBounds.Y;
+                Debug.WriteLine($"Content bbox: origin=({netOriginXMm:0.##}, {netOriginYMm:0.##}), size=({netWidthMm:0.##} x {netHeightMm:0.##}) mm");
+            }
+            else
+            {
+                Debug.WriteLine("No drawable content found; falling back to page dimensions.");
+                netWidthMm = svgDocument.Width.Value;
+                netHeightMm = svgDocument.Height.Value;
+                netOriginXMm = 0f;
+                netOriginYMm = 0f;
+            }
+
+            int numPanelsX = (int)Math.Ceiling((netWidthMm - 2 * marginMm) / panelWidthMm);
+            int numPanelsY = (int)Math.Ceiling((netHeightMm - 2 * marginMm) / panelHeightMm);
+
+            // Soft cap — if the requested board size would explode into too many panels,
+            // emit the source SVG untiled instead of silently writing thousands of files.
+            if (numPanelsX * numPanelsY > MaxPanels)
+            {
+                string fallbackPath = Path.Combine(outputDirectory, $"{filename}_panel_page{pageIndex}_0_0.svg");
+                Debug.WriteLine($"Panel count {numPanelsX}x{numPanelsY}={numPanelsX * numPanelsY} exceeds cap of {MaxPanels}. Falling back to a single untiled SVG at {fallbackPath}.");
+
+                try
+                {
+                    if (File.Exists(fallbackPath)) File.Delete(fallbackPath);
+                    File.Move(inputSvgPath, fallbackPath);
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Fallback copy failed: {ex.Message}");
+                }
+                return;
+            }
+
+            // Commit to tiling — the source SVG is consumed by this export.
             try
             {
                 if (File.Exists(inputSvgPath))
@@ -39,20 +93,14 @@ namespace UnBox3D.Utils
                 Debug.WriteLine($"Failed to delete {inputSvgPath}: {ex.Message}");
             }
 
-            // Blender's paper_model addon emits width/height/viewBox in millimetres.
-            // Stay in mm all the way through so the panel viewBox matches the source coordinate space.
-            float svgWidthMm = svgDocument.Width.Value;
-            float svgHeightMm = svgDocument.Height.Value;
-
-            int numPanelsX = (int)Math.Ceiling((svgWidthMm - 2 * marginMm) / panelWidthMm);
-            int numPanelsY = (int)Math.Ceiling((svgHeightMm - 2 * marginMm) / panelHeightMm);
-
             for (int x = 0; x < numPanelsX; x++)
             {
                 for (int y = 0; y < numPanelsY; y++)
                 {
-                    float xOffsetMm = x * panelWidthMm + marginMm;
-                    float yOffsetMm = y * panelHeightMm + marginMm;
+                    // ViewBox is anchored at the content's origin so each panel shows a
+                    // real slice of the net rather than a slice of the empty page.
+                    float xOffsetMm = netOriginXMm + x * panelWidthMm + marginMm;
+                    float yOffsetMm = netOriginYMm + y * panelHeightMm + marginMm;
 
                     SvgDocument panelDoc = new SvgDocument
                     {
@@ -72,6 +120,36 @@ namespace UnBox3D.Utils
                     panelDoc.Write(outputFilePath);
                     Debug.WriteLine($"Exported panel to {outputFilePath} with x-offset: {xOffsetMm}mm, y-offset: {yOffsetMm}mm");
                 }
+            }
+        }
+
+        // Walk the SVG tree and union the bounding boxes of every drawable leaf
+        // (paths, text, shapes). Containers (groups, the svg root) and non-visual
+        // nodes (style, defs) are skipped because their own .Bounds would either
+        // double-count descendants or be meaningless.
+        private static System.Drawing.RectangleF ComputeContentBounds(SvgElement root)
+        {
+            System.Drawing.RectangleF acc = System.Drawing.RectangleF.Empty;
+            AccumulateBounds(root, ref acc);
+            return acc;
+        }
+
+        private static void AccumulateBounds(SvgElement element, ref System.Drawing.RectangleF acc)
+        {
+            if (element is SvgVisualElement visual
+                && !(element is SvgGroup)
+                && !(element is SvgFragment))
+            {
+                var b = visual.Bounds;
+                if (b.Width > 0 || b.Height > 0)
+                {
+                    acc = acc.IsEmpty ? b : System.Drawing.RectangleF.Union(acc, b);
+                }
+            }
+
+            foreach (var child in element.Children)
+            {
+                AccumulateBounds(child, ref acc);
             }
         }
 

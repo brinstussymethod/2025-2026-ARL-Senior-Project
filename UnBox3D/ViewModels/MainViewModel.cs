@@ -55,11 +55,13 @@ namespace UnBox3D.ViewModels
 
         // Page dimensions are in METERS — Blender's paper_model addon consumes
         // output_size_x/y as meters, and SVGEditor receives the same value scaled to mm.
+        // Defaults match the laser cutter's maximum board size (4 m × 8 m). Users can
+        // override in the UI for smaller stock.
         [ObservableProperty]
-        private float pageWidth = 25.0f;
+        private float pageWidth = 4.0f;
 
         [ObservableProperty]
-        private float pageHeight = 25.0f;
+        private float pageHeight = 8.0f;
 
         [ObservableProperty]
         private float simplificationRatio = 50f; // represents percentage (10–100)
