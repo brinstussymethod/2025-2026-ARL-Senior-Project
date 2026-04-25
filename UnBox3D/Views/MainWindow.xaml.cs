@@ -619,6 +619,34 @@ namespace UnBox3D.Views
             return true;
         }
 
+        private void NumericTextBox_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
+        {
+            if (sender is not TextBox textBox) return;
+
+            int cursorPosition = textBox.SelectionStart;
+            string originalText = textBox.Text;
+
+            if (string.IsNullOrEmpty(textBox.Text) || textBox.Text == ".")
+                return;
+
+            if (float.TryParse(textBox.Text, out float value) &&
+                textBox.DataContext is ViewModels.MainViewModel viewModel)
+            {
+                if (textBox.Name.Contains("Width"))
+                    viewModel.PageWidth = value;
+                else if (textBox.Name.Contains("Height"))
+                    viewModel.PageHeight = value;
+            }
+
+            if (textBox.Text != originalText)
+            {
+                int charsAdded = textBox.Text.Length - originalText.Length;
+                cursorPosition += charsAdded > 0 ? charsAdded : 0;
+            }
+
+            textBox.SelectionStart = cursorPosition;
+        }
+
         private void NumericTextBox_LostFocus(object sender, RoutedEventArgs e)
         {
             if (sender is not TextBox textBox) return;
