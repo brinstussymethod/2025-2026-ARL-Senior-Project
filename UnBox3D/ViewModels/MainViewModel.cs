@@ -11,6 +11,7 @@ using System.Windows;
 using UnBox3D.Commands;
 using UnBox3D.Controls;
 using UnBox3D.Controls.States;
+using UnBox3D.Rendering.Rulers;
 using UnBox3D.Models;
 using UnBox3D.Rendering;
 using UnBox3D.Rendering.OpenGL;
@@ -38,6 +39,9 @@ namespace UnBox3D.ViewModels
         private readonly ModelExporter _modelExporter;
         private readonly ICommandHistory _commandHistory;
         private readonly IRenderer _renderer;
+        private readonly IRulerManager       _rulerManager;
+        private readonly RulerRenderer       _rulerRenderer;
+        private readonly RulerOverlayManager _rulerOverlayManager;
         private string? _importedFilePath; // Global filepath that should be referenced when simplifying
         private List<IAppMesh>? _latestImportedModel; // This is so we can keep track of the original model when playing around with small mesh thresholds.
         private IAppMesh? _lastSelectedMesh; // Keep track of the previously selected mesh so we can remove its highlight
@@ -49,11 +53,23 @@ namespace UnBox3D.ViewModels
         [ObservableProperty]
         private IAppMesh? selectedMesh;
 
+        // Page dimensions are in METERS — Blender's paper_model addon consumes
+        // output_size_x/y as meters, and SVGEditor receives the same value scaled to mm.
+        // Defaults match the laser cutter's maximum board size (4 m × 8 m). Users can
+        // override in the UI for smaller stock.
         [ObservableProperty]
-        private float pageWidth = 25.0f;
+        private float pageWidth = 4.0f;
 
         [ObservableProperty]
-        private float pageHeight = 25.0f;
+        private float pageHeight = 8.0f;
+
+        // Whitespace margin in metres on every side of each physical board.
+        // The inner (pageWidth - 2*margin) × (pageHeight - 2*margin) region is the
+        // usable cut area; the margin band around it is empty on the exported panel.
+        // Default 1 m for initial testing of the visible effect; realistic values
+        // are much smaller (centimetres).
+        [ObservableProperty]
+        private float panelMargin = 0.1f;
 
         [ObservableProperty]
         private float simplificationRatio = 50f; // represents percentage (10–100)
@@ -116,7 +132,8 @@ namespace UnBox3D.ViewModels
             IFileSystem fileSystem, BlenderIntegration blenderIntegration,
             IBlenderInstaller blenderInstaller, ModelExporter modelExporter,
             MouseController mouseController, IGLControlHost glControlHost, ICamera camera, ICommandHistory commandHistory,
-            IRenderer renderer)
+            IRenderer renderer, IRulerManager rulerManager, RulerRenderer rulerRenderer,
+            RulerOverlayManager rulerOverlayManager)
         {
             _logger = logger;
             _settingsManager = settingsManager;
@@ -131,6 +148,9 @@ namespace UnBox3D.ViewModels
             _camera = camera;
             _commandHistory = commandHistory;
             _renderer = renderer;
+            _rulerManager        = rulerManager;
+            _rulerRenderer       = rulerRenderer;
+            _rulerOverlayManager = rulerOverlayManager;
             // setup selection highlight colors
             LoadColors();
         }
@@ -189,7 +209,7 @@ namespace UnBox3D.ViewModels
             }
 
             string destinationPath = _fileSystem.CombinePaths(importDirectory, Path.GetFileName(filePath));
-            
+
             try
             {
                 File.Copy(filePath, destinationPath, overwrite: true);
@@ -375,6 +395,8 @@ namespace UnBox3D.ViewModels
 
                 CleanupUnfoldedFolder(outputDirectory);
 
+                // Blender-page dimensions in metres. Grows via the retry loop below when
+                // the unfolded net doesn't fit.
                 double incrementWidth = PageWidth;
                 double incrementHeight = PageHeight;
                 bool success = false;
@@ -401,7 +423,7 @@ namespace UnBox3D.ViewModels
                         {
                             incrementWidth++;
                             incrementHeight++;
-                            loadingWindow.UpdateStatus($"Retrying with new dimensions: {incrementWidth} x {incrementHeight}");
+                            loadingWindow.UpdateStatus($"Retrying with new dimensions: {incrementWidth:0.##}m x {incrementHeight:0.##}m");
                             await DispatcherHelper.DoEvents();
                         }
                         else
@@ -438,8 +460,10 @@ namespace UnBox3D.ViewModels
                     loadingWindow.UpdateProgress(50 + ((double)i / totalPanels * 30));
                     await DispatcherHelper.DoEvents();
 
+                    // SVGEditor works in millimetres (matches Blender's SVG output units):
+                    // PageWidth / PageHeight / PanelMargin are metres, × 1000 = mm.
                     await Task.Run(() => SVGEditor.ExportSvgPanels(svgFile, outputDirectory, newFileName, i,
-                        PageWidth * 1000f, PageHeight * 1000f));
+                        PageWidth * 1000f, PageHeight * 1000f, PanelMargin * 1000f));
                 }
 
                 loadingWindow.UpdateStatus("Exporting final files...");
@@ -1128,7 +1152,7 @@ namespace UnBox3D.ViewModels
                 ToastService.Show("Select a mesh first.", isError: false);
         }
 
-        
+
 
         [RelayCommand]
         private async Task ReplaceWithCubeOption(IAppMesh mesh)
@@ -1510,7 +1534,7 @@ namespace UnBox3D.ViewModels
         public bool HasSelectedMesh => SelectedMesh != null;
 
         public bool IsTransformModeActive =>
-            _mouseController.GetState() is MoveState or RotateState or GimbalState;
+            _mouseController.GetState() is MoveState or RotateState or GimbalState or RulerState;
 
         /// <summary>
         /// Points the active gizmo at the currently selected mesh, or hides it when nothing is selected.
@@ -1677,6 +1701,7 @@ namespace UnBox3D.ViewModels
         private void SetSelectMode()
         {
             ActiveMode = "Select";
+            SetRulerActive(false);
             _renderer.SetActiveGizmoMesh(null);
             var state = new DefaultState(_sceneManager, _glControlHost, _camera, new RayCaster(_glControlHost, _camera),
                 _renderer, NotifyStateSelectionChanged);
@@ -1687,6 +1712,7 @@ namespace UnBox3D.ViewModels
         private void SetDeleteMode()
         {
             ActiveMode = "Delete";
+            SetRulerActive(false);
             _renderer.SetActiveGizmoMesh(null);
             var state = new DeleteState(_glControlHost, _sceneManager, _camera, new RayCaster(_glControlHost, _camera), _commandHistory);
             _mouseController.SetState(state);
@@ -1696,6 +1722,7 @@ namespace UnBox3D.ViewModels
         private void SetMoveMode()
         {
             ActiveMode = "Move";
+            SetRulerActive(false);
             var state = new MoveState(
                 _glControlHost, _sceneManager, _camera,
                 new RayCaster(_glControlHost, _camera), _commandHistory, _renderer,
@@ -1712,6 +1739,7 @@ namespace UnBox3D.ViewModels
         private void SetRotateMode()
         {
             ActiveMode = "Rotate";
+            SetRulerActive(false);
             var state = new RotateState(
                 _settingsManager, _sceneManager, _glControlHost, _camera,
                 new RayCaster(_glControlHost, _camera), _commandHistory, _renderer,
@@ -1728,6 +1756,7 @@ namespace UnBox3D.ViewModels
         private void SetGimbalMode()
         {
             ActiveMode = "Gimbal";
+            SetRulerActive(false);
             var state = new GimbalState(
                 _glControlHost, _sceneManager, _camera,
                 new RayCaster(_glControlHost, _camera), _commandHistory, _renderer,
@@ -1742,6 +1771,39 @@ namespace UnBox3D.ViewModels
             _mouseController.SetState(state);
         }
 
+        [RelayCommand]
+        private void SetRulerMode()
+        {
+            ActiveMode = "Ruler";
+            _renderer.SetActiveGizmoMesh(null);
+            _renderer.SetGizmoMode(GizmoMode.None);
+            var state = new RulerState(
+                _glControlHost, _camera, new RayCaster(_glControlHost, _camera),
+                _commandHistory, _rulerManager, _rulerRenderer, _rulerOverlayManager);
+            _mouseController.SetState(state);
+            SetRulerActive(true);
+        }
+
+        /// <summary>
+        /// Activates or deactivates the ruler overlay.
+        /// When inactive, GL geometry and WPF labels are faded to 25 % opacity and
+        /// label edit-mode is blocked.
+        /// </summary>
+        private void SetRulerActive(bool active)
+        {
+            _rulerRenderer.InRulerMode      = active;
+            _rulerOverlayManager.InRulerMode = active;
+            // Force an immediate GL repaint so the opacity change is visible right away.
+            _glControlHost.Invalidate();
+        }
+
+        public RulerOverlayManager RulerOverlayManager => _rulerOverlayManager;
+
+        public void RulerDeleteKey()
+        {
+            if (_mouseController.GetState() is RulerState rs)
+                rs.OnDeleteKey();
+        }
         private void NotifyStateSelectionChanged(IAppMesh? mesh)
         {
             // Invoked from WinForms mouse thread — marshal to UI thread.
