@@ -361,7 +361,7 @@ namespace UnBox3D.ViewModels
                 {
                     Title = "Save your unfolded file",
                     Filter = "SVG Files|*.svg|PDF Files|*.pdf",
-                    FileName = Path.GetFileNameWithoutExtension(this._importedFilePath)
+                    FileName = "MyUnfoldedFile"
                 };
 
                 if (saveFileDialog.ShowDialog() != DialogResult.OK)
