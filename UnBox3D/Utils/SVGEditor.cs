@@ -1,24 +1,14 @@
 ﻿using PdfSharpCore.Drawing;
 using PdfSharpCore.Pdf;
 using Svg;
-using Svg.Transforms;
 using System.Diagnostics;
 using System.IO;
 using System.Drawing.Imaging;    // For ImageFormat
-/* Values are in pixels
-// SOMEONE GET ON THIS
-// Margins don't work? It seems to crop out rather than provide that 2in buffer
-// Needs a proper buffer instead of translating/offsetting the view
-// OPTIMIZATION
-// Rotation and eliminating empty boxes are nice to implement but not urgent
-*/
 
 namespace UnBox3D.Utils
 {
     public class SVGEditor
     {
-        private const float MmToPx = 3.779527f;
-
         // Safety cap — refuse to emit more than this many panels from a single export.
         // Guards against tiny board sizes entered against a huge unfolded net
         // (e.g. 50 mm boards against a 7 m net => ~20k files).

@@ -846,10 +846,9 @@
                                                VerticalAlignment="Center" Margin="0,0,7,0"/>
                                     <TextBox Grid.Row="0" Grid.Column="1"
                                              Name="PageWidthTextBox"
-                                             Text="{Binding PageWidth, UpdateSourceTrigger=PropertyChanged}"
+                                             Text="{Binding PageWidth, UpdateSourceTrigger=LostFocus}"
                                              PreviewTextInput="NumericTextBox_PreviewTextInput"
                                              PreviewKeyDown="NumericTextBox_PreviewKeyDown"
-                                             TextChanged="NumericTextBox_TextChanged"
                                              LostFocus="NumericTextBox_LostFocus"/>
                                     <TextBlock Grid.Row="0" Grid.Column="2" Text="H (m)"
                                                FontSize="12" FontWeight="SemiBold"
@@ -857,10 +856,9 @@
                                                VerticalAlignment="Center" Margin="10,0,7,0"/>
                                     <TextBox Grid.Row="0" Grid.Column="3"
                                              Name="PageHeightTextBox"
-                                             Text="{Binding PageHeight, UpdateSourceTrigger=PropertyChanged}"
+                                             Text="{Binding PageHeight, UpdateSourceTrigger=LostFocus}"
                                              PreviewTextInput="NumericTextBox_PreviewTextInput"
                                              PreviewKeyDown="NumericTextBox_PreviewKeyDown"
-                                             TextChanged="NumericTextBox_TextChanged"
                                              LostFocus="NumericTextBox_LostFocus"/>
                                     <TextBlock Grid.Row="1" Grid.Column="0" Text="M (m)"
                                                FontSize="12" FontWeight="SemiBold"
@@ -869,10 +867,9 @@
                                                ToolTip="Whitespace margin on every side of each board (metres). The inner (W - 2·M) × (H - 2·M) region is the usable cut area."/>
                                     <TextBox Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="3"
                                              Name="PanelMarginTextBox"
-                                             Text="{Binding PanelMargin, UpdateSourceTrigger=PropertyChanged}"
+                                             Text="{Binding PanelMargin, UpdateSourceTrigger=LostFocus}"
                                              PreviewTextInput="NumericTextBox_PreviewTextInput"
                                              PreviewKeyDown="NumericTextBox_PreviewKeyDown"
-                                             TextChanged="NumericTextBox_TextChanged"
                                              LostFocus="NumericTextBox_LostFocus"
                                              Margin="0,8,0,0"/>
                                 </Grid>
