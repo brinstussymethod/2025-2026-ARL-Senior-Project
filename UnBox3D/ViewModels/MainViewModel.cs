@@ -53,11 +53,23 @@ namespace UnBox3D.ViewModels
         [ObservableProperty]
         private IAppMesh? selectedMesh;
 
+        // Page dimensions are in METERS — Blender's paper_model addon consumes
+        // output_size_x/y as meters, and SVGEditor receives the same value scaled to mm.
+        // Defaults match the laser cutter's maximum board size (4 m × 8 m). Users can
+        // override in the UI for smaller stock.
         [ObservableProperty]
-        private float pageWidth = 25.0f;
+        private float pageWidth = 4.0f;
 
         [ObservableProperty]
-        private float pageHeight = 25.0f;
+        private float pageHeight = 8.0f;
+
+        // Whitespace margin in metres on every side of each physical board.
+        // The inner (pageWidth - 2*margin) × (pageHeight - 2*margin) region is the
+        // usable cut area; the margin band around it is empty on the exported panel.
+        // Default 1 m for initial testing of the visible effect; realistic values
+        // are much smaller (centimetres).
+        [ObservableProperty]
+        private float panelMargin = 0.1f;
 
         [ObservableProperty]
         private float simplificationRatio = 50f; // represents percentage (10–100)
@@ -197,7 +209,7 @@ namespace UnBox3D.ViewModels
             }
 
             string destinationPath = _fileSystem.CombinePaths(importDirectory, Path.GetFileName(filePath));
-            
+
             try
             {
                 File.Copy(filePath, destinationPath, overwrite: true);
@@ -383,6 +395,8 @@ namespace UnBox3D.ViewModels
 
                 CleanupUnfoldedFolder(outputDirectory);
 
+                // Blender-page dimensions in metres. Grows via the retry loop below when
+                // the unfolded net doesn't fit.
                 double incrementWidth = PageWidth;
                 double incrementHeight = PageHeight;
                 bool success = false;
@@ -409,7 +423,7 @@ namespace UnBox3D.ViewModels
                         {
                             incrementWidth++;
                             incrementHeight++;
-                            loadingWindow.UpdateStatus($"Retrying with new dimensions: {incrementWidth} x {incrementHeight}");
+                            loadingWindow.UpdateStatus($"Retrying with new dimensions: {incrementWidth:0.##}m x {incrementHeight:0.##}m");
                             await DispatcherHelper.DoEvents();
                         }
                         else
@@ -446,8 +460,10 @@ namespace UnBox3D.ViewModels
                     loadingWindow.UpdateProgress(50 + ((double)i / totalPanels * 30));
                     await DispatcherHelper.DoEvents();
 
+                    // SVGEditor works in millimetres (matches Blender's SVG output units):
+                    // PageWidth / PageHeight / PanelMargin are metres, × 1000 = mm.
                     await Task.Run(() => SVGEditor.ExportSvgPanels(svgFile, outputDirectory, newFileName, i,
-                        PageWidth * 1000f, PageHeight * 1000f));
+                        PageWidth * 1000f, PageHeight * 1000f, PanelMargin * 1000f));
                 }
 
                 loadingWindow.UpdateStatus("Exporting final files...");
@@ -1136,7 +1152,7 @@ namespace UnBox3D.ViewModels
                 ToastService.Show("Select a mesh first.", isError: false);
         }
 
-        
+
 
         [RelayCommand]
         private async Task ReplaceWithCubeOption(IAppMesh mesh)
