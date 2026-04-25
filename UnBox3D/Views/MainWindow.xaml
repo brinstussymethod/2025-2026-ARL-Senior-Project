@@ -830,48 +830,34 @@
                                        Style="{StaticResource SectionLabelStyle}"/>
                             <Border Style="{StaticResource CardBorderStyle}">
                                 <Grid>
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                    </Grid.RowDefinitions>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto"/>
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="Auto"/>
                                         <ColumnDefinition Width="*"/>
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock Grid.Row="0" Grid.Column="0" Text="W (m)"
+                                    <TextBlock Grid.Column="0" Text="W"
                                                FontSize="12" FontWeight="SemiBold"
                                                Foreground="{DynamicResource AccentBrush}"
                                                VerticalAlignment="Center" Margin="0,0,7,0"/>
-                                    <TextBox Grid.Row="0" Grid.Column="1"
+                                    <TextBox Grid.Column="1"
                                              Name="PageWidthTextBox"
-                                             Text="{Binding PageWidth, UpdateSourceTrigger=LostFocus}"
+                                             Text="{Binding PageWidth, UpdateSourceTrigger=PropertyChanged}"
                                              PreviewTextInput="NumericTextBox_PreviewTextInput"
                                              PreviewKeyDown="NumericTextBox_PreviewKeyDown"
+                                             TextChanged="NumericTextBox_TextChanged"
                                              LostFocus="NumericTextBox_LostFocus"/>
-                                    <TextBlock Grid.Row="0" Grid.Column="2" Text="H (m)"
+                                    <TextBlock Grid.Column="2" Text="H"
                                                FontSize="12" FontWeight="SemiBold"
                                                Foreground="{DynamicResource AccentBrush}"
                                                VerticalAlignment="Center" Margin="10,0,7,0"/>
-                                    <TextBox Grid.Row="0" Grid.Column="3"
+                                    <TextBox Grid.Column="3"
                                              Name="PageHeightTextBox"
-                                             Text="{Binding PageHeight, UpdateSourceTrigger=LostFocus}"
+                                             Text="{Binding PageHeight, UpdateSourceTrigger=PropertyChanged}"
                                              PreviewTextInput="NumericTextBox_PreviewTextInput"
                                              PreviewKeyDown="NumericTextBox_PreviewKeyDown"
+                                             TextChanged="NumericTextBox_TextChanged"
                                              LostFocus="NumericTextBox_LostFocus"/>
-                                    <TextBlock Grid.Row="1" Grid.Column="0" Text="M (m)"
-                                               FontSize="12" FontWeight="SemiBold"
-                                               Foreground="{DynamicResource AccentBrush}"
-                                               VerticalAlignment="Center" Margin="0,8,7,0"
-                                               ToolTip="Whitespace margin on every side of each board (metres). The inner (W - 2·M) × (H - 2·M) region is the usable cut area."/>
-                                    <TextBox Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="3"
-                                             Name="PanelMarginTextBox"
-                                             Text="{Binding PanelMargin, UpdateSourceTrigger=LostFocus}"
-                                             PreviewTextInput="NumericTextBox_PreviewTextInput"
-                                             PreviewKeyDown="NumericTextBox_PreviewKeyDown"
-                                             LostFocus="NumericTextBox_LostFocus"
-                                             Margin="0,8,0,0"/>
                                 </Grid>
                             </Border>
                             <Button Content="Export Unfolded (SVG/PDF)…"
