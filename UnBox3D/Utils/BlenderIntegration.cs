@@ -97,7 +97,7 @@ namespace UnBox3D.Utils
                 {
                     errorMessage = runtimeErrorMessage ?? "An unknown error occurred during processing.";
                     _logger.Error($"Blender script failed. Exit code: {process.ExitCode}, Error: {errorMessage}");
-                    ForceTerminateBlender();
+                    //ForceTerminateBlender();
                     return false;
                 }
             }
